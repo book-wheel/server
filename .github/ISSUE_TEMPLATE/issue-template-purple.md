@@ -3,7 +3,7 @@ name: issue template-PurPle
 about: 퍼플-책바퀴 이슈 템플릿
 title: ''
 labels: ''
-assignees: ''
+assignees: 2unhy2, soheesgit, hyeyeon25
 
 ---
 
