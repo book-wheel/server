@@ -1,12 +1,9 @@
-package com.bookwheel.user.controller;
+package com.bookwheel.server.user.controller;
 
-import com.bookwheel.common.response.ApiResponse;
-import com.bookwheel.user.dto.EmailVerificationCodeRequest;
-import com.bookwheel.user.dto.EmailVerificationRequest;
-import com.bookwheel.user.dto.UserLoginRequest;
-import com.bookwheel.user.dto.*;
-import com.bookwheel.user.service.EmailService;
-import com.bookwheel.user.service.UserService;
+import com.bookwheel.server.common.response.ApiResponse;
+import com.bookwheel.server.user.dto.*;
+import com.bookwheel.server.user.service.EmailService;
+import com.bookwheel.server.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

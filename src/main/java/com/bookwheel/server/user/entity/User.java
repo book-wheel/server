@@ -1,4 +1,4 @@
-package com.bookwheel.user.entity;
+package com.bookwheel.server.user.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

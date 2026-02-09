@@ -1,7 +1,7 @@
-package com.bookwheel.user.dto;
+package com.bookwheel.server.user.dto;
 
-import com.bookwheel.user.entity.SocialType;
-import com.bookwheel.user.entity.User;
+import com.bookwheel.server.user.entity.SocialType;
+import com.bookwheel.server.user.entity.User;
 
 public record UserResponse(
     String id,

@@ -1,12 +1,12 @@
-package com.bookwheel.user.service;
+package com.bookwheel.server.user.service;
 
-import com.bookwheel.common.exception.BusinessException;
-import com.bookwheel.common.exception.ErrorCode;
-import com.bookwheel.user.dto.UserLoginRequest;
-import com.bookwheel.user.dto.UserResponse;
-import com.bookwheel.user.dto.UserSignupRequest;
-import com.bookwheel.user.entity.User;
-import com.bookwheel.user.repository.UserRepository;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.user.dto.UserLoginRequest;
+import com.bookwheel.server.user.dto.UserResponse;
+import com.bookwheel.server.user.dto.UserSignupRequest;
+import com.bookwheel.server.user.entity.User;
+import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,7 +29,7 @@ public class UserService {
         User user = User.builder()
             .userId(request.userId())
             .password(passwordEncoder.encode(request.password()))
-            .nickname(request.nickname())
+                .nickname(request.nickname())
             .mail(request.mail())
             .comment(request.comment())
             .build();

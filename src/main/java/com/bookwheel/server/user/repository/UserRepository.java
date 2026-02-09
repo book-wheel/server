@@ -1,6 +1,6 @@
-package com.bookwheel.user.repository;
+package com.bookwheel.server.user.repository;
 
-import com.bookwheel.user.entity.User;
+import com.bookwheel.server.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;

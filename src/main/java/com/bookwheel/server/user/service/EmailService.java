@@ -1,7 +1,7 @@
-package com.bookwheel.user.service;
+package com.bookwheel.server.user.service;
 
-import com.bookwheel.common.exception.BusinessException;
-import com.bookwheel.common.exception.ErrorCode;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
