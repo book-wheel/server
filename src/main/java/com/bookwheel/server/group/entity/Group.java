@@ -4,6 +4,7 @@ import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.enums.State;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Formula;
 
 import java.time.LocalDate;
 
@@ -58,5 +59,9 @@ public class Group {
     @Column(name = "group_state")
     @Enumerated(EnumType.STRING)
     private State groupState;
+
+    // DB 컬럼이 아닌, 쿼리 실행 시 서브쿼리로 계산되는 가상 필드
+    @Formula("(SELECT count(1) FROM member m WHERE m.group_id = group_id AND m.member_status = 'ACTIVE')")
+    private int currentMembers;
 
 }

@@ -4,15 +4,17 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
 import com.bookwheel.server.group.entity.Group;
-import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.group.repository.*;
 import org.springframework.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly=true)
+@Transactional(readOnly = true)
 public class GroupService {
     private final GroupRepository groupRepository;
 
@@ -33,11 +35,19 @@ public class GroupService {
             throw new BusinessException(ErrorCode.GROUP_PASSWORD_REQUIRED);
         }
         // 오프라인 모임이면서, 지역 선택이 없다면 오류
-        if (request.groupOffline() && !StringUtils.hasText(String.valueOf(request.groupRegion()))) {
+        if (request.groupOffline() && request.groupRegion() == null) {
             throw new BusinessException(ErrorCode.GROUP_REGION_REQUIRED);
         }
 
         Group saveGroup = groupRepository.save(group);
         return GroupCreateResponse.of(saveGroup.getGroupId());
+    }
+
+    public Page<GroupSearchResponse> getGroups(GroupSearchCondition condition, Pageable pageable) {
+        // 1. Specification을 이용해 동적 쿼리 생성 및 조회
+        Page<Group> groupPage = groupRepository.findAll(GroupSpecification.searchWith(condition), pageable);
+
+        // 2. Entity -> DTO 변환 (Page의 map 메서드 활용)
+        return groupPage.map(GroupSearchResponse::from);
     }
 }
