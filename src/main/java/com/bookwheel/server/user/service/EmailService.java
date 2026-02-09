@@ -17,9 +17,11 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class EmailService {
 
-    private static final String VERIFICATION_CODE_PREFIX = "email_verification:";
+    private static final String VERIFICATION_CODE_PREFIX = "email_code:";
+    private static final String VERIFIED_STATUS_PREFIX = "email_verified:"; // 인증 완료 상태 저장용
     private static final int CODE_LENGTH = 6;
     private static final int EXPIRATION_MINUTES = 5;
+    private static final int VERIFIED_EXPIRATION_MINUTES = 30; // 인증 완료 상태 유지 시간 - 30분
 
     private final JavaMailSender mailSender;
     private final StringRedisTemplate redisTemplate;
@@ -27,11 +29,9 @@ public class EmailService {
 
     public void sendVerificationCode(String email) {
         String code = generateVerificationCode();
-
         try {
-            sendEmail(email, "BookWheel 이메일 인증",
-                     String.format("인증번호: %s\n5분 내에 입력해주세요.", code));
-
+            sendEmail(email, "[책바퀴] 이메일 인증번호 안내",
+                    String.format("인증번호: %s\n5분 내에 입력해주세요.", code));
             saveVerificationCode(email, code);
             log.info("인증번호 발송 완료: {}", email);
         } catch (Exception e) {
@@ -46,13 +46,25 @@ public class EmailService {
         if (storedCode == null) {
             throw new BusinessException(ErrorCode.EXPIRED_VERIFICATION_CODE);
         }
-
         if (!storedCode.equals(code)) {
             throw new BusinessException(ErrorCode.INVALID_VERIFICATION_CODE);
         }
 
+        // 인증 성공 로직
         deleteVerificationCode(email);
+        saveVerifiedStatus(email);     // "이 이메일은 인증됨" 상태 저장
         log.info("이메일 인증 완료: {}", email);
+    }
+
+    // UserService에서 호출할 메서드
+    public boolean isVerified(String email) {
+        String key = VERIFIED_STATUS_PREFIX + email;
+        return Boolean.TRUE.toString().equals(redisTemplate.opsForValue().get(key));
+    }
+
+    private void saveVerifiedStatus(String email) {
+        String key = VERIFIED_STATUS_PREFIX + email;
+        redisTemplate.opsForValue().set(key, "true", VERIFIED_EXPIRATION_MINUTES, TimeUnit.MINUTES);
     }
 
     private String generateVerificationCode() {
@@ -86,4 +98,3 @@ public class EmailService {
         redisTemplate.delete(key);
     }
 }
-

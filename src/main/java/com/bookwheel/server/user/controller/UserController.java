@@ -1,43 +1,28 @@
 package com.bookwheel.server.user.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
-import com.bookwheel.server.user.dto.*;
-import com.bookwheel.server.user.service.EmailService;
+import com.bookwheel.server.user.dto.UserResponse;
+import com.bookwheel.server.user.dto.UserSignupRequest;
 import com.bookwheel.server.user.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Users", description = "회원 정보 관리 API")
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
-    private final EmailService emailService;
 
-    @PostMapping("/email/send")
-    public ApiResponse<?> sendEmailVerification(@Valid @RequestBody EmailVerificationRequest request) {
-        emailService.sendVerificationCode(request.email());
-        return ApiResponse.success("인증번호가 발송되었습니다.");
-    }
-
-    @PostMapping("/email/verify")
-    public ApiResponse<?> verifyEmailCode(@Valid @RequestBody EmailVerificationCodeRequest request) {
-        emailService.verifyCode(request.email(), request.code());
-        return ApiResponse.success("이메일 인증이 완료되었습니다.");
-    }
-
+    @Operation(summary = "회원가입", description = "이메일 인증을 완료한 후, 회원 정보를 입력해 가입합니다.")
     @PostMapping("/signup")
+    @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<UserResponse> signup(@Valid @RequestBody UserSignupRequest request) {
-        UserResponse response = userService.signup(request);
-        return ApiResponse.success(response);
-    }
-
-    @PostMapping("/login")
-    public ApiResponse<UserResponse> login(@Valid @RequestBody UserLoginRequest request) {
-        UserResponse response = userService.login(request);
-        return ApiResponse.success(response);
+        return ApiResponse.success(userService.signup(request));
     }
 }
-

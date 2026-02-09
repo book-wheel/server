@@ -28,8 +28,8 @@ public class SwaggerConfig {
     }
     private Info apiInfo() {
         return new Info()
-                .title("책바퀴 (Book-Wheel)") // API의 제목
-                .description("책바퀴 API") // API에 대한 설명
-                .version("1.0.0"); // API의 버전
+                .title("Book-Wheel")
+                .description("책바퀴 API")
+                .version("1.0.0");
     }
 }
