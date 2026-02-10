@@ -49,7 +49,6 @@ public class UserService {
         return UserResponse.from(savedUser);
     }
 
-    // 반환 타입 변경: UserResponse -> LoginResponse
     public LoginResponse login(UserLoginRequest request) {
         User user = findByUserIdAndValidateActive(request.userId());
 
