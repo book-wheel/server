@@ -24,6 +24,12 @@ public enum ErrorCode {
     EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "AUTH_009", "이메일 인증이 완료되지 않았습니다."),
     INACTIVE_USER(HttpStatus.BAD_REQUEST, "AUTH_010", "탈퇴한 사용자입니다."),
 
+
+    // 그룹 관련 에러
+    DUPLICATE_GROUP_NAME(HttpStatus.BAD_REQUEST, "GROUP_001", "이미 존재하는 그룹 이름입니다."),
+    GROUP_PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_002", "비공개 그룹은 비밀번호가 필수입니다."),
+    GROUP_REGION_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_003", "오프라인 그룹은 지역 입력이 필수입니다."),
+
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다.");

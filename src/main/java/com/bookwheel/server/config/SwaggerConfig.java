@@ -28,7 +28,7 @@ public class SwaggerConfig {
     }
     private Info apiInfo() {
         return new Info()
-                .title("Book-Wheel")
+                .title("책바퀴 (Book-Wheel")
                 .description("책바퀴 API")
                 .version("1.0.0");
     }
