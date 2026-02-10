@@ -50,4 +50,11 @@ public class GroupService {
         // 2. Entity -> DTO 변환 (Page의 map 메서드 활용)
         return groupPage.map(GroupSearchResponse::from);
     }
+
+    public GroupDetailResponse getGroup(String groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        return GroupDetailResponse.from(group);
+    }
 }

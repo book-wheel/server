@@ -29,6 +29,7 @@ public enum ErrorCode {
     DUPLICATE_GROUP_NAME(HttpStatus.BAD_REQUEST, "GROUP_001", "이미 존재하는 그룹 이름입니다."),
     GROUP_PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_002", "비공개 그룹은 비밀번호가 필수입니다."),
     GROUP_REGION_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_003", "오프라인 그룹은 지역 입력이 필수입니다."),
+    GROUP_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_004", "존재하지 않는 그룹입니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),

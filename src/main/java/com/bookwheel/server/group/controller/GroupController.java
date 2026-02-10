@@ -34,5 +34,11 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/{groupId}")
+    public ResponseEntity<ApiResponse<GroupDetailResponse>> getGroup(@PathVariable String groupId) {
+        GroupDetailResponse response = groupService.getGroup(groupId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
 
 }
