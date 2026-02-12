@@ -2,8 +2,8 @@ package com.bookwheel.server.user.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.common.jwt.JwtTokenProvider; // 추가됨
-import com.bookwheel.server.user.dto.LoginResponse;      // 추가됨
+import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.user.dto.LoginResponse;
 import com.bookwheel.server.user.dto.UserLoginRequest;
 import com.bookwheel.server.user.dto.UserResponse;
 import com.bookwheel.server.user.dto.UserSignupRequest;
@@ -61,7 +61,7 @@ public class UserService {
 
         log.info("로그인 성공: userId={}", user.getUserId());
 
-        // 토큰과 함께 응답 반환
+        // 토큰, 응답 반환
         return LoginResponse.of(user, accessToken);
     }
 
@@ -75,6 +75,12 @@ public class UserService {
         if (userRepository.existsByNickname(request.nickname())) {
             throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
         }
+    }
+
+    // 내 정보 조회
+    public UserResponse getMyInfo(String userId) {
+        User user = findByUserIdAndValidateActive(userId);
+        return UserResponse.from(user);
     }
 
     private User findByUserIdAndValidateActive(String userId) {
