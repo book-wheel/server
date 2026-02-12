@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import com.bookwheel.server.user.dto.TokenReissueRequest;
+import com.bookwheel.server.user.dto.TokenResponse;
 
 @Tag(name = "Users", description = "회원 정보 관리 API")
 @RestController
@@ -37,5 +39,11 @@ public class UserController {
         String userId = userDetails.getUsername();
         UserResponse response = userService.getMyInfo(userId);
         return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "토큰 재발급", description = "Refresh Token을 이용해 새로운 Access Token을 발급받습니다.")
+    @PostMapping("/reissue")
+    public ApiResponse<TokenResponse> reissue(@RequestBody @Valid TokenReissueRequest request) {
+        return ApiResponse.success(userService.reissue(request));
     }
 }

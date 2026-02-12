@@ -24,22 +24,32 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private final Key key;
-    private static final long ACCESS_TOKEN_EXPIRE_TIME = 1000 * 60 * 30;
-
+    private static final long REFRESH_TOKEN_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 14; // 2주
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey) {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // 로그인 시 토큰 생성
-
-    public String createAccessToken(String userId) {
+    public String createRefreshToken(String userId) {
         long now = (new Date()).getTime();
-        Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRE_TIME);
+        Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
                 .setSubject(userId)
-                .claim("auth", "ROLE_USER")   // 권한 정보 (기본값 ROLE_USER로 고정)
+                .claim("auth", "ROLE_USER")
+                .setExpiration(refreshTokenExpiresIn)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // 로그인 시 토큰 생성
+    public String createAccessToken(String userId) {
+        long now = (new Date()).getTime();
+        Date accessTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
+
+        return Jwts.builder()
+                .setSubject(userId)
+                .claim("auth", "ROLE_USER")   // [수정 필요] 권한 정보 (기본값 ROLE_USER로 고정)
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
