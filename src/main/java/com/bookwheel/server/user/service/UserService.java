@@ -6,6 +6,7 @@ import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.user.dto.*;
+import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,6 @@ public class UserService {
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
-        // 이메일 인증 여부 확인
         if (!emailService.isVerified(request.mail())) {
             throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
@@ -41,6 +41,7 @@ public class UserService {
                 .nickname(request.nickname())
                 .mail(request.mail())
                 .comment(request.comment())
+                .role(Role.USER)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -57,11 +58,8 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
         }
 
-        // Access Token 발급
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
-
-        // Refresh Token 발급
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getRole());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId(), user.getRole());
 
         // Redis에 Refresh Token 저장 (ID: Key, 토큰: Value)
         refreshTokenRepository.save(new RefreshToken(user.getUserId(), refreshToken));
@@ -87,35 +85,31 @@ public class UserService {
     public TokenResponse reissue(TokenReissueRequest request) {
         String refreshToken = request.refreshToken();
 
-        // 1. 토큰 유효성 검사 (위조된 건지 확인)
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN); // 혹은 401 에러
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        // 2. 토큰에서 유저 ID 뽑아내기
         String userId = jwtTokenProvider.getAuthentication(refreshToken).getName();
 
-        // 3. Redis 금고에서 저장된 토큰 가져오기
+        // Redis에서 저장된 토큰 가져오기
         RefreshToken storedToken = refreshTokenRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_NOT_FOUND)); // "로그아웃 되셨는데요?"
+                .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_NOT_FOUND));
 
-        // 4. 내가 받은 토큰이랑 금고에 있는 거랑 똑같은지 비교
+        // 받은 토큰과 현재 거 동일한지 비교
         if (!storedToken.getRefreshToken().equals(refreshToken)) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN); // "누가 토큰 훔쳐서 쓰는 중?"
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        // 5. 다 통과했으니 새 Access Token 발급!
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId);
+        User user = findByUserIdAndValidateActive(userId);
 
-        // (선택) Refresh Token도 새로 발급해서 보안 강화 (Rotate)
-        // String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
-        // refreshTokenRepository.save(new RefreshToken(userId, newRefreshToken));
+        // 새 Access Token 발급
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId, user.getRole());
 
         log.info("토큰 재발급 성공: userId={}", userId);
 
         return TokenResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(refreshToken) // 일단 기존 Refresh Token 그대로 반환 (Rotate 안 할 경우)
+                .refreshToken(refreshToken)
                 .build();
     }
 

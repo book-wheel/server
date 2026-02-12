@@ -19,6 +19,7 @@ public record UserResponse(
     public static UserResponse from(User user) {
         return UserResponse.builder()
                 .role(user.getRole())
+                .id(user.getId())
                 .userId(user.getUserId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())

@@ -1,5 +1,6 @@
 package com.bookwheel.server.common.jwt;
 
+import com.bookwheel.server.user.entity.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -24,33 +25,36 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private final Key key;
+    private static final long ACCESS_TOKEN_EXPIRE_TIME = 1000 * 60 * 30;            // 30분
     private static final long REFRESH_TOKEN_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 14; // 2주
+
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey) {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String createRefreshToken(String userId) {
+    // ✨ 1. Access Token 생성 (Role을 받도록 수정!)
+    public String createAccessToken(String userId, Role role) {
+        long now = (new Date()).getTime();
+        Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRE_TIME);
+
+        return Jwts.builder()
+                .setSubject(userId)
+                .claim("auth", role.getKey()) //
+                .setExpiration(accessTokenExpiresIn)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // ✨ 2. Refresh Token 생성 (Role을 받도록 수정!)
+    public String createRefreshToken(String userId, Role role) {
         long now = (new Date()).getTime();
         Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
                 .setSubject(userId)
-                .claim("auth", "ROLE_USER")
+                .claim("auth", role.getKey())
                 .setExpiration(refreshTokenExpiresIn)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    // 로그인 시 토큰 생성
-    public String createAccessToken(String userId) {
-        long now = (new Date()).getTime();
-        Date accessTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
-
-        return Jwts.builder()
-                .setSubject(userId)
-                .claim("auth", "ROLE_USER")   // [수정 필요] 권한 정보 (기본값 ROLE_USER로 고정)
-                .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -91,7 +95,6 @@ public class JwtTokenProvider {
         return false;
     }
 
-    // 토큰 복호화 메서드 (내부용)
     private Claims parseClaims(String accessToken) {
         try {
             return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(accessToken).getBody();
