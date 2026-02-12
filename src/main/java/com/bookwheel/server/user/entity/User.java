@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import com.bookwheel.server.user.entity.Role;
 
 import java.util.UUID;
 
@@ -46,9 +47,14 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role;
+
     @Builder
     public User(String userId, String password, String nickname, String mail,
-                SocialType social, String socialId, String comment, String profileImage) {
+                SocialType social, String socialId, String comment, String profileImage,
+                Role role) { // ✨ 파라미터에 role 추가!
         this.id = UUID.randomUUID().toString();
         this.userId = userId;
         this.password = password;
@@ -59,6 +65,9 @@ public class User {
         this.comment = comment;
         this.profileImage = profileImage;
         this.isActive = true;
+
+        // 기본적으로 USER로 설정
+        this.role = role != null ? role : Role.USER;
     }
 
     public void updatePassword(String password) {

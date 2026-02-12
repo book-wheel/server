@@ -1,9 +1,13 @@
 package com.bookwheel.server.user.dto;
 
+import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
+import lombok.Builder;
 
+@Builder
 public record UserResponse(
+    Role role,
     String id,
     String userId,
     String nickname,
@@ -13,15 +17,15 @@ public record UserResponse(
     String profileImage
 ) {
     public static UserResponse from(User user) {
-        return new UserResponse(
-            user.getId(),
-            user.getUserId(),
-            user.getNickname(),
-            user.getMail(),
-            user.getSocial(),
-            user.getComment(),
-            user.getProfileImage()
-        );
+        return UserResponse.builder()
+                .role(user.getRole())
+                .userId(user.getUserId())
+                .nickname(user.getNickname())
+                .mail(user.getMail())
+                .social(user.getSocial())
+                .comment(user.getComment())
+                .profileImage(user.getProfileImage())
+                .build();
     }
 }
 

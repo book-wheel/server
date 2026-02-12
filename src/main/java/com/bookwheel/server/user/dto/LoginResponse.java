@@ -1,5 +1,6 @@
 package com.bookwheel.server.user.dto;
 
+import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import lombok.Builder;
@@ -8,6 +9,7 @@ import lombok.Builder;
 public record LoginResponse(
         String accessToken,
         String refreshToken,
+        Role role,
         String id,
         String userId,
         String nickname,
@@ -20,6 +22,7 @@ public record LoginResponse(
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .role(user.getRole())
                 .id(user.getId())
                 .userId(user.getUserId())
                 .nickname(user.getNickname())
