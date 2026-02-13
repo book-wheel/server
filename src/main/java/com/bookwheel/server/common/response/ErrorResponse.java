@@ -1,4 +1,3 @@
 package com.bookwheel.server.common.response;
 
-public record ErrorResponse(String code, String message) {
-}
+public record ErrorResponse(String code, String message) {}

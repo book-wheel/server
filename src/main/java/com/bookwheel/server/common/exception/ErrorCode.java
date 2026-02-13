@@ -24,6 +24,11 @@ public enum ErrorCode {
     EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "AUTH_009", "이메일 인증이 완료되지 않았습니다."),
     INACTIVE_USER(HttpStatus.BAD_REQUEST, "AUTH_010", "탈퇴한 사용자입니다."),
 
+    // JWT 토큰 관련 에러
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_011", "유효하지 않은 토큰입니다."),
+    EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_012", "만료된 토큰입니다."),
+    REFRESH_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "AUTH_013", "리프레시 토큰을 찾을 수 없습니다. (로그인이 필요합니다.)"),
+    UNSUPPORTED_TOKEN(HttpStatus.BAD_REQUEST, "AUTH_014", "지원하지 않는 토큰입니다."),
 
     // 그룹 관련 에러
     DUPLICATE_GROUP_NAME(HttpStatus.BAD_REQUEST, "GROUP_001", "이미 존재하는 그룹 이름입니다."),
