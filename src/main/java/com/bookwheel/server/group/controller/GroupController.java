@@ -41,8 +41,11 @@ public class GroupController {
     }
 
     @GetMapping("/{groupId}")
-    public ResponseEntity<ApiResponse<GroupDetailResponse>> getGroup(@PathVariable String groupId) {
-        GroupDetailResponse response = groupService.getGroup(groupId);
+    public ResponseEntity<ApiResponse<GroupDetailResponse>> getGroup(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        GroupDetailResponse response = groupService.getGroup(groupId, userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

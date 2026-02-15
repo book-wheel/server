@@ -21,13 +21,10 @@ public record GroupDetailResponse(
         int maxMembers,
         int currentMembers,
         int groupRoundCount,
-        State groupState
-
-        // TODO: 화면 하단 버튼이 [참여하기] 인지, [참여 중] 인지, [모임장 설정] 인지 보여주려면,
-        //  "이 API를 호출한 사람이 이 모임의 멤버인가?" 하는 정보가 필요합니다.
-        //   User 구현 시 추가 구현 예정
+        State groupState,
+        GroupDetailButtonType bottomButtonType
 ) {
-    public static GroupDetailResponse from(Group group) {
+    public static GroupDetailResponse from(Group group, GroupDetailButtonType bottomButtonType) {
         return GroupDetailResponse.builder()
                 .groupId(group.getGroupId())
                 .groupName(group.getGroupName())
@@ -42,6 +39,7 @@ public record GroupDetailResponse(
                 .currentMembers(group.getCurrentMembers())
                 .groupRoundCount(group.getGroupRoundCount())
                 .groupState(group.getGroupState())
+                .bottomButtonType(bottomButtonType)
                 .build();
     }
 }

@@ -90,8 +90,13 @@ public class GroupService {
     }
 
     public GroupDetailResponse getGroup(String groupId) {
+        return getGroup(groupId, resolveCurrentUserId());
+    }
+
+    public GroupDetailResponse getGroup(String groupId, String userId) {
         Group group = findGroupById(groupId);
-        return GroupDetailResponse.from(group);
+        GroupDetailButtonType bottomButtonType = resolveBottomButtonType(groupId, userId);
+        return GroupDetailResponse.from(group, bottomButtonType);
     }
 
     public List<MemberRequestResponse> getMemberRequests(String groupId, String leaderUserId) {
@@ -168,6 +173,24 @@ public class GroupService {
         if (!isLeader || !isActive) {
             throw new BusinessException(ErrorCode.GROUP_LEADER_ONLY);
         }
+    }
+
+    private GroupDetailButtonType resolveBottomButtonType(String groupId, String userId) {
+        return memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+                .map(member -> {
+                    if (member.getMemberRole() == MemberRole.LEADER
+                            && member.getMemberStatus() == MemberStatus.ACTIVE) {
+                        return GroupDetailButtonType.LEADER_SETTING;
+                    }
+
+                    if (member.getMemberStatus() == MemberStatus.ACTIVE
+                            || member.getMemberStatus() == MemberStatus.PENDING) {
+                        return GroupDetailButtonType.JOINED;
+                    }
+
+                    return GroupDetailButtonType.JOIN;
+                })
+                .orElse(GroupDetailButtonType.JOIN);
     }
 
     private Group findGroupById(String groupId) {
