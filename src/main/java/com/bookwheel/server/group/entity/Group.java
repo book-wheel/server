@@ -64,4 +64,9 @@ public class Group {
     @Formula("(SELECT count(1) FROM member m WHERE m.group_id = group_id AND m.member_status = 'ACTIVE')")
     private int currentMembers;
 
+    public void updateScheduleInfo(LocalDate startDate, int groupRoundCount) {
+        this.startDate = startDate;
+        this.groupRoundCount = groupRoundCount;
+    }
+
 }
