@@ -3,7 +3,7 @@ package com.bookwheel.server.schedule.controller;
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
-import com.bookwheel.server.schedule.service.GroupInnerScheduleService;
+import com.bookwheel.server.schedule.service.GroupScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api/groups")
 public class GroupScheduleController {
-    private final GroupInnerScheduleService groupInnerScheduleService;
+    private final GroupScheduleService groupScheduleService;
 
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(
@@ -29,7 +29,7 @@ public class GroupScheduleController {
             @RequestBody @Valid GroupScheduleCreateRequest request,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
-        List<GroupScheduleRoundResponse> response = groupInnerScheduleService.createSchedule(
+        List<GroupScheduleRoundResponse> response = groupScheduleService.createSchedule(
                 groupId,
                 request,
                 userDetails.getUsername()

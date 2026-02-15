@@ -3,7 +3,7 @@ package com.bookwheel.server.book.controller;
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.book.dto.OwnBookRegisterRequest;
 import com.bookwheel.server.book.dto.OwnBookRegisterResponse;
-import com.bookwheel.server.book.service.GroupInnerBookService;
+import com.bookwheel.server.book.service.GroupBookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/groups")
-public class GroupInnerBookController {
-    private final GroupInnerBookService groupInnerBookService;
+public class GroupBookController {
+    private final GroupBookService groupBookService;
 
     @PostMapping("/{groupId}/books")
     public ResponseEntity<ApiResponse<OwnBookRegisterResponse>> registerOwnBook(
@@ -27,7 +27,7 @@ public class GroupInnerBookController {
             @RequestBody @Valid OwnBookRegisterRequest request,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
-        OwnBookRegisterResponse response = groupInnerBookService.registerOwnBook(
+        OwnBookRegisterResponse response = groupBookService.registerOwnBook(
                 groupId,
                 request,
                 userDetails.getUsername()
