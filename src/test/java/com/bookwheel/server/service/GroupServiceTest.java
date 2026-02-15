@@ -1,88 +1,110 @@
 package com.bookwheel.server.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.GroupCreateRequest;
 import com.bookwheel.server.group.dto.GroupCreateResponse;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupService;
+import com.bookwheel.server.member.entity.Member;
+import com.bookwheel.server.member.enums.MemberRole;
+import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.member.repository.MemberRepository;
+import com.bookwheel.server.user.entity.Role;
+import com.bookwheel.server.user.entity.User;
+import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@Transactional
-@ActiveProfiles("dev")
-public class GroupServiceTest {
+@ExtendWith(MockitoExtension.class)
+class GroupServiceTest {
 
-    @Autowired
-    private GroupService groupService;
-
-    @Autowired
+    @Mock
     private GroupRepository groupRepository;
 
+    @Mock
+    private MemberRepository memberRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private GroupService groupService;
+
     @Test
-    @DisplayName("그룹 생성 성공 (DB 연동 확인 완료)")
-    void createGroup_db_success() {
-        // Given
+    @DisplayName("createGroup creates leader member")
+    void createGroup_success() {
         GroupCreateRequest request = GroupCreateRequest.builder()
-                .groupName("천안 교환독서방")
-                .groupComment("천안에서 독서해요")
-                .groupRule("상호존중")
+                .groupName("book-group")
+                .groupComment("comment")
+                .groupRule("rule")
                 .groupPublic(true)
                 .groupOffline(false)
                 .readingPeriod(7)
                 .startDate(LocalDate.now().plusDays(1))
-                .maxMembers(4)
+                .maxMembers(5)
                 .build();
 
-        // When
-        GroupCreateResponse response = groupService.createGroup(request);
+        User user = User.builder()
+                .userId("leader-user")
+                .password("pw")
+                .nickname("leader")
+                .mail("leader@mail.com")
+                .role(Role.USER)
+                .build();
 
-        // Then
-        Group saveGroup = groupRepository.findById(response.groupId()).orElseThrow();
+        Group savedGroup = request.toEntity();
 
-        assertThat(saveGroup.getGroupName()).isEqualTo("천안 교환독서방");
-        assertThat(saveGroup.isGroupPublic()).isTrue();
+        when(groupRepository.existsByGroupName("book-group")).thenReturn(false);
+        when(userRepository.findByUserId("leader-user")).thenReturn(Optional.of(user));
+        when(groupRepository.save(any(Group.class))).thenReturn(savedGroup);
+
+        GroupCreateResponse response = groupService.createGroup(request, "leader-user");
+
+        assertThat(response.groupId()).isEqualTo(savedGroup.getGroupId());
+
+        ArgumentCaptor<Member> memberCaptor = ArgumentCaptor.forClass(Member.class);
+        verify(memberRepository).save(memberCaptor.capture());
+        Member leaderMember = memberCaptor.getValue();
+        assertThat(leaderMember.getMemberRole()).isEqualTo(MemberRole.LEADER);
+        assertThat(leaderMember.getMemberStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(leaderMember.getUser().getUserId()).isEqualTo("leader-user");
     }
 
     @Test
-    @DisplayName("그룹 생성 실패 (중복 이름 생성)")
-    void createGroup_db_fail_duplicate() {
-        // Given
-        GroupCreateRequest request1 = GroupCreateRequest.builder()
-                .groupName("중복이")
-                .groupComment("소개")
-                .groupRule("규칙")
+    @DisplayName("createGroup fails when group name already exists")
+    void createGroup_duplicateName_fail() {
+        GroupCreateRequest request = GroupCreateRequest.builder()
+                .groupName("book-group")
+                .groupComment("comment")
+                .groupRule("rule")
                 .groupPublic(true)
-                .maxMembers(4)
-                .startDate(LocalDate.now().plusDays(1))
+                .groupOffline(false)
                 .readingPeriod(7)
+                .startDate(LocalDate.now().plusDays(1))
+                .maxMembers(5)
                 .build();
 
-        groupService.createGroup(request1);
+        when(groupRepository.existsByGroupName("book-group")).thenReturn(true);
 
-        GroupCreateRequest request2 = GroupCreateRequest.builder()
-                .groupName("중복이")
-                .groupComment("소개2")
-                .groupRule("규칙2")
-                .groupPublic(true)
-                .maxMembers(4)
-                .startDate(LocalDate.now().plusDays(1))
-                .readingPeriod(7)
-                .build();
-
-        // When & Then
-        assertThatThrownBy(() -> groupService.createGroup(request2))
+        assertThatThrownBy(() -> groupService.createGroup(request, "leader-user"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("이미 존재하는 그룹 이름입니다.");
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.DUPLICATE_GROUP_NAME);
     }
 }
