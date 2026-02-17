@@ -13,8 +13,10 @@ import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -29,6 +31,7 @@ public class GroupService {
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public GroupCreateResponse createGroup(GroupCreateRequest request) {
@@ -41,6 +44,9 @@ public class GroupService {
 
         User user = findActiveUserByUserId(userId);
         Group group = request.toEntity();
+        if (!request.groupPublic() && StringUtils.hasText(group.getGroupPassword())) {
+            group.updateGroupPassword(passwordEncoder.encode(group.getGroupPassword()));
+        }
         Group savedGroup = groupRepository.save(group);
 
         Member leader = Member.builder()
@@ -116,7 +122,9 @@ public class GroupService {
             String leaderUserId,
             MemberRequestStatus status
     ) {
-        Group group = findGroupById(groupId);
+        Group group = (status == MemberRequestStatus.APPROVED)
+                ? findGroupByIdForUpdate(groupId)
+                : findGroupById(groupId);
         validateLeaderPermission(groupId, leaderUserId);
 
         Member targetMember = memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId)
@@ -154,7 +162,8 @@ public class GroupService {
 
     private void validateJoinRequest(Group group, GroupJoinRequest request) {
         if (!group.isGroupPublic()) {
-            if (!StringUtils.hasText(request.password()) || !request.password().equals(group.getGroupPassword())) {
+            if (!StringUtils.hasText(request.password())
+                    || !isGroupPasswordMatched(request.password(), group.getGroupPassword())) {
                 throw new BusinessException(ErrorCode.INVALID_GROUP_PASSWORD);
             }
         }
@@ -198,6 +207,11 @@ public class GroupService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
+    private Group findGroupByIdForUpdate(String groupId) {
+        return groupRepository.findByGroupIdForUpdate(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
     private User findActiveUserByUserId(String userId) {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -211,9 +225,21 @@ public class GroupService {
 
     private String resolveCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !StringUtils.hasText(authentication.getName())) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken
+                || !StringUtils.hasText(authentication.getName())) {
+            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
         }
         return authentication.getName();
+    }
+
+    private boolean isGroupPasswordMatched(String rawPassword, String savedPassword) {
+        if (!StringUtils.hasText(savedPassword)) {
+            return false;
+        }
+
+        // Backward compatibility for rows saved before hash migration.
+        return passwordEncoder.matches(rawPassword, savedPassword) || rawPassword.equals(savedPassword);
     }
 }

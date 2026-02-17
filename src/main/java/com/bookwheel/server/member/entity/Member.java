@@ -35,7 +35,7 @@ public class Member {
     private Group group;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private User user;
 
     @Enumerated(EnumType.STRING)
@@ -51,6 +51,5 @@ public class Member {
     private LocalDateTime requestDate;
 
     @Column(name = "join_ment", length = 50)
-    @Builder.Default
-    private String joinMent = "중도 하차 없이 성실하게 참여하겠습니다";
+    private String joinMent;
 }

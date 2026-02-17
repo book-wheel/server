@@ -32,7 +32,7 @@ public class Group {
     @Column(name = "group_public")
     private boolean groupPublic = false;
 
-    @Column(name = "group_password", length = 20)
+    @Column(name = "group_password", length = 255)
     private String groupPassword;
 
     @Builder.Default
@@ -67,6 +67,10 @@ public class Group {
     public void updateScheduleInfo(LocalDate startDate, int groupRoundCount) {
         this.startDate = startDate;
         this.groupRoundCount = groupRoundCount;
+    }
+
+    public void updateGroupPassword(String groupPassword) {
+        this.groupPassword = groupPassword;
     }
 
 }
