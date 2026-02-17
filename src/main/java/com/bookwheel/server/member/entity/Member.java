@@ -3,14 +3,26 @@ package com.bookwheel.server.member.entity;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @Setter
 @Builder
-@Table(name = "member")
+@Table(
+        name = "member",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_member_group_user",
+                        columnNames = {"group_id", "user_id"}
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member {
@@ -22,10 +34,9 @@ public class Member {
     @JoinColumn(name = "group_id", nullable = false)
     private Group group;
 
-    //    @ManyToOne(fetch = FetchType.LAZY)
-    //    @JoinColumn(name = "user_id", nullable = false)
-    //    private User user;
-    // TODO: User 객체 생성
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
+    private User user;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "member_role", nullable = false)
@@ -35,7 +46,10 @@ public class Member {
     @Column(name = "member_status", nullable = false)
     private MemberStatus memberStatus;
 
+    @CreationTimestamp
+    @Column(name = "request_date", updatable = false)
+    private LocalDateTime requestDate;
+
     @Column(name = "join_ment", length = 50)
-    @Builder.Default
-    private String joinMent = "중도 하차 없이 성실하게 참여하겠습니다";
+    private String joinMent;
 }
