@@ -46,7 +46,9 @@ public enum ErrorCode {
     GROUP_ROUND_TABLE_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "GROUP_012", "round 테이블이 없거나 생성할 수 없습니다."),
     GROUP_SCHEDULE_OWN_BOOK_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_013", "참여 도서가 없어 일정을 생성할 수 없습니다."),
     GROUP_READING_PERIOD_INVALID(HttpStatus.BAD_REQUEST, "GROUP_014", "독서 주기가 올바르지 않습니다."),
-
+    GROUP_ORDER_MANAGER_ONLY(HttpStatus.FORBIDDEN, "GROUP_015", "ACTIVE LEADER/SUB_LEADER만 읽기 순서를 지정할 수 있습니다."),
+    GROUP_ORDER_REQUEST_INVALID(HttpStatus.BAD_REQUEST, "GROUP_016", "isRandom과 memberIds 조합이 올바르지 않습니다."),
+    GROUP_ORDER_MEMBER_SET_INVALID(HttpStatus.BAD_REQUEST, "GROUP_017", "수동 지정 memberIds가 ACTIVE 멤버 전체와 일치하지 않습니다."),
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),
