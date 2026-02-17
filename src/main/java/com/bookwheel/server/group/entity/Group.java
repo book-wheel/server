@@ -32,7 +32,7 @@ public class Group {
     @Column(name = "group_public")
     private boolean groupPublic = false;
 
-    @Column(name = "group_password", length = 20)
+    @Column(name = "group_password", length = 255)
     private String groupPassword;
 
     @Builder.Default
@@ -63,5 +63,9 @@ public class Group {
     // DB 컬럼이 아닌, 쿼리 실행 시 서브쿼리로 계산되는 가상 필드
     @Formula("(SELECT count(1) FROM member m WHERE m.group_id = group_id AND m.member_status = 'ACTIVE')")
     private int currentMembers;
+
+    public void updateGroupPassword(String groupPassword) {
+        this.groupPassword = groupPassword;
+    }
 
 }

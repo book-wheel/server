@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +41,9 @@ class GroupServiceMemberRequestUnitTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private GroupService groupService;
@@ -88,7 +92,7 @@ class GroupServiceMemberRequestUnitTest {
         Member leader = createMember("leader-member", group, createUser("leader"), MemberRole.LEADER, MemberStatus.ACTIVE);
         Member pending = createMember("pending-member", group, createUser("member"), MemberRole.MEMBER, MemberStatus.PENDING);
 
-        when(groupRepository.findById("group-1")).thenReturn(Optional.of(group));
+        when(groupRepository.findByGroupIdForUpdate("group-1")).thenReturn(Optional.of(group));
         when(memberRepository.findByGroup_GroupIdAndUser_UserId("group-1", "leader")).thenReturn(Optional.of(leader));
         when(memberRepository.findByMemberIdAndGroup_GroupId("pending-member", "group-1")).thenReturn(Optional.of(pending));
 
@@ -127,7 +131,7 @@ class GroupServiceMemberRequestUnitTest {
         Member leader = createMember("leader-member", group, createUser("leader"), MemberRole.LEADER, MemberStatus.ACTIVE);
         Member activeMember = createMember("active-member", group, createUser("member"), MemberRole.MEMBER, MemberStatus.ACTIVE);
 
-        when(groupRepository.findById("group-1")).thenReturn(Optional.of(group));
+        when(groupRepository.findByGroupIdForUpdate("group-1")).thenReturn(Optional.of(group));
         when(memberRepository.findByGroup_GroupIdAndUser_UserId("group-1", "leader")).thenReturn(Optional.of(leader));
         when(memberRepository.findByMemberIdAndGroup_GroupId("active-member", "group-1")).thenReturn(Optional.of(activeMember));
 
@@ -146,7 +150,7 @@ class GroupServiceMemberRequestUnitTest {
         Member leader = createMember("leader-member", group, createUser("leader"), MemberRole.LEADER, MemberStatus.ACTIVE);
         Member pending = createMember("pending-member", group, createUser("member"), MemberRole.MEMBER, MemberStatus.PENDING);
 
-        when(groupRepository.findById("group-1")).thenReturn(Optional.of(group));
+        when(groupRepository.findByGroupIdForUpdate("group-1")).thenReturn(Optional.of(group));
         when(memberRepository.findByGroup_GroupIdAndUser_UserId("group-1", "leader")).thenReturn(Optional.of(leader));
         when(memberRepository.findByMemberIdAndGroup_GroupId("pending-member", "group-1")).thenReturn(Optional.of(pending));
 
