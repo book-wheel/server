@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import com.bookwheel.server.user.entity.Role;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -51,6 +52,10 @@ public class User {
     @Column(name = "role", nullable = false)
     private Role role;
 
+
+    @Column(name = "ban_expired_at")
+    private LocalDateTime banExpiredAt;
+
     @Builder
     public User(String userId, String password, String nickname, String mail,
                 SocialType social, String socialId, String comment, String profileImage,
@@ -80,7 +85,15 @@ public class User {
         this.profileImage = profileImage;
     }
 
-    public void deactivate() {
-        this.isActive = false;
+    public void applyBan(String banType) {
+        if ("PERMANENT".equals(banType)) {
+            this.isActive = false;
+            this.banExpiredAt = LocalDateTime.of(9999, 12, 31, 23, 59, 59);
+        }else if ("SEVEN_DAYS".equals(banType)) {
+            this.banExpiredAt = LocalDateTime.now().plusDays(7);
+        }else if ("THREE_DAYS".equals(banType)) {
+            this.banExpiredAt = LocalDateTime.now().plusDays(3);
+        }
+
     }
 }

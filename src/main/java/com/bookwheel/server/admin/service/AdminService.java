@@ -1,6 +1,9 @@
 package com.bookwheel.server.admin.service;
 
 
+import com.bookwheel.server.admin.dto.AdminBanRequest;
+import com.bookwheel.server.admin.dto.AdminBanResponse;
+import com.bookwheel.server.admin.dto.BanReason;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.user.entity.Role;
@@ -9,6 +12,8 @@ import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +25,7 @@ public class AdminService {
 
     //회원 강제 탈퇴/정지 시키기
     @Transactional
-    public void banUser(String userId){
+    public AdminBanResponse banUser(String userId, AdminBanRequest request) {
 
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -33,10 +38,25 @@ public class AdminService {
             throw new BusinessException(ErrorCode.ALREADY_BANNED_USER);
         }
 
-        user.deactivate();
-        // TODO: 만약 영구 정지 뿐만이 아닌 ３일정지 ７일정지 엔티티 추가 된다 하면 바로 개발
+        user.applyBan(request.banType());
 
 
 
+        String reasonMessage = (request.reasonCode() == BanReason.ETC)
+            ? request.detailedReason()
+            : request.reasonCode().getDescription();
+
+        return AdminBanResponse.builder()
+            .userId(user.getUserId())
+            .nickname(user.getNickname())
+            .status(user.getIsActive() ? "BANNED" : "PERMANENT_BANNED")
+            .banType(request.banType())
+            .reasonMessage(reasonMessage)
+            .bannedAt(LocalDateTime.now())
+            .releaseDate(user.getBanExpiredAt()) // 아직 엔티티에 날짜 필드가 없으므로 임시로 null 처리
+            .build();
     }
 }
+
+
+

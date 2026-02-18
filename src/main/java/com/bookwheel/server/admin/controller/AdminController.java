@@ -1,5 +1,7 @@
 package com.bookwheel.server.admin.controller;
 
+import com.bookwheel.server.admin.dto.AdminBanRequest;
+import com.bookwheel.server.admin.dto.AdminBanResponse;
 import com.bookwheel.server.admin.service.AdminService;
 import com.bookwheel.server.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,7 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 @Tag(name = "관리자(Admin) API", description = "신고 처리, 회원 제재, 사진 검수 등 관리자 전용 기능")
 public class AdminController {
@@ -31,9 +33,12 @@ public class AdminController {
 
     @Operation(summary = "회원 강제 탈퇴/정지 시키기")
     @PostMapping("/users/{userId}/ban")
-    public ApiResponse<String> banUser(@PathVariable("userId") String userId) {
-        adminService.banUser(userId);
-        return ApiResponse.success(userId + "번 회원 정지 완료");
+    public ApiResponse<AdminBanResponse> banUser(
+        @PathVariable("userId") String userId,
+        @RequestBody AdminBanRequest request) {
+
+        AdminBanResponse response = adminService.banUser(userId, request);
+        return ApiResponse.success(response);
     }
 
     @Operation(summary = "패널티 이력 조회")
