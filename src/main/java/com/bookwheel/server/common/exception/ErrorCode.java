@@ -23,6 +23,7 @@ public enum ErrorCode {
     EXPIRED_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "AUTH_008", "인증번호가 만료되었습니다."),
     EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "AUTH_009", "이메일 인증이 완료되지 않았습니다."),
     INACTIVE_USER(HttpStatus.BAD_REQUEST, "AUTH_010", "탈퇴한 사용자입니다."),
+    AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_015", "인증이 필요합니다."),
 
     // JWT 토큰 관련 에러
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_011", "유효하지 않은 토큰입니다."),
@@ -34,6 +35,13 @@ public enum ErrorCode {
     DUPLICATE_GROUP_NAME(HttpStatus.BAD_REQUEST, "GROUP_001", "이미 존재하는 그룹 이름입니다."),
     GROUP_PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_002", "비공개 그룹은 비밀번호가 필수입니다."),
     GROUP_REGION_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_003", "오프라인 그룹은 지역 입력이 필수입니다."),
+    GROUP_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_004", "존재하지 않는 그룹입니다."),
+    INVALID_GROUP_PASSWORD(HttpStatus.BAD_REQUEST, "GROUP_005", "비밀번호가 틀렸습니다."),
+    GROUP_FULL(HttpStatus.BAD_REQUEST, "GROUP_006", "그룹 정원이 초과되었습니다."),
+    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 가입 요청을 처리할 수 있습니다."),
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_008", "해당 멤버를 찾을 수 없습니다."),
+    MEMBER_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "GROUP_009", "대기 중인 가입 요청만 처리할 수 있습니다."),
+    DUPLICATE_GROUP_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_010", "이미 가입했거나 가입 요청을 보낸 모임입니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
