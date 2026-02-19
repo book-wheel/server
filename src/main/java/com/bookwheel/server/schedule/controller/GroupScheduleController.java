@@ -28,7 +28,7 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "시작일 기준으로 라운드 일정을 생성하거나 재생성합니다."
+            description = "시작일 기준으로 라운드 일정을 생성/재생성합니다. endDate를 보내면 계산된 마지막 종료일과 일치해야 하며, excludedDates는 독서일 계산에서 제외됩니다."
     )
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(

@@ -45,27 +45,29 @@ public class GroupBookService {
             throw new BusinessException(ErrorCode.OWN_BOOK_ALREADY_REGISTERED);
         }
 
-        if (bookRepository.existsByIsbn(request.isbn())) {
+        if (ownBookRepository.existsByGroup_GroupIdAndBook_Isbn(groupId, request.isbn())) {
             throw new BusinessException(ErrorCode.DUPLICATE_BOOK_ISBN);
         }
 
-        Book book = Book.builder()
-                .bookId(UUID.randomUUID().toString())
-                .isbn(request.isbn())
-                .title(request.title())
-                .author(request.author())
-                .publisher(request.publisher())
-                .pubDate(request.pubDate())
-                .totalPage(request.totalPage())
-                .coverImage(request.coverImage())
-                .build();
-        Book savedBook = bookRepository.save(book);
+        Book book = bookRepository.findByIsbn(request.isbn())
+                .orElseGet(() -> bookRepository.save(
+                        Book.builder()
+                                .bookId(UUID.randomUUID().toString())
+                                .isbn(request.isbn())
+                                .title(request.title())
+                                .author(request.author())
+                                .publisher(request.publisher())
+                                .pubDate(request.pubDate())
+                                .totalPage(request.totalPage())
+                                .coverImage(request.coverImage())
+                                .build()
+                ));
 
         OwnBook ownBook = OwnBook.builder()
                 .ownbookId(UUID.randomUUID().toString())
                 .group(group)
                 .owner(user)
-                .book(savedBook)
+                .book(book)
                 .bookCondition(request.bookCondition())
                 .noteToReader(request.noteToReader())
                 .build();

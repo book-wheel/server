@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -56,30 +58,68 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
 
-        int roundCount = Math.toIntExact(ownBookCount);
-        jdbcTemplate.update("DELETE FROM `round` WHERE group_id = ?", groupId);
+        LocalDate startDate = request.startDate();
+        LocalDate requestedEndDate = request.endDate();
+        if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
+        }
 
-        group.updateScheduleInfo(request.startDate(), roundCount);
+        int roundCount = Math.toIntExact(ownBookCount);
+        Set<LocalDate> excludedDates = request.excludedDates() == null
+                ? Set.of()
+                : new HashSet<>(request.excludedDates());
 
         List<GroupScheduleRoundResponse> rounds = new ArrayList<>(roundCount);
-        LocalDate currentStart = request.startDate();
+        LocalDate currentStart = startDate;
         for (int roundNumber = 1; roundNumber <= roundCount; roundNumber++) {
-            LocalDate endDate = currentStart.plusDays(readingPeriod - 1L);
+            LocalDate endDate = calculateRoundEndDate(currentStart, readingPeriod, excludedDates);
             rounds.add(GroupScheduleRoundResponse.of(roundNumber, currentStart, endDate));
+
+            currentStart = endDate.plusDays(1);
+        }
+
+        LocalDate calculatedFinalEndDate = rounds.get(rounds.size() - 1).endDate();
+        if (requestedEndDate != null && !requestedEndDate.isEqual(calculatedFinalEndDate)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
+        }
+
+        jdbcTemplate.update("DELETE FROM `round` WHERE group_id = ?", groupId);
+        group.updateScheduleInfo(startDate, roundCount);
+
+        for (GroupScheduleRoundResponse round : rounds) {
 
             jdbcTemplate.update(
                     "INSERT INTO `round` (round_id, group_id, round_number, start_date, end_date) VALUES (?, ?, ?, ?, ?)",
                     UUID.randomUUID().toString(),
                     groupId,
-                    roundNumber,
-                    currentStart,
-                    endDate
+                    round.roundNumber(),
+                    round.startDate(),
+                    round.endDate()
             );
-
-            currentStart = endDate.plusDays(1);
         }
 
         return rounds;
+    }
+
+    private LocalDate calculateRoundEndDate(
+            LocalDate currentStart,
+            int readingPeriod,
+            Set<LocalDate> excludedDates
+    ) {
+        LocalDate cursor = currentStart;
+        int validDayCount = 0;
+
+        while (validDayCount < readingPeriod) {
+            if (!excludedDates.contains(cursor)) {
+                validDayCount++;
+            }
+            if (validDayCount == readingPeriod) {
+                return cursor;
+            }
+            cursor = cursor.plusDays(1);
+        }
+
+        return cursor;
     }
 
     private void ensureRoundTableExists() {
