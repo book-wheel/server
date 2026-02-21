@@ -50,7 +50,7 @@ public enum ErrorCode {
     GROUP_ORDER_REQUEST_INVALID(HttpStatus.BAD_REQUEST, "GROUP_016", "isRandom과 memberIds 조합이 올바르지 않습니다."),
     GROUP_ORDER_MEMBER_SET_INVALID(HttpStatus.BAD_REQUEST, "GROUP_017", "수동 지정 memberIds가 ACTIVE 멤버 전체와 일치하지 않습니다."),
     GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_018", "종료일은 시작일보다 빠를 수 없습니다."),
-    GROUP_SCHEDULE_END_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_019", "요청한 종료일이 계산된 마지막 종료일과 일치하지 않습니다."),
+    GROUP_SCHEDULE_END_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_019", "요청한 종료일을 계산된 마지막 종료일이 초과했습니다."),
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),

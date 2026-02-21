@@ -21,14 +21,14 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "Group-Inner", description = "그룹 내부 활동 API (참여 도서 등록, 일정 생성, 읽기 순서 지정)")
+@Tag(name = "Group-Inner", description = "그룹 내부 활동 API")
 @RequestMapping("/api/v1/groups")
 public class GroupScheduleController {
     private final GroupScheduleService groupScheduleService;
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "시작일 기준으로 라운드 일정을 생성/재생성합니다. endDate를 보내면 계산된 마지막 종료일과 일치해야 하며, excludedDates는 독서일 계산에서 제외됩니다."
+            description = "시작일 기준으로 라운드 일정을 생성/재생성합니다. endDate는 최대 종료일(데드라인)이며 계산된 마지막 종료일이 이를 초과하면 실패합니다. excludedDates는 단일 날짜 제외, excludedDateRanges는 기간 제외(양끝 포함)입니다."
     )
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(

@@ -12,10 +12,16 @@ public record GroupScheduleCreateRequest(
         @NotNull(message = "시작 일을 입력해주세요.")
         LocalDate startDate,
 
-        @Schema(description = "일정 종료일(선택). 전달 시 계산된 마지막 회차 종료일과 일치해야 합니다.", example = "2026-03-31")
+        @Schema(description = "일정 마감일 (선택 사항). 계산된 최종 종료일은 이 날짜보다 작거나 같아야 합니다.", example = "2026-03-31")
         LocalDate endDate,
 
-        @Schema(description = "독서일 계산에서 제외할 날짜 목록(선택)", example = "[\"2026-03-03\", \"2026-03-09\"]")
-        List<LocalDate> excludedDates
+        @Schema(description = "제외할 개별 날짜 목록 (선택 사항)", example = "[\"2026-03-03\", \"2026-03-09\"]")
+        List<LocalDate> excludedDates,
+
+        @Schema(
+                description = "제외할 날짜 범위 목록 (선택 사항, 시작 및 종료일 포함).",
+                example = "[{\"startDate\":\"2026-03-10\",\"endDate\":\"2026-03-12\"},{\"startDate\":\"2026-03-20\",\"endDate\":\"2026-03-22\"}]"
+        )
+        List<ExcludedDateRange> excludedDateRanges
 ) {
 }
