@@ -5,8 +5,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import com.bookwheel.server.user.entity.Role;
-
 import java.util.UUID;
 
 @Entity
@@ -22,7 +20,7 @@ public class User {
     @Column(name = "user_id", length = 50, unique = true, nullable = false)
     private String userId;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password")
     private String password;
 
     @Column(name = "nickname", length = 50, nullable = false)
@@ -32,8 +30,8 @@ public class User {
     private String mail;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "social", length = 20)
-    private SocialType social = SocialType.NONE;
+    @Column(name = "social_type", length = 20)
+    private SocialType socialType = SocialType.NONE;
 
     @Column(name = "social_id", length = 100)
     private String socialId;
@@ -53,20 +51,19 @@ public class User {
 
     @Builder
     public User(String userId, String password, String nickname, String mail,
-                SocialType social, String socialId, String comment, String profileImage,
-                Role role) { // ✨ 파라미터에 role 추가!
+                SocialType socialType, String socialId, String comment, String profileImage,
+                Role role) {
         this.id = UUID.randomUUID().toString();
         this.userId = userId;
         this.password = password;
         this.nickname = nickname;
         this.mail = mail;
-        this.social = social != null ? social : SocialType.NONE;
+        this.socialType = socialType != null ? socialType : SocialType.NONE;
         this.socialId = socialId;
         this.comment = comment;
         this.profileImage = profileImage;
         this.isActive = true;
 
-        // 기본적으로 USER로 설정
         this.role = role != null ? role : Role.USER;
     }
 

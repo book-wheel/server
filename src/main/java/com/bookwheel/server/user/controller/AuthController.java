@@ -5,10 +5,16 @@ import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.service.EmailService;
 import com.bookwheel.server.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+
+import java.io.IOException;
 
 @Tag(name = "Auth", description = "인증/인가 관련 API")
 @RestController
@@ -37,5 +43,19 @@ public class AuthController {
     public ApiResponse<?> verifyEmailCode(@Valid @RequestBody EmailVerificationCodeRequest request) {
         emailService.verifyCode(request.email(), request.code());
         return ApiResponse.success("이메일 인증이 완료되었습니다.");
+    }
+
+    @Operation(
+            summary = "소셜 로그인 시작",
+            description = "각 플랫폼의 로그인 페이지로 리다이렉트합니다. 스웨거에서는 테스트가 불가능하므로 브라우저 주소창에 직접 입력하거나 프론트에서 링크로 사용하세요."
+    )
+    @GetMapping("/authorize/{provider}")
+    public void socialLogin(
+            @PathVariable String provider,
+            HttpServletResponse response) throws IOException {
+
+        // 진짜 시큐리티 소셜 로그인 주소로 리다이렉트
+        String redirectUrl = "/oauth2/authorization/" + provider;
+        response.sendRedirect(redirectUrl);
     }
 }

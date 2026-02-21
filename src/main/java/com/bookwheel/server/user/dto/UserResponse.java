@@ -23,7 +23,7 @@ public record UserResponse(
                 .userId(user.getUserId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
-                .social(user.getSocial())
+                .social(user.getSocialType())
                 .comment(user.getComment())
                 .profileImage(user.getProfileImage())
                 .build();
