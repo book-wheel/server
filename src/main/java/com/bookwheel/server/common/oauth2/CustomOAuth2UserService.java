@@ -74,9 +74,12 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         User findUser = userRepository.findBySocialTypeAndSocialId(socialType, userInfo.getSocialId())
                 .orElse(null);
 
-        if (findUser == null) {
-            return saveUser(userInfo, socialType);
+        // 탈퇴했었던 유저라면 재활성화
+        if (!findUser.getIsActive()) {
+            log.info("탈퇴했던 유저의 재접속: 활성화 상태로 변경합니다. userId={}", findUser.getUserId());
+            findUser.activate();
         }
+
         return findUser;
     }
 
@@ -84,8 +87,10 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         // 이메일이 있으면 이메일, 없으면 소셜 고유 ID를 userId로 사용
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
+        String uniqueUserId = socialType.name() + "_" + userInfo.getSocialId();
+
         User user = User.builder()
-                .userId(userInfo.getEmail() != null ? userInfo.getEmail() : userInfo.getSocialId())
+                .userId(uniqueUserId)
                 .password(UUID.randomUUID().toString())
                 .socialType(socialType)
                 .socialId(userInfo.getSocialId())

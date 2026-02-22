@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 
 @Schema(description = "회원 탈퇴 요청 DTO")
 public record UserWithdrawRequest(
-
-        @Schema(description = "현재 비밀번호 (본인 확인용)", example = "myPassword123!")
-        @NotBlank(message = "비밀번호를 입력해주세요.")
+        @Schema(description = "비밀번호 (일반 로그인 회원 필수)", example = "password123!")
         String password
 ) {}

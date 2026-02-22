@@ -45,7 +45,7 @@ public class UserController {
         return ApiResponse.success(userService.reissue(request));
     }
 
-    @Operation(summary = "로그아웃", description = "사용자를 로그아웃 처리하고 서버(Redis)의 Refresh Token을 삭제합니다.")
+    @Operation(summary = "로그아웃", description = "사용자를 로그아웃 처리하고 Redis의 Refresh Token을 삭제합니다.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공")
     })
@@ -55,7 +55,7 @@ public class UserController {
         return ApiResponse.success(null);
     }
 
-    @Operation(summary = "회원 탈퇴", description = "비밀번호를 확인한 후 계정을 비활성화(Soft Delete) 처리하고 강제 로그아웃합니다.")
+    @Operation(summary = "회원 탈퇴", description = "비밀번호를 확인한 후 계정을 비활성화 처리하고 강제 로그아웃합니다.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "회원 탈퇴 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "비밀번호 불일치 (INVALID_PASSWORD)"),
@@ -64,8 +64,7 @@ public class UserController {
     @DeleteMapping("/me")
     public ApiResponse<Void> withdraw(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody @Valid UserWithdrawRequest request) {
-
+            @RequestBody(required = false) @Valid UserWithdrawRequest request) { // 소셜 로그인을 위해 required = false 설정
         userService.withdraw(userDetails.getUsername(), request);
         return ApiResponse.success(null);
     }

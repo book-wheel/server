@@ -7,6 +7,7 @@ import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.Role;
+import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,8 @@ public class UserService {
     private final EmailService emailService;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SocialUnlinkService socialUnlinkService;
+    private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -139,18 +142,44 @@ public class UserService {
     // 회원 탈퇴
     @Transactional
     public void withdraw(String userId, UserWithdrawRequest request) {
+        // 유저 조회 및 활성 상태 검증
         User user = findByUserIdAndValidateActive(userId);
+        // [TODO] 추후 탈퇴하려는 회원이 가입된 모임이 있는지 확인하는 로직 추가 필요
 
-        // 비밀번호 재확인
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new BusinessException(ErrorCode.INVALID_PASSWORD);
+        if (user.getSocialType() == SocialType.NONE) {
+            if (request == null || request.password() == null ||
+                    !passwordEncoder.matches(request.password(), user.getPassword())) {
+                throw new BusinessException(ErrorCode.INVALID_PASSWORD);
+            }
         }
 
-        // 회원 상태 비활성화 (Soft Delete)
+        // [디버깅] 현재 시큐리티 세션에 기록된 진짜 이름을 확인
+        String principalName = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+        log.info("시큐리티가 기억하는 유저 이름(Principal Name): {}", principalName);
+        log.info("우리가 DB에서 가져온 유저 ID(userId): {}", user.getUserId());
+
+        // 구글일 경우 연동 해제용 액세스 토큰 가져오기
+        String socialAccessToken = null;
+        if (user.getSocialType() == SocialType.GOOGLE) {
+            org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
+                    authorizedClientService.loadAuthorizedClient("google", user.getUserId());
+            if (client != null && client.getAccessToken() != null) {
+                socialAccessToken = client.getAccessToken().getTokenValue();     // 토큰
+            }
+        }
+
+        // 계정 비활성화 (Soft Delete)
         user.deactivate();
 
+        // Redis에 저장된 Refresh Token 삭제
         refreshTokenRepository.deleteById(userId);
 
-        log.info("회원 탈퇴 완료: userId={}", userId);
+        // 소셜 연동 해제
+        if (user.getSocialType() != SocialType.NONE) {
+            socialUnlinkService.unlink(user.getSocialType(), user.getSocialId(), socialAccessToken);
+        }
+
+        log.info("회원 탈퇴 완료: userId={}, socialType={}", userId, user.getSocialType());
     }
 }
