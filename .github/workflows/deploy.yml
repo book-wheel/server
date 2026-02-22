@@ -45,10 +45,10 @@ jobs:
             cd ~/app
             nohup java -jar \
               -Dspring.profiles.active=prod \
-              -DDB_URL="${{ secrets.DB_URL }}" \
-              -DDB_USERNAME="${{ secrets.DB_USERNAME }}" \
-              -DDB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
-              -DJWT_SECRET="${{ secrets.JWT_SECRET }}" \
-              -DMAIL_USERNAME="${{ secrets.MAIL_USERNAME }}" \
-              -DMAIL_PASSWORD="${{ secrets.MAIL_PASSWORD }}" \
+              -Dspring.datasource.url="${{ secrets.DB_URL }}" \
+              -Dspring.datasource.username="${{ secrets.DB_USERNAME }}" \
+              -Dspring.datasource.password="${{ secrets.DB_PASSWORD }}" \
+              -Djwt.secret="${{ secrets.JWT_SECRET }}" \
+              -Dspring.mail.username="${{ secrets.MAIL_USERNAME }}" \
+              -Dspring.mail.password="${{ secrets.MAIL_PASSWORD }}" \
               *SNAPSHOT.jar > app.log 2>&1 &
