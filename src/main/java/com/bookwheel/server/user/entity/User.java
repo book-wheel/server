@@ -85,6 +85,10 @@ public class User {
         this.profileImage = profileImage;
     }
 
+    public void deactivate() {
+        this.isActive = false;
+    }
+
     public void applyBan(String banType) {
         if ("PERMANENT".equals(banType)) {
             this.isActive = false;

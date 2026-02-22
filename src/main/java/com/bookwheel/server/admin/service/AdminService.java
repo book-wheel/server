@@ -53,7 +53,7 @@ public class AdminService {
             .banType(request.banType())
             .reasonMessage(reasonMessage)
             .bannedAt(LocalDateTime.now())
-            .releaseDate(user.getBanExpiredAt()) // 아직 엔티티에 날짜 필드가 없으므로 임시로 null 처리
+            .releaseDate(user.getBanExpiredAt())
             .build();
     }
 }
