@@ -15,7 +15,6 @@ import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,21 +37,15 @@ public class GroupScheduleService {
     private final OwnBookRepository ownBookRepository;
     private final JdbcTemplate jdbcTemplate;
 
-    // 동적으로 테이블을 생성할 때 발생할 수 있는 동시성 이슈를 제어하기 위한 락 객체와 플래그
-    private final Object roundTableInitLock = new Object();
-    private volatile boolean roundTableInitialized;
-
     @Transactional
     public List<GroupScheduleRoundResponse> createSchedule(
             String groupId,
             GroupScheduleCreateRequest request,
             String userId
     ) {
-        Group group = findGroupById(groupId);
+        Group group = findGroupByIdForUpdate(groupId);
         findActiveUserByUserId(userId);
         validateLeaderPermission(groupId, userId);
-
-        ensureRoundTableExists();
 
         // 그룹이 소유한 책의 개수를 기준으로 총 라운드 수를 결정
         long ownBookCount = ownBookRepository.countByGroup_GroupId(groupId);
@@ -73,8 +66,10 @@ public class GroupScheduleService {
 
         int roundCount = Math.toIntExact(ownBookCount);
 
-        // 제외할 날짜(단일/범위)들을 병합하여 탐색에 최적화된 달력 객체 생성
-        ExcludedCalendar excludedCalendar = normalizeExcludedCalendar(request.excludedDates(), request.excludedDateRanges());
+        ExcludedCalendar excludedCalendar = normalizeExcludedCalendar(
+                request.excludedDates(),
+                request.excludedDateRanges()
+        );
         long requiredUsableDays = (long) roundCount * readingPeriod;
 
         if (requestedEndDate != null) {
@@ -217,38 +212,8 @@ public class GroupScheduleService {
         return excludedCalendar.countUsableDaysInInterval(startDate, requestedEndDate);
     }
 
-    // 동시성 제어: Double-Checked Locking(DCL) 패턴을 사용하여 멀티스레드 환경에서 테이블이 단 한 번만 생성되도록 보장
-    private void ensureRoundTableExists() {
-        if (roundTableInitialized) {
-            return;
-        }
-
-        synchronized (roundTableInitLock) {
-            if (roundTableInitialized) {
-                return;
-            }
-
-            try {
-                jdbcTemplate.execute("""
-                        CREATE TABLE IF NOT EXISTS `round` (
-                            `round_id` VARCHAR(50) PRIMARY KEY,
-                            `group_id` VARCHAR(50) NOT NULL,
-                            `round_number` INT NOT NULL,
-                            `start_date` DATE,
-                            `end_date` DATE,
-                            CONSTRAINT `fk_round_group`
-                                FOREIGN KEY (`group_id`) REFERENCES `reading_group`(`group_id`) ON DELETE CASCADE
-                        )
-                        """);
-                roundTableInitialized = true;
-            } catch (DataAccessException e) {
-                throw new BusinessException(ErrorCode.GROUP_ROUND_TABLE_NOT_FOUND);
-            }
-        }
-    }
-
-    private Group findGroupById(String groupId) {
-        return groupRepository.findById(groupId)
+    private Group findGroupByIdForUpdate(String groupId) {
+        return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
