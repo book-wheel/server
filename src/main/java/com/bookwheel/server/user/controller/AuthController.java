@@ -25,6 +25,12 @@ public class AuthController {
     private final UserService userService;
     private final EmailService emailService;
 
+    @Operation(summary = "일반 회원가입 (Stage 1)", description = "이메일 인증 완료 후 아이디와 비밀번호만 입력해 계정을 생성합니다. 닉네임은 추후 프로필 설정에서 입력합니다.")
+    @PostMapping("/signup")
+    public ApiResponse<UserResponse> signup(@Valid @RequestBody UserSignupRequest request) {
+        return ApiResponse.success(userService.signup(request));
+    }
+
     @Operation(summary = "로그인", description = "아이디와 비밀번호를 입력해 JWT 토큰을 발급받습니다.")
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody UserLoginRequest request) {

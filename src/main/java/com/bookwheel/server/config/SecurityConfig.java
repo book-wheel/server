@@ -58,7 +58,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/**",
                                 "/api/v1/users/signup",
                                 "/login/**",        // 카카오 콜백 주소 허용
-                                "/oauth2/**"       // 시큐리티 기본 소셜 로그인 시작 주소 허용
+                                "/oauth2/**",       // 시큐리티 기본 소셜 로그인 시작 주소 허용
+                                "/images/profiles/**"
                         ).permitAll()
 
                         .anyRequest().authenticated()

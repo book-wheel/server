@@ -22,8 +22,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final JwtTokenProvider jwtTokenProvider;
 
     @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
-        log.info("OAuth2 로그인 성공! JWT 토큰 발행을 시작합니다.");
+    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {        log.info("OAuth2 로그인 성공! JWT 토큰 발행을 시작합니다.");
 
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
         String userId = oAuth2User.getUserId();
@@ -33,11 +32,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String accessToken = jwtTokenProvider.createAccessToken(userId, role);
         String refreshToken = jwtTokenProvider.createRefreshToken(userId, role);
 
+        // 소셜 신규 유저인지 판단
+        boolean isFirstLogin = oAuth2User.getNickname().startsWith("USER_");
+
         // 프론트엔드로 리다이렉트
-        // 실제 운영 시 쿠키나 특정 URL을 사용. 현재는 테스트를 위해 파라미터 방식 사용
+        // [TODO] 배포 시 리다이렉트 URL은 실제 도메인 주소로 변경해야 함
         String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/oauth2/redirect")
                 .queryParam("accessToken", accessToken)
                 .queryParam("refreshToken", refreshToken)
+                .queryParam("isFirstLogin", isFirstLogin)
                 .build().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);

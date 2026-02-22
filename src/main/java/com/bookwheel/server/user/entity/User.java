@@ -52,7 +52,7 @@ public class User {
     @Builder
     public User(String userId, String password, String nickname, String mail,
                 SocialType socialType, String socialId, String comment, String profileImage,
-                Role role) {
+                Role role, Boolean isActive) {
         this.id = UUID.randomUUID().toString();
         this.userId = userId;
         this.password = password;
@@ -62,13 +62,24 @@ public class User {
         this.socialId = socialId;
         this.comment = comment;
         this.profileImage = profileImage;
-        this.isActive = true;
-
+        this.isActive = isActive != null ? isActive : true;
         this.role = role != null ? role : Role.USER;
     }
 
     public void updatePassword(String password) {
         this.password = password;
+    }
+
+    public void updateProfileImage(String profileImage) {
+        this.profileImage = profileImage;
+    }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void updateComment(String comment) {
+        this.comment = comment;
     }
 
     public void updateProfile(String nickname, String comment, String profileImage) {

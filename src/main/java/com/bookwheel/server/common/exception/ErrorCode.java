@@ -45,7 +45,10 @@ public enum ErrorCode {
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
-    ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다.");
+    ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),
+
+    // 파일 관련 에러
+    FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_001", "파일 업로드 중 오류가 발생했습니다.");
 
     private final HttpStatus status;
     private final String code;

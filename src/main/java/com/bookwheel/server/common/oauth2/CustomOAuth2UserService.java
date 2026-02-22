@@ -7,6 +7,7 @@ import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,6 +24,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
@@ -55,7 +57,8 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 attributes,
                 userNameAttributeName,
                 user.getUserId(),
-                user.getRole()
+                user.getRole(),
+                user.getNickname()
         );
     }
 
@@ -73,6 +76,11 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         // 소셜 타입과 소셜 고유 ID로 이미 가입된 유저인지 확인
         User findUser = userRepository.findBySocialTypeAndSocialId(socialType, userInfo.getSocialId())
                 .orElse(null);
+
+        // 신규 유저라면 바로 저장
+        if (findUser == null) {
+            return saveUser(userInfo, socialType);
+        }
 
         // 탈퇴했었던 유저라면 재활성화
         if (!findUser.getIsActive()) {
