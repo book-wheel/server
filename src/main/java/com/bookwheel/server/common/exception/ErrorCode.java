@@ -42,7 +42,15 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_008", "해당 멤버를 찾을 수 없습니다."),
     MEMBER_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "GROUP_009", "대기 중인 가입 요청만 처리할 수 있습니다."),
     DUPLICATE_GROUP_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_010", "이미 가입했거나 가입 요청을 보낸 모임입니다."),
-
+    GROUP_ACTIVE_MEMBER_ONLY(HttpStatus.FORBIDDEN, "GROUP_011", "ACTIVE 멤버만 그룹 내부 기능을 사용할 수 있습니다."),
+    GROUP_ROUND_TABLE_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "GROUP_012", "round 테이블이 없거나 생성할 수 없습니다."),
+    GROUP_SCHEDULE_OWN_BOOK_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_013", "참여 도서가 없어 일정을 생성할 수 없습니다."),
+    GROUP_READING_PERIOD_INVALID(HttpStatus.BAD_REQUEST, "GROUP_014", "독서 주기가 올바르지 않습니다."),
+    GROUP_ORDER_MANAGER_ONLY(HttpStatus.FORBIDDEN, "GROUP_015", "ACTIVE LEADER/SUB_LEADER만 읽기 순서를 지정할 수 있습니다."),
+    GROUP_ORDER_REQUEST_INVALID(HttpStatus.BAD_REQUEST, "GROUP_016", "isRandom과 memberIds 조합이 올바르지 않습니다."),
+    GROUP_ORDER_MEMBER_SET_INVALID(HttpStatus.BAD_REQUEST, "GROUP_017", "수동 지정 memberIds가 ACTIVE 멤버 전체와 일치하지 않습니다."),
+    GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_018", "종료일은 시작일보다 빠를 수 없습니다."),
+    GROUP_SCHEDULE_END_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_019", "요청한 종료일을 계산된 마지막 종료일이 초과했습니다."),
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),
@@ -54,9 +62,11 @@ public enum ErrorCode {
     ALREADY_BANNED_USER(HttpStatus.BAD_REQUEST, "ADMIN_002", "이미 정지된 사용자입니다."),
 
     //사진관련 에러
-    PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "PHOTO_001", "해당 사진을 찾을 수 없습니다.");
+    PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "PHOTO_001", "해당 사진을 찾을 수 없습니다."),
 
 
+    DUPLICATE_BOOK_ISBN(HttpStatus.BAD_REQUEST, "BOOK_003", "이미 등록된 ISBN입니다."),
+    OWN_BOOK_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "BOOK_004", "이미 해당 그룹에 참여 도서를 등록했습니다.");
     private final HttpStatus status;
     private final String code;
     private final String message;
