@@ -2,6 +2,7 @@ package com.bookwheel.server.admin.controller;
 
 import com.bookwheel.server.admin.dto.AdminBanRequest;
 import com.bookwheel.server.admin.dto.AdminBanResponse;
+import com.bookwheel.server.admin.dto.PenaltyResponse;
 import com.bookwheel.server.admin.service.AdminService;
 import com.bookwheel.server.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,6 +10,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -41,10 +44,11 @@ public class AdminController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "패널티 이력 조회")
+    @Operation(summary = "패널티 이력 조회", description = "특정 회원의 과거 제재 이력을 최신순으로 조회")
     @GetMapping("/users/{userId}/histories")
-    public ApiResponse<String> getPenaltyHistories(@PathVariable("userId") String userId) {
-        return ApiResponse.success(userId + "번 회원 패널티 이력 조회 API 연결 성공");
+    public ApiResponse<List<PenaltyResponse>> getPenaltyHistories(@PathVariable("userId") String userId) {
+        List<PenaltyResponse> response = adminService.getPenalties(userId);
+        return ApiResponse.success(response);
     }
 
     @Operation(summary = "전체 사진 목록 조회 (검수용)")
