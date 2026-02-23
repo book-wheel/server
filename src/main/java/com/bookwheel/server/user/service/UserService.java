@@ -200,17 +200,14 @@ public class UserService {
         log.info("회원 탈퇴 완료: userId={}, socialType={}", userId, user.getSocialType());
     }
 
-    /**
-     * 중복 및 재가입 처리 로직 (이메일은 가입 방식이 다르면 허용함)
-     */
     private void handleExistingUser(String userId, String mail, SocialType socialType) {
-        // 1. 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
+        // 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
         userRepository.findByUserId(userId).ifPresent(user -> {
             if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
             userRepository.delete(user);
         });
 
-        // 2. 이메일 중복 확인: 현재 시도하려는 가입 방식(socialType)에 대해서만 중복 체크
+        // 이메일 중복 확인: 현재 시도하려는 가입 방식(socialType)에 대해서만 중복 체크
         userRepository.findByMailAndSocialType(mail, socialType).ifPresent(user -> {
             if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
             // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
@@ -248,9 +245,18 @@ public class UserService {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if (!user.getIsActive()) {
+        // 탈퇴 여부 먼저 확인
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new BusinessException(ErrorCode.INACTIVE_USER);
         }
+
+        // 밴 상태 확인
+        String banStatus = user.getBanStatus();
+        if (!"ACTIVE".equals(banStatus)) {
+            // "BANNED"나 "PERMANENT_BANNED"인 경우 에러 발생
+            throw new BusinessException(ErrorCode.BANNED_USER);
+        }
+
         return user;
     }
 }

@@ -61,6 +61,7 @@ public class SecurityConfig {
                                 "/oauth2/**",       // 시큐리티 기본 소셜 로그인 시작 주소 허용
                                 "/images/profiles/**"
                         ).permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )

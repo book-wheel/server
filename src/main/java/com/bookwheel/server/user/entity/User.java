@@ -5,6 +5,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import com.bookwheel.server.user.entity.Role;
+
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -48,6 +51,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role;
+
+
+    @Column(name = "ban_expired_at")
+    private LocalDateTime banExpiredAt;
 
     @Builder
     public User(String userId, String password, String nickname, String mail,
@@ -94,5 +101,26 @@ public class User {
 
     public void deactivate() {
         this.isActive = false;
+    }
+
+    public void applyBan(String banType) {
+        if ("PERMANENT".equals(banType)) {
+            this.banExpiredAt = LocalDateTime.of(9999, 12, 31, 23, 59, 59);
+        }else if ("SEVEN_DAYS".equals(banType)) {
+            this.banExpiredAt = LocalDateTime.now().plusDays(7);
+        }else if ("THREE_DAYS".equals(banType)) {
+            this.banExpiredAt = LocalDateTime.now().plusDays(3);
+        }
+
+    }
+
+    public String getBanStatus() {
+        if (this.banExpiredAt == null || LocalDateTime.now().isAfter(this.banExpiredAt)) {
+            return "ACTIVE"; //정지기록 x, 이미 기간 지남
+        }
+        if (this.banExpiredAt.getYear() == 9999) {
+            return "PERMANENT_BANNED"; // 영구 정지
+        }
+        return "BANNED"; // 기간제 정지 중
     }
 }

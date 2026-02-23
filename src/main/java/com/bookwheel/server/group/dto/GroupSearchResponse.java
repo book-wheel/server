@@ -16,13 +16,17 @@ public record GroupSearchResponse(
         boolean groupOffline,
         Region groupRegion,
         int currentMembers,
+        int groupRoundCount,
         int maxMembers,
         State groupState,
+        String groupStateLabel,
         LocalDate startDate,
         String status,
         int dday
 ) {
     public static GroupSearchResponse from(Group group) {
+        State normalizedState = normalizeState(group.getGroupState());
+
         return GroupSearchResponse.builder()
                 .groupId(group.getGroupId())
                 .groupName(group.getGroupName())
@@ -30,23 +34,36 @@ public record GroupSearchResponse(
                 .groupRegion(group.getGroupRegion())
                 .groupOffline(group.isGroupOffline())
                 .currentMembers(group.getCurrentMembers())
+                .groupRoundCount(group.getGroupRoundCount())
                 .maxMembers(group.getMaxMembers())
-                .groupState(group.getGroupState())
+                .groupState(normalizedState)
+                .groupStateLabel(mapStateLabel(normalizedState))
                 .startDate(group.getStartDate())
-                .status(mapStatus(group.getGroupState()))
+                .status(mapStatus(normalizedState))
                 .dday(calculateDday(group.getStartDate()))
                 .build();
     }
 
-    private static String mapStatus(State state) {
+    private static State normalizeState(State state) {
         if (state == null) {
-            return "scheduled";
+            return State.RECRUITING;
         }
+        return state;
+    }
 
+    private static String mapStatus(State state) {
         return switch (state) {
             case RECRUITING -> "scheduled";
             case IN_PROGRESS -> "active";
             case COMPLETE -> "done";
+        };
+    }
+
+    private static String mapStateLabel(State state) {
+        return switch (state) {
+            case RECRUITING -> "시작전";
+            case IN_PROGRESS -> "진행중";
+            case COMPLETE -> "끝";
         };
     }
 
