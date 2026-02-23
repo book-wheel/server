@@ -46,6 +46,9 @@ public class Member {
     @Column(name = "member_status", nullable = false)
     private MemberStatus memberStatus;
 
+    @Column(name = "read_order")
+    private Integer readOrder;
+
     @CreationTimestamp
     @Column(name = "request_date", updatable = false)
     private LocalDateTime requestDate;
