@@ -128,4 +128,29 @@ public class UserService {
         }
         return user;
     }
+
+    // 로그아웃
+    @Transactional
+    public void logout(String userId) {
+        refreshTokenRepository.deleteById(userId);
+        log.info("로그아웃 완료: userId={}", userId);
+    }
+
+    // 회원 탈퇴
+    @Transactional
+    public void withdraw(String userId, UserWithdrawRequest request) {
+        User user = findByUserIdAndValidateActive(userId);
+
+        // 비밀번호 재확인
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 회원 상태 비활성화 (Soft Delete)
+        user.deactivate();
+
+        refreshTokenRepository.deleteById(userId);
+
+        log.info("회원 탈퇴 완료: userId={}", userId);
+    }
 }

@@ -1,10 +1,10 @@
 package com.bookwheel.server.user.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
-import com.bookwheel.server.user.dto.UserResponse;
-import com.bookwheel.server.user.dto.UserSignupRequest;
+import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import com.bookwheel.server.user.dto.TokenReissueRequest;
-import com.bookwheel.server.user.dto.TokenResponse;
 
 @Tag(name = "Users", description = "회원 정보 관리 API")
 @RestController
@@ -45,5 +43,30 @@ public class UserController {
     @PostMapping("/reissue")
     public ApiResponse<TokenResponse> reissue(@RequestBody @Valid TokenReissueRequest request) {
         return ApiResponse.success(userService.reissue(request));
+    }
+
+    @Operation(summary = "로그아웃", description = "사용자를 로그아웃 처리하고 서버(Redis)의 Refresh Token을 삭제합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공")
+    })
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(@AuthenticationPrincipal UserDetails userDetails) {
+        userService.logout(userDetails.getUsername());
+        return ApiResponse.success(null);
+    }
+
+    @Operation(summary = "회원 탈퇴", description = "비밀번호를 확인한 후 계정을 비활성화(Soft Delete) 처리하고 강제 로그아웃합니다.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "회원 탈퇴 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "비밀번호 불일치 (INVALID_PASSWORD)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않거나 이미 탈퇴한 사용자 (USER_NOT_FOUND, INACTIVE_USER)")
+    })
+    @DeleteMapping("/me")
+    public ApiResponse<Void> withdraw(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid UserWithdrawRequest request) {
+
+        userService.withdraw(userDetails.getUsername(), request);
+        return ApiResponse.success(null);
     }
 }
