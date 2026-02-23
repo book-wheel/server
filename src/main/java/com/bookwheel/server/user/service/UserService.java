@@ -15,11 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
+import com.bookwheel.server.user.dto.ProfileSetupRequest;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.UUID;
 
 @Slf4j
@@ -35,9 +32,6 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
     private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
-
-    // [TODO] 실제 운영 환경에서는 S3 같은 클라우드 스토리지로 변경 필요
-    private final String uploadPath = Paths.get(System.getProperty("user.home"), "Desktop", "bookwheel", "profiles").toString();
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -82,10 +76,9 @@ public class UserService {
             }
         }
 
-        // 프로필 이미지 실제 저장 처리
-        if (request.getProfileImage() != null && !request.getProfileImage().isEmpty()) {
-            String storeFileName = saveImage(request.getProfileImage());
-            user.updateProfileImage("/images/profiles/" + storeFileName); // 접근용 URL 경로 저장
+        // 전달받은 S3 URL을 그대로 저장
+        if (request.getProfileImageUrl() != null) {
+            user.updateProfileImage(request.getProfileImageUrl());
         }
 
         user.updateComment(request.getComment());
@@ -213,23 +206,6 @@ public class UserService {
             // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
             userRepository.delete(user);
         });
-    }
-
-    private String saveImage(MultipartFile file) {
-        String originalFilename = file.getOriginalFilename();
-        String storeFileName = UUID.randomUUID() + "_" + originalFilename;
-
-        try {
-            File folder = new File(uploadPath);
-            if (!folder.exists()) {
-                folder.mkdirs();
-            }
-            file.transferTo(new File(uploadPath + File.separator + storeFileName));
-        } catch (IOException e) {
-            log.error("파일 저장 실패: ", e);
-            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
-        }
-        return storeFileName;
     }
 
     private LoginResponse getLoginResponse(User user) {
