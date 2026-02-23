@@ -73,6 +73,12 @@ public class User {
         this.role = role != null ? role : Role.USER;
     }
 
+    private boolean isProfileSet = false;
+
+    public void completeProfile() {
+        this.isProfileSet = true;
+    }
+
     public void updatePassword(String password) {
         this.password = password;
     }

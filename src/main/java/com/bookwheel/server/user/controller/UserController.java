@@ -27,7 +27,7 @@ public class UserController {
     @PatchMapping("/setup-profile")
     public ApiResponse<LoginResponse> setupProfile(
             @AuthenticationPrincipal Object principal, // 일반/소셜 유저 공통 처리를 위해 Object로 받음
-            @ModelAttribute ProfileSetupRequest request) {
+            @RequestBody ProfileSetupRequest request) {
 
         String userId;
         if (principal instanceof CustomOAuth2User) {

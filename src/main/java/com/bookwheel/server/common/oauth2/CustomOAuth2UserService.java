@@ -82,12 +82,21 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             return saveUser(userInfo, socialType);
         }
 
-        // 탈퇴했었던 유저라면 재활성화
+        // 탈퇴했었던 유저 처리
         if (!findUser.getIsActive()) {
-            log.info("탈퇴했던 유저의 재접속: 활성화 상태로 변경합니다. userId={}", findUser.getUserId());
-            findUser.activate();
+            log.info("탈퇴했던 소셜 유저의 재접속: 기존 데이터를 삭제하고 신규 가입 처리합니다. userId={}", findUser.getUserId());
+
+            // 기존 데이터 삭제 (Hard Delete)
+            userRepository.delete(findUser);
+
+            // 즉시 DB에 반영하여 중복 제약 조건 충돌 방지
+            userRepository.flush();
+
+            // 새로운 유저 엔티티 생성 및 저장
+            return saveUser(userInfo, socialType);
         }
 
+        // 정상 활동 중인 유저라면 그대로 반환
         return findUser;
     }
 

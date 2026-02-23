@@ -82,6 +82,7 @@ public class UserService {
         }
 
         user.updateComment(request.getComment());
+        user.completeProfile(); // 프로필 설정 완료
 
         log.info("프로필 설정 완료 (Stage 2): userId={}, nickname={}", userId, user.getNickname());
 
