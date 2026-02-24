@@ -16,7 +16,6 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
-import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -89,7 +88,7 @@ public class GroupDashboardService {
             myStep = MyStepResponse.of(
                     ws.getWheelStateId(),
                     book.getBookId(),
-                    WheelStatus.valueOf(ws.getWheelState().name()),
+                    ws.getWheelState(),
                     book.getTitle(),
                     book.getCoverImage(),
                     previousSenderName
