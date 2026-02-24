@@ -9,6 +9,7 @@ import lombok.Builder;
 public record LoginResponse(
         String accessToken,
         String refreshToken,
+        boolean isProfileSet,
         Role role,
         String id,
         String userId,
@@ -22,12 +23,13 @@ public record LoginResponse(
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .isProfileSet(user.isProfileSet())
                 .role(user.getRole())
                 .id(user.getId())
                 .userId(user.getUserId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
-                .social(user.getSocial())
+                .social(user.getSocialType())
                 .comment(user.getComment())
                 .profileImage(user.getProfileImage())
                 .build();

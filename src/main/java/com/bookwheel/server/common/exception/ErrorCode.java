@@ -23,6 +23,7 @@ public enum ErrorCode {
     EXPIRED_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "AUTH_008", "인증번호가 만료되었습니다."),
     EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "AUTH_009", "이메일 인증이 완료되지 않았습니다."),
     INACTIVE_USER(HttpStatus.BAD_REQUEST, "AUTH_010", "탈퇴한 사용자입니다."),
+    BANNED_USER(HttpStatus.FORBIDDEN, "AUTH_016", "제재 중인 사용자입니다."),
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_015", "인증이 필요합니다."),
 
     // JWT 토큰 관련 에러
@@ -60,6 +61,9 @@ public enum ErrorCode {
     ALREADY_PROCESSED_REPORT(HttpStatus.BAD_REQUEST, "REPORT_002", "이미 처리 완료된 신고입니다."),
     CANNOT_BAN_ADMIN(HttpStatus.BAD_REQUEST, "ADMIN_001", "관리자 계정은 제재할 수 없습니다."),
     ALREADY_BANNED_USER(HttpStatus.BAD_REQUEST, "ADMIN_002", "이미 정지된 사용자입니다."),
+
+    // 파일 관련 에러
+    FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_001", "파일 업로드 중 오류가 발생했습니다."),
 
     //사진관련 에러
     PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "PHOTO_001", "해당 사진을 찾을 수 없습니다."),
