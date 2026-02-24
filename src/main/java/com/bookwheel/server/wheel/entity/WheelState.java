@@ -9,7 +9,13 @@ import lombok.*;
 @Entity
 @Getter
 @Builder
-@Table(name = "wheel_state")
+@Table(
+        name = "wheel_state",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_wheel_state_round_member", columnNames = {"round_id", "member_id"}),
+                @UniqueConstraint(name = "uk_wheel_state_round_ownbook", columnNames = {"round_id", "ownbook_id"})
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class WheelState {

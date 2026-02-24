@@ -11,7 +11,7 @@ import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
-import com.bookwheel.server.schedule.Repository.RoundRepository;
+import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -77,7 +77,7 @@ public class GroupDashboardService {
         // 4. myStep (내가 현재 읽고 있는 책 상태 조회)
         MyStepResponse myStep = null;
         Optional<WheelState> myWheelStateOpt = wheelStateRepository
-                .findByRoundIdAndMember_MemberId(currentRound.getRoundId(), member.getMemberId());
+                .findFirstByRoundIdAndMember_MemberId(currentRound.getRoundId(), member.getMemberId());
 
         // 책 정보가 존재한다면 그것을 토대로 반환
         if (myWheelStateOpt.isPresent()) {
@@ -154,7 +154,7 @@ public class GroupDashboardService {
         LocalDate today = LocalDate.now();
 
         // 라운드 전체를 회차 오름차순으로 조회
-        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        List<Round> rounds = roundRepository.findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(groupId);
 
         if (rounds.isEmpty()) {
             return null;
