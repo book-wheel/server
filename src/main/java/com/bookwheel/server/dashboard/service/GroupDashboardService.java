@@ -167,11 +167,10 @@ public class GroupDashboardService {
             }
         }
 
-        // 2. 진행 중 라운드가 없다면 가장 가까운 미래 라운드 찾기
-        for (Round round : rounds) {
-            if (today.isBefore(round.getStartDate())) {
-                return round;
-            }
+        // 아직 첫 라운드 시작 전이면 null 반환
+        Round firstRound = rounds.get(0);
+        if (firstRound.getStartDate() != null && today.isBefore(firstRound.getStartDate())) {
+            return null;
         }
 
         // 3. 모두 종료되었다면 마지막 라운드 반환
