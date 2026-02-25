@@ -12,6 +12,8 @@ import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.ExcludedDateRange;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
+import com.bookwheel.server.schedule.entity.Round;
+import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,8 @@ public class GroupScheduleService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final OwnBookRepository ownBookRepository;
+
+    private final RoundRepository roundRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Transactional
@@ -66,6 +70,7 @@ public class GroupScheduleService {
 
         int roundCount = Math.toIntExact(ownBookCount);
 
+        // 제외할 날짜(단일/범위)들을 병합하여 탐색에 최적화된 달력 객체 생성
         ExcludedCalendar excludedCalendar = normalizeExcludedCalendar(
                 request.excludedDates(),
                 request.excludedDateRanges()
@@ -93,23 +98,23 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
         }
 
-        // 기존 스케줄 초기화
-        jdbcTemplate.update("DELETE FROM `round` WHERE group_id = ?", groupId);
+        // 기존 스케줄 초기화 (이전 논의 내용 반영: Repository 벌크 삭제 사용)
+        roundRepository.deleteByGroup_GroupId(groupId);
         group.updateScheduleInfo(startDate, roundCount);
 
-        // 성능 최적화: 다량의 라운드 데이터를 단건 INSERT가 아닌 Batch Insert로 한 번에 처리
-        jdbcTemplate.batchUpdate(
-                "INSERT INTO `round` (round_id, group_id, round_number, start_date, end_date) VALUES (?, ?, ?, ?, ?)",
-                rounds,
-                500,
-                (ps, round) -> {
-                    ps.setString(1, UUID.randomUUID().toString());
-                    ps.setString(2, groupId);
-                    ps.setInt(3, round.roundNumber());
-                    ps.setObject(4, round.startDate());
-                    ps.setObject(5, round.endDate());
-                }
-        );
+        // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
+        List<Round> roundEntities = rounds.stream()
+                .map(round -> Round.builder()
+                        .roundId(UUID.randomUUID().toString())
+                        .group(group)
+                        .roundNumber(round.roundNumber())
+                        .startDate(round.startDate())
+                        .endDate(round.endDate())
+                        .build())
+                .toList();
+
+        // JPA의 saveAll()을 사용하여 한 번에 저장
+        roundRepository.saveAll(roundEntities);
 
         return rounds;
     }
