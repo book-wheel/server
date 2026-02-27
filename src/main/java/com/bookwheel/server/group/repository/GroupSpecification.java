@@ -2,6 +2,7 @@ package com.bookwheel.server.group.repository;
 
 import com.bookwheel.server.group.dto.GroupSearchCondition;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -29,7 +30,14 @@ public class GroupSpecification {
         }
 
         if (condition.state() != null) {
-            spec = spec.and((r, q, b) -> b.equal(r.get("groupState"), condition.state()));
+            if (condition.state() == State.RECRUITING) {
+                spec = spec.and((r, q, b) -> b.or(
+                        b.equal(r.get("groupState"), State.RECRUITING),
+                        b.isNull(r.get("groupState"))
+                ));
+            } else {
+                spec = spec.and((r, q, b) -> b.equal(r.get("groupState"), condition.state()));
+            }
         }
 
         if (StringUtils.hasText(condition.keyword())) {
