@@ -23,6 +23,9 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew clean build -x test
+        env :
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@master
@@ -43,6 +46,9 @@ jobs:
           script: |
             sudo fuser -k 8080/tcp || true # 혹시 켜져있는 기존 서버가 있다면 종료
             cd ~/app
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export AWS_REGION="ap-northeast-2"
             nohup java -jar \
               -Dspring.profiles.active=prod \
               -Dspring.datasource.url="${{ secrets.DB_URL }}" \
