@@ -12,10 +12,13 @@ public record ReviewCreateResponse(
     @Schema(description = "도서 ID", example = "book-12345")
     String bookId,
 
+    //@Schema(description = "작성자 프로필 이미지 URL", example = "https://...")
+    //String reviewerProfileImageUrl, 추후 프론트에서 프로필 보일때 추가할게요!
+
     @Schema(description = "추천 여부", example = "true")
     boolean isRecommended,
 
-    @Schema(description = "리뷰 내용", example = "이 책 덕분에 많이 웃었습니다. 다음 분도 재밌게 읽으시길!")
+    @Schema(description = "코멘트 내용", example = "이 책 덕분에 많이 웃었습니다. 다음 분도 재밌게 읽으시길!")
     String comment,
 
     @Schema(description = "히든 리뷰 상태", example = "true")

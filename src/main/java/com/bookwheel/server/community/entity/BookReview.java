@@ -46,4 +46,18 @@ public class BookReview {
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "like_count", nullable = false)
+    @Builder.Default
+    private int likeCount = 0;
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
 }
