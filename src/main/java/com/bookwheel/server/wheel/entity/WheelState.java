@@ -53,9 +53,4 @@ public class WheelState {
     public void updateStatus(WheelStatus wheelState) {
         this.wheelState = wheelState;
     }
-
-    public void closeWheel() {
-        this.wheelState = WheelStatus.UNFINISHED;
-        this.isCompleted = true;
-    }
 }

@@ -19,6 +19,7 @@ import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -144,17 +145,8 @@ public class GroupScheduleService {
         // 만약 끝난 라운드가 하나도 없다면(비어있다면) 메서드 종료
         if (expiredRoundIds.isEmpty()) return 0;
 
-        // 2. expiredRoundIds에 속하면서, 아직 완료되지 않은 책바퀴 가져옴.
-        List<WheelState> wheelsToClose = wheelStateRepository.findByRoundIdInAndIsCompletedFalse(expiredRoundIds);
-
-        int cnt = 0;
-        // 3. 가져온 책바퀴들을 for문으로 돌면서 상태를 '완료'로 바꿔줍니다.
-        for (WheelState wheel : wheelsToClose) {
-            wheel.closeWheel();
-            cnt++;
-        }
-
-        return cnt;
+        // 2. expiredRoundIds에 속하면서, 아직 완료되지 않은 책바퀴 종료.
+        return wheelStateRepository.bulkCloseWheelStates(expiredRoundIds, WheelStatus.UNFINISHED);
     }
 
     @Transactional
@@ -167,26 +159,38 @@ public class GroupScheduleService {
         // 없을 경우, 0 리턴
         if (startingRounds.isEmpty()) return 0;
 
+        // 2. 이번에 시작하는 라운드들의 '그룹 ID'를 전부 뽑기
+        List<String> groupIds = startingRounds.stream()
+                .map(round -> round.getGroup().getGroupId())
+                .toList();
+
+        // 3. IN 쿼리로 멤버와 책을 한 번에 조회
+        List<Member> allMembers = memberRepository.findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(groupIds, MemberStatus.ACTIVE);
+        List<OwnBook> allBooks = ownBookRepository.findByGroup_GroupIdIn(groupIds);
+
+        // 4. 데이터를 그룹별로 분류해서 Map으로 정리
+        Map<String, List<Member>> membersByGroup = allMembers.stream()
+                .collect(Collectors.groupingBy(m -> m.getGroup().getGroupId()));
+        Map<String, List<OwnBook>> booksByGroup = allBooks.stream()
+                .collect(Collectors.groupingBy(b -> b.getGroup().getGroupId()));
+
         int cnt = 0;
-        // 책바퀴를 담을 바구니
         List<WheelState> newWheels = new ArrayList<>();
 
-        // 2. 라운드 하나씩 계산
+        // 5. for문에서 실제 정렬 로직 구현 (DB 삽입 X)
         for (Round round : startingRounds) {
             String groupId = round.getGroup().getGroupId();
 
-            //groupId에 속한 멤버들을 읽는 순서대로 정렬하기
-            List<Member> members = memberRepository.findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(groupId, MemberStatus.ACTIVE);
+            List<Member> members = new ArrayList<>(membersByGroup.getOrDefault(groupId, Collections.emptyList()));
+            List<OwnBook> books = booksByGroup.getOrDefault(groupId, Collections.emptyList());
+
+            // 멤버나 책이 없는 비정상 그룹은 스킵
+            if (members.isEmpty() || books.isEmpty()) continue;
 
             // 읽는 순서가 지정되어있지 않다면, 임의로 정렬하기
-            if (!members.isEmpty() && members.get(0).getReadOrder() == null) {
+            if (members.get(0).getReadOrder() == null) {
                 members.sort(Comparator.comparing(Member::getMemberId));
             }
-
-            // 이 그룹아이디에 등록된 책 목록 가져오기
-            List<OwnBook> books = ownBookRepository.findByGroup_GroupId(groupId);
-
-            // 3. 멤버들과 책을 연결해서 WheelState를 만들어 저장
 
             // 누가 어떤 책의 주인인지 찾기 쉽게 Map 으로 연결
             Map<String, OwnBook> bookMap = books.stream()

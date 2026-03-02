@@ -25,7 +25,7 @@ public class RoundScheduler {
 
         // 2. 오늘 끝나는 라운드의 책바퀴(WheelState) 마감 처리
         int finishGroupCount = groupScheduleService.closeExpiredWheelStates();
-        log.info("=> 2단계 완료: {}개의 그룹이 COMPLETE으로 변경됨", finishGroupCount);
+        log.info("=> 2단계 완료: {}개의 그룹이 UNFINISHED로 변경됨", finishGroupCount);
 
         // 3. 오늘 시작하는 라운드의 새로운 책바퀴(WheelState) 생성 및 할당
         int startGroupCount = groupScheduleService.startRoundWheelState();

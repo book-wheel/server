@@ -46,4 +46,6 @@ public interface MemberRepository extends JpaRepository<Member, String> {
             @Param("memberStatus") MemberStatus memberStatus
     );
 
+    // 해당 그룹 안에 특정 상태의 멤버들을 정렬해서 전부 가져오기
+    List<Member> findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(List<String> groupIds, MemberStatus memberStatus);
 }
