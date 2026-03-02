@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record ReviewDetailResponse(
     Long reviewId,
     String bookId,
+    String reviewerName,
     boolean isRecommended,
     String comment,
     boolean isHidden,

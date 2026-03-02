@@ -121,6 +121,7 @@ public class BookService {
 
             return new ReviewDetailResponse(
                 review.getReviewId(),
+                book.getBookId(),
                 review.getReviewer().getNickname(),
                 review.getIsRecommended(),
                 review.getContent(),
