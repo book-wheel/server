@@ -12,8 +12,8 @@ public record ReviewCreateResponse(
     @Schema(description = "도서 ID", example = "book-12345")
     String bookId,
 
-    @Schema(description = "별점", example = "5")
-    int rating,
+    @Schema(description = "추천 여부", example = "true")
+    boolean isRecommended,
 
     @Schema(description = "리뷰 내용", example = "이 책 덕분에 많이 웃었습니다. 다음 분도 재밌게 읽으시길!")
     String comment,

@@ -22,23 +22,23 @@ public class BookReview {
     @Column(name = "review_id")
     private Long reviewId;
 
-    // 1. 어떤 책에 작성된 리뷰인지 (Book 참조)
+    // 어떤 책에 작성된 리뷰인지 (Book 참조)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", referencedColumnName = "book_id", nullable = false)
     private Book book;
 
-    // 2. 누가 작성한 리뷰인지 (User 참조)
+    // 누가 작성한 리뷰인지 (User 참조)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private User reviewer;
 
-    // 3. 리뷰 내용
+    // 리뷰 내용
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    // 4. 별점 (1~5점)
-    @Column(name = "rating", nullable = false)
-    private Integer rating;
+    // 추천/비추천 (true: 추천, false: 비추천)
+    @Column(name = "is_recommended", nullable = false)
+    private Boolean isRecommended;
 
     @Column(name = "is_hidden", nullable = false)
     private Boolean isHidden;

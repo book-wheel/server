@@ -38,7 +38,7 @@ public class BookService {
             .book(book)
             .reviewer(user)
             .content(request.comment())
-            .rating(request.rating())
+            .isRecommended(request.isRecommended())
             .isHidden(request.isHidden())
             .build();
 
@@ -47,7 +47,7 @@ public class BookService {
         return new ReviewCreateResponse(
             savedReview.getReviewId(),
             book.getBookId(),
-            savedReview.getRating(),
+            savedReview.getIsRecommended(),
             savedReview.getContent(),
             savedReview.getIsHidden(),
             savedReview.getCreatedAt()
