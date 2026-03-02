@@ -55,7 +55,7 @@ public class WheelState {
     }
 
     public void closeWheel() {
-        this.wheelState = WheelStatus.COMPLETED;
+        this.wheelState = WheelStatus.UNFINISHED;
         this.isCompleted = true;
     }
 }
