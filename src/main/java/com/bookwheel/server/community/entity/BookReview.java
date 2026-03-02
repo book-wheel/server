@@ -4,6 +4,10 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -11,6 +15,7 @@ import lombok.*;
 @Table(name = "book_review")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
+@EntityListeners(AuditingEntityListener.class)
 public class BookReview {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,4 +42,8 @@ public class BookReview {
 
     @Column(name = "is_hidden", nullable = false)
     private Boolean isHidden;
+
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 }

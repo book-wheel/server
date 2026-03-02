@@ -50,7 +50,7 @@ public class BookService {
             savedReview.getRating(),
             savedReview.getContent(),
             savedReview.getIsHidden(),
-            java.time.LocalDateTime.now()
+            savedReview.getCreatedAt()
         );
     }
 
