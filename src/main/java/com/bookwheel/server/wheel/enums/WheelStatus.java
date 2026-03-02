@@ -4,5 +4,6 @@ public enum WheelStatus {
     WAITING,
     READY,
     READING,
-    COMPLETED
+    COMPLETED,
+    UNFINISHED
 }

@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,4 +23,9 @@ public interface RoundRepository extends JpaRepository<Round, String> {
     
     // 시작일/종료일이 모두 존재하는 '유효한' 라운드만 회차순으로 조회 (날짜 비교 시 null로 인한 NPE 방지용)
     List<Round> findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(String groupId);
+    // 오늘 날짜보다 종료일이 이전인 Round들의 ID 목록 가져옴
+    @Query("SELECT r.roundId FROM Round r WHERE r.endDate < :date")
+    List<String> findRoundIdsByEndDateBefore(LocalDate date);
+
+    List<Round> findByStartDate(LocalDate startDate);
 }
