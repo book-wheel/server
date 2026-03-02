@@ -46,13 +46,7 @@ public class BookService {
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
-        BookReview review = BookReview.builder()
-            .book(book)
-            .reviewer(user)
-            .content(request.comment())
-            .isRecommended(request.isRecommended())
-            .isHidden(request.isHidden())
-            .build();
+        BookReview review = request.toEntity(book, user);
 
         BookReview savedReview = bookReviewRepository.save(review);
 

@@ -1,5 +1,8 @@
 package com.bookwheel.server.community.dto;
 
+import com.bookwheel.server.book.entity.Book;
+import com.bookwheel.server.community.entity.BookReview;
+import com.bookwheel.server.user.entity.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -21,4 +24,15 @@ public record ReviewCreateRequest(
         @Schema(description = "히든 리뷰 여부 (true: 라운드 중 비공개, false: 공개)", example = "true")
         @NotNull(message = "히든 리뷰 설정 여부는 필수 입니다.")
             Boolean isHidden
-) {}
+)
+{
+    public BookReview toEntity(Book book, User user) {
+        return BookReview.builder()
+            .book(book)
+            .reviewer(user)
+            .content(this.comment)
+            .isRecommended(this.isRecommended)
+            .isHidden(this.isHidden)
+            .build();
+    }
+}
