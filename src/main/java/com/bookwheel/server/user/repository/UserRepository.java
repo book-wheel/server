@@ -17,5 +17,8 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     Optional<User> findBySocialTypeAndSocialId(SocialType socialType, String socialId);
     Optional<User> findByMailAndSocialType(String mail, SocialType socialType);
+
+    // 이메일 + 가입경로(SocialType) + 활성상태(isActive) 모두 만족하는 단 한 명의 유저 조회
+    Optional<User> findByMailAndSocialTypeAndIsActiveTrue(String mail, SocialType socialType);
 }
 
