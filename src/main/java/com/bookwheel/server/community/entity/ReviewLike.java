@@ -22,4 +22,11 @@ public class ReviewLike {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    public static ReviewLike create(BookReview review, User user) {
+        return ReviewLike.builder()
+            .review(review)
+            .user(user)
+            .build();
+    }
 }

@@ -50,14 +50,7 @@ public class BookService {
 
         BookReview savedReview = bookReviewRepository.save(review);
 
-        return new ReviewCreateResponse(
-            savedReview.getReviewId(),
-            book.getBookId(),
-            savedReview.getIsRecommended(),
-            savedReview.getContent(),
-            savedReview.getIsHidden(),
-            savedReview.getCreatedAt()
-        );
+        return ReviewCreateResponse.from(savedReview);
     }
 
     @Transactional
@@ -77,10 +70,7 @@ public class BookService {
                 },
                 // 하트를 누르지 않은 상태면 -> 좋아요 추가
                 () -> {
-                    reviewLikeRepository.save(ReviewLike.builder()
-                        .review(review)
-                        .user(user)
-                        .build());
+                    reviewLikeRepository.save(ReviewLike.create(review, user));
                     review.increaseLikeCount();
                 }
             );
@@ -119,17 +109,7 @@ public class BookService {
 
             boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
 
-            return new ReviewDetailResponse(
-                review.getReviewId(),
-                book.getBookId(),
-                review.getReviewer().getNickname(),
-                review.getIsRecommended(),
-                review.getContent(),
-                review.getIsHidden(),
-                review.getLikeCount(),
-                isLikedByMe,
-                review.getCreatedAt()
-            );
+            return ReviewDetailResponse.of(review, isLikedByMe);
         }).collect(Collectors.toList());
     }
 

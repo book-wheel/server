@@ -1,5 +1,6 @@
 package com.bookwheel.server.community.dto;
 
+import com.bookwheel.server.community.entity.BookReview;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -27,4 +28,15 @@ public record ReviewCreateResponse(
     @Schema(description = "작성 일시")
     LocalDateTime createdAt
 )
-{}
+{
+    public static ReviewCreateResponse from(BookReview review) {
+        return new ReviewCreateResponse(
+            review.getReviewId(),
+            review.getBook().getBookId(),
+            review.getIsRecommended(),
+            review.getContent(),
+            review.getIsHidden(),
+            review.getCreatedAt()
+        );
+    }
+}
