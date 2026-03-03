@@ -1,5 +1,6 @@
 package com.bookwheel.server.common.service;
 
+import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,8 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -38,5 +41,27 @@ public class S3Service {
 
         // 최종 URL 문자열 반환
         return s3Presigner.presignPutObject(presignRequest).url().toString();
+    }
+
+    public PostImagePresignedResponse getPostPresignedUrls(String bookId, List<String> fileExtensions) {
+        String prefix = "posts/" + bookId;
+        List<PostImagePresignedResponse.PresignedInfo> presignedInfos = fileExtensions.stream().map(ext -> {
+            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + ext;
+
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+
+            PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(5))
+                .putObjectRequest(putObjectRequest).build();
+
+            String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+            String imageUrl = presignedUrl.split("\\?")[0];
+
+            return new PostImagePresignedResponse.PresignedInfo(presignedUrl, imageUrl);
+        }).toList();
+        return new PostImagePresignedResponse(presignedInfos);
     }
 }

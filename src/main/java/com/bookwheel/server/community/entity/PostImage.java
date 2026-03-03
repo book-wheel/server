@@ -10,22 +10,21 @@ import lombok.*;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class Bookphoto {
+@Table(name = "post_images")
+public class PostImage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "photo_id")
-    private Long photoId;
+    @Column(name = "post_image_id")
+    private Long postImageId;
 
-    // Book 엔티티 참조 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "book_id", referencedColumnName = "book_id", nullable = false)
-    private Book book;
-
-    // 업로드한 사용자 참조 (N:1)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
-    private User uploader;
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post; // 어느 게시물에 속한 사진인지
 
     @Column(name = "image_url", nullable = false, length = 500)
     private String imageUrl;
+
+    public void setPost(Post post) {
+        this.post = post;
+    }
 }
