@@ -36,7 +36,7 @@ public class UserController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "내 정보 조회", description = "로그인한 사용자의 정보를 조회합니다. (토큰 필요)")
+    @Operation(summary = "내 정보 조회", description = "로그인한 사용자의 정보를 조회합니다. (소셜 유저도 가능!)")
     @GetMapping("/me")
     public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal Object principal) {
         String userId = getUserIdFromPrincipal(principal);
@@ -72,40 +72,22 @@ public class UserController {
         return ApiResponse.success(true);
     }
 
+     // 소셜 유저인지 일반 유저인지 구분해서 userId를 추출하는 메서드
+     private String getUserIdFromPrincipal(Object principal) {
+         if (principal instanceof CustomOAuth2User oauth2User) {
+             return oauth2User.getUserId();
+         } else if (principal instanceof UserDetails userDetails) {
+             return userDetails.getUsername();
+         }
+         throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
+     }
 
-
-//     // 소셜 유저, 일반 유저 모두에게서 String userId 추출
-//    private String getUserIdFromPrincipal(Object principal) {
-//        if (principal instanceof CustomOAuth2User) {
-//            return ((CustomOAuth2User) principal).getUserId();
-//        } else if (principal instanceof UserDetails) {
-//            return ((UserDetails) principal).getUsername();
-//        }
-//        throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
-//    }
-
-     //  [ID 추출기 + 로그 모니터링]
-    private String getUserIdFromPrincipal(Object principal) {
-        // 1. 어떤 객체가 들어왔는지 클래스 이름을 로그로 찍어봅니다.
-        log.info("[ID 추출기] 현재 접근한 객체 타입: {}", principal != null ? principal.getClass().getSimpleName() : "null");
-
-        String userId;
-
-        if (principal instanceof CustomOAuth2User oauth2User) {
-            // 소셜 로그인 유저인 경우
-            userId = oauth2User.getUserId();
-            log.info("=> [소셜 로그인] CustomOAuth2User에서 추출된 ID: {}", userId);
-        } else if (principal instanceof UserDetails userDetails) {
-            // 일반 로그인 유저인 경우
-            userId = userDetails.getUsername();
-            log.info("=> [일반 로그인] UserDetails에서 추출된 ID: {}", userId);
-        } else {
-            // 로그인이 안 되어 있거나 알 수 없는 타입인 경우 (보통 Filter에서 걸러지지만 안전장치로!)
-            log.warn("=> [경고] 인증 정보가 없거나 알 수 없는 타입의 접근입니다.");
-            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
+     // 소셜 유저 검증
+    private void validateNonSocialUser(String userId) {
+        if (userId.startsWith("GOOGLE_") || userId.startsWith("KAKAO_")) {
+            log.warn("=> [경고] 소셜 유저가 금지된 기능(비밀번호 변경 등)에 접근함. ID: {}", userId);
+            throw new BusinessException(ErrorCode.SOCIAL_ACCOUNT_CANNOT_USE_RECOVERY);
         }
-
-        return userId;
     }
 
     @Operation(summary = "비밀번호 직접 변경", description = "로그인한 사용자가 현재 비밀번호를 확인한 후 새로운 비밀번호로 변경합니다.")
@@ -115,6 +97,10 @@ public class UserController {
             @Valid @RequestBody PasswordChangeRequest request) {
 
         String userId = getUserIdFromPrincipal(principal);
+
+        // 소셜 유저 검증
+        validateNonSocialUser(userId);
+
         userService.changePassword(userId, request);
         return ApiResponse.success(null);
     }

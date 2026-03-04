@@ -64,4 +64,12 @@ public class AuthController {
         String redirectUrl = "/oauth2/authorization/" + provider;
         response.sendRedirect(redirectUrl);
     }
+
+    // AuthController.java 에 추가
+
+    @Operation(summary = "토큰 재발급", description = "만료된 Access Token 대신 Refresh Token을 이용해 새로운 토큰을 발급받습니다.")
+    @PostMapping("/reissue")
+    public ApiResponse<TokenResponse> reissue(@Valid @RequestBody TokenReissueRequest request) {
+        return ApiResponse.success(userService.reissue(request));
+    }
 }
