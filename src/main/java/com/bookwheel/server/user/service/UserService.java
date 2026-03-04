@@ -248,7 +248,7 @@ public class UserService {
 
     @Transactional
     public void changePassword(String userId, PasswordChangeRequest request) {
-        // 1유저 조회
+        // 유저 조회
         User user = findByUserIdAndValidateActive(userId);
 
         // 소셜 로그인 유저는 비밀번호 변경 불가
