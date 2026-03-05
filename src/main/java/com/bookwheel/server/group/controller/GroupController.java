@@ -16,11 +16,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @RestController
 @RequiredArgsConstructor
@@ -33,9 +34,9 @@ public class GroupController {
     @PostMapping("/making")
     public ResponseEntity<ApiResponse<GroupCreateResponse>> createGroup(
             @RequestBody @Valid GroupCreateRequest groupCreateRequest,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal Object principal
     ) {
-        GroupCreateResponse response = groupService.createGroup(groupCreateRequest, userDetails.getUsername());
+        GroupCreateResponse response = groupService.createGroup(groupCreateRequest, getUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -62,9 +63,9 @@ public class GroupController {
     @GetMapping("/{groupId}")
     public ResponseEntity<ApiResponse<GroupDetailResponse>> getGroup(
             @PathVariable String groupId,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal Object principal
     ) {
-        GroupDetailResponse response = groupService.getGroup(groupId, userDetails.getUsername());
+        GroupDetailResponse response = groupService.getGroup(groupId, getUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -73,9 +74,9 @@ public class GroupController {
     public ResponseEntity<ApiResponse<GroupJoinResponse>> joinGroup(
             @PathVariable String groupId,
             @RequestBody @Valid GroupJoinRequest groupJoinRequest,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal Object principal
     ) {
-        GroupJoinResponse response = groupService.joinGroup(groupId, groupJoinRequest, userDetails.getUsername());
+        GroupJoinResponse response = groupService.joinGroup(groupId, groupJoinRequest, getUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -83,9 +84,9 @@ public class GroupController {
     @GetMapping("/{groupId}/members/requests")
     public ResponseEntity<ApiResponse<List<MemberRequestResponse>>> getMemberRequests(
             @PathVariable String groupId,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal Object principal
     ) {
-        List<MemberRequestResponse> response = groupService.getMemberRequests(groupId, userDetails.getUsername());
+        List<MemberRequestResponse> response = groupService.getMemberRequests(groupId, getUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -95,12 +96,12 @@ public class GroupController {
             @PathVariable String groupId,
             @PathVariable String memberId,
             @RequestBody @Valid MemberRequestStatusUpdateRequest request,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal Object principal
     ) {
         MemberRequestStatusUpdateResponse response = groupService.updateMemberRequestStatus(
                 groupId,
                 memberId,
-                userDetails.getUsername(),
+                getUserId(principal),
                 request.status()
         );
         return ResponseEntity.ok(ApiResponse.success(response));

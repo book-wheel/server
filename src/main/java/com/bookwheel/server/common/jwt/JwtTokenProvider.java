@@ -33,7 +33,7 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // ✨ 1. Access Token 생성 (Role을 받도록 수정!)
+    // Access Token 생성
     public String createAccessToken(String userId, Role role) {
         long now = (new Date()).getTime();
         Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRE_TIME);
@@ -46,7 +46,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    // ✨ 2. Refresh Token 생성 (Role을 받도록 수정!)
+    // Refresh Token 생성
     public String createRefreshToken(String userId, Role role) {
         long now = (new Date()).getTime();
         Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
