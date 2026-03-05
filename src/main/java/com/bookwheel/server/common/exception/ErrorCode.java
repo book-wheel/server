@@ -58,6 +58,9 @@ public enum ErrorCode {
     GROUP_ORDER_MEMBER_SET_INVALID(HttpStatus.BAD_REQUEST, "GROUP_017", "수동 지정 memberIds가 ACTIVE 멤버 전체와 일치하지 않습니다."),
     GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_018", "종료일은 시작일보다 빠를 수 없습니다."),
     GROUP_SCHEDULE_END_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_019", "요청한 종료일을 계산된 마지막 종료일이 초과했습니다."),
+    WHEEL_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_020", "해당 도서의 진행 정보를 찾을 수 없습니다."),
+    WHEEL_ALREADY_CERTIFIED(HttpStatus.BAD_REQUEST, "GROUP_021", "이미 독서 완료 인증 정보가 존재합니다."),
+    IMAGES_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_022", "도서 정보를 꼭 등록해야합니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
