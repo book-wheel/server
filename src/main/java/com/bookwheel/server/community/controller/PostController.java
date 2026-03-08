@@ -7,10 +7,8 @@ import com.bookwheel.server.community.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -22,7 +20,7 @@ public class PostController {
     private final PostService postService;
 
     @Operation(summary = "게시물 사진 업로드용 Presigned URL 다중 발급")
-    @PostMapping("{bookId}/images/presigned-urls")
+    @PostMapping("/{bookId}/images/presigned-urls")
     public ApiResponse<PostImagePresignedResponse> getPresignedUrls(
         @PathVariable("bookId") String bookId,
         @RequestBody PostImagePresignedRequest request) {
@@ -33,9 +31,9 @@ public class PostController {
     @Operation(summary = "게시물 업로드(사진 + 글)")
     @PostMapping("/{bookId}/save")
     public ApiResponse<PostCreateResponse> save(@PathVariable("bookId") String bookId,
-                                                @RequestBody PostCreateRequest request, @AuthenticationPrincipal UserDetails userDetails) {
+                                                @RequestBody PostCreateRequest request, Object principal) {
 
-        String userId = userDetails.getUsername();
+        String userId = getUserId(principal);
         PostCreateResponse response = postService.create(bookId, request,userId);
         return ApiResponse.success(response);
     }

@@ -21,8 +21,8 @@ public class PostImage {
     @JoinColumn(name = "post_id", nullable = false)
     private Post post; // 어느 게시물에 속한 사진인지
 
-    @Column(name = "image_url", nullable = false, length = 500)
-    private String imageUrl;
+    @Column(name = "fileExtensions", nullable = false, length = 500)
+    private String objectKey;
 
     public void setPost(Post post) {
         this.post = post;

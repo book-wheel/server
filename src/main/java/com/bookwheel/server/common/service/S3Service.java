@@ -1,5 +1,7 @@
 package com.bookwheel.server.common.service;
 
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +23,7 @@ public class S3Service {
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucket;
+    private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp");
 
     public String getPresignedUrl(String prefix, String fileName) {
         // 중복 방지를 위해 고유한 파일 경로 생성
@@ -46,7 +49,12 @@ public class S3Service {
     public PostImagePresignedResponse getPostPresignedUrls(String bookId, List<String> fileExtensions) {
         String prefix = "posts/" + bookId;
         List<PostImagePresignedResponse.PresignedInfo> presignedInfos = fileExtensions.stream().map(ext -> {
-            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + ext;
+
+            String normalizedExt = ext.toLowerCase().replace(".", "");
+            if (!ALLOWED_EXTENSIONS.contains(normalizedExt)) {
+                throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+            }
+            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + normalizedExt;
 
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -58,9 +66,8 @@ public class S3Service {
                 .putObjectRequest(putObjectRequest).build();
 
             String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
-            String imageUrl = presignedUrl.split("\\?")[0];
 
-            return new PostImagePresignedResponse.PresignedInfo(presignedUrl, imageUrl);
+            return new PostImagePresignedResponse.PresignedInfo(presignedUrl, objectKey);
         }).toList();
         return new PostImagePresignedResponse(presignedInfos);
     }

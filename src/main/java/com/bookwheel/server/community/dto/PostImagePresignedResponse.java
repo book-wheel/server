@@ -14,7 +14,7 @@ public record PostImagePresignedResponse(
         @Schema(description = "클라이언트가 파일을 PUT할 임시 URL", example = "https://bucket.s3.ap-northeast-2.amazonaws.com/...")
         String presignedUrl,
 
-        @Schema(description = "업로드 완료 후 DB에 저장할 실제 이미지 URL", example = "https://bucket.s3.ap-northeast-2.amazonaws.com/posts/123/uuid.jpg")
-        String imageUrl
+        @Schema(description = "업로드 완료 후 DB에 저장할 S3 객체 키 (Object Key)", example = "posts/105/abcd_image.jpg")
+        String objectKey
     ) {}
 }

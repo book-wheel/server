@@ -18,15 +18,15 @@ public record PostCreateResponse(
     String content,
 
     @Schema(description = "저장된 이미지 URL 목록")
-    List<String> imageUrls
+    List<String> objectKeys
 ) {
     public static PostCreateResponse from(Post post) {
         return new PostCreateResponse(
-            post.getPostsId(),
+            post.getPostId(),
             post.getBook().getBookId(),
             post.getContent(),
             post.getImages().stream()
-                .map(PostImage::getImageUrl)
+                .map(PostImage::getObjectKey)
                 .toList()
         );
     }

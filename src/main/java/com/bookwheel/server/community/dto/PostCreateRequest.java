@@ -4,6 +4,7 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.user.entity.User;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
@@ -12,8 +13,9 @@ public record PostCreateRequest(
     @Schema(description = "감상평 내용", example = "이 페이지 진짜 너무 웃김 ㅋㅋㅋ")
     String content,
 
-    @Schema(description = "S3에 업로드 완료된 이미지 URL 목록 (최대 5개)", example = "[\"https://.../uuid1.jpg\", \"https://.../uuid2.jpg\"]")
-    List<String> imageUrls
+    @Schema(description = "S3에 업로드 완료된 이미지 객체 키 목록 (최대 5개)", example = "[\"posts/105/abcd_image.jpg\"]")
+    @Size(max = 5, message = "사진은 최대 5장까지만 업로드할 수 있습니다.")
+    List<String> objectKeys
 ) {
 
     public Post toEntity(Book book, User uploader) {

@@ -11,7 +11,6 @@ import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
-import com.bookwheel.server.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,10 +33,10 @@ public class PostService {
 
         Post post = request.toEntity(book, user);
 
-        if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
-            for (String url : request.imageUrls()) {
+        if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
+            for (String key : request.objectKeys()) {
                 PostImage postImage = PostImage.builder()
-                    .imageUrl(url)
+                    .objectKey(key)
                     .build();
                 post.addImage(postImage);
             }
