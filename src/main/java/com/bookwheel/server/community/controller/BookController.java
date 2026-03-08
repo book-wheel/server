@@ -20,7 +20,7 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 @RestController
 @RequestMapping("/api/v1/books")
 @RequiredArgsConstructor
-@Tag(name = "도서 및 커뮤니티 API", description = "도서 검색 -> 도서 상세 조회, 관심도서 찜 | 교환독서 책에 대한 리뷰 및 사진 업로드 ")
+@Tag(name = "도서 및 커뮤니티(코멘트) API", description = "도서 검색 -> 도서 상세 조회, 관심도서 찜 | 교환독서 책 리뷰 ")
 
 public class BookController{
     private final BookService bookService;
@@ -38,12 +38,7 @@ public class BookController{
         return ApiResponse.success(bookId + "도서 상세 조회 api 연결");
     }
 
-    @Operation(summary ="사진첩 업로드")
-    @PostMapping("/{bookId}/photos")
-    public ApiResponse<String> addBookPhoto(@PathVariable("bookId") String bookId, @RequestParam("file") MultipartFile file) {
-        // TODO: 사진 파일과 사용자 정보 받아서 Service로 넘기기
-        return ApiResponse.success(bookId + "사진첩 업로드 api 연결");
-    }
+
 
 
     @Operation(summary ="관심 도서 찜")

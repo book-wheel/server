@@ -11,7 +11,7 @@ public class PhotoReport {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "photo_id", nullable = false)
-    private Bookphoto photo; // 신고 대상 사진
+    private PostImage photo; // 신고 대상 사진
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporter_id", nullable = false)
