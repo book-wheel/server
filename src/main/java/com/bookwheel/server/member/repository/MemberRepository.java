@@ -14,7 +14,7 @@ import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, String> {
     // 특정 그룹에 특정 사용자가 이미 멤버로 등록되어 있는지 확인
-    // 특정 사용자가 해당 그룹에 이미 가입했거나 신청 중인지 중복 여부를 확인할 때 사용
+    // 특정 사용자가 해당 그룹에 속하는 유저인지 확인하는 용도 (중복 방지 시 사용)
     boolean existsByGroup_GroupIdAndUser_UserId(String groupId, String userId);
 
     // 특정 그룹 안에서 이 사용자가 '어떤 멤버'로 등록되어 있는지 단 한 명의 정보 조회
@@ -27,9 +27,6 @@ public interface MemberRepository extends JpaRepository<Member, String> {
 
     // 특정 그룹 내 특정 상태(ex. PENDING, ACTIVE)의 멤버 목록 조회
     List<Member> findByGroup_GroupIdAndMemberStatus(String groupId, MemberStatus memberStatus);
-
-    // 특정 그룹의 읽는 순서대로 멤버 목록 조회
-    List<Member> findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(String groupId, MemberStatus memberStatus);
 
     // 모임 멤버들의 명단을 불러오는 기능
     // 독서 순서를 바꾸는 동안 다른 사람이 건드리지 못하게 잠금(Lock)을 걸고 이름 정보(User)까지 한 번에 조회
