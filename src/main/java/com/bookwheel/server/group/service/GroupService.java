@@ -1,6 +1,7 @@
 package com.bookwheel.server.group.service;
 
-import com.bookwheel.server.common.exception.*;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
 import com.bookwheel.server.group.entity.*;
 import com.bookwheel.server.group.repository.*;
@@ -51,7 +52,6 @@ public class GroupService {
         memberRepository.save(leader);
         return GroupCreateResponse.of(savedGroup.getGroupId());
     }
-
 
     @Transactional
     public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userId) {
@@ -205,7 +205,6 @@ public class GroupService {
 
         return user;
     }
-
 
     private boolean isGroupPasswordMatched(String rawPassword, String savedPassword) {
         if (!StringUtils.hasText(savedPassword)) {
