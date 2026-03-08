@@ -64,7 +64,7 @@ public class GroupBookService {
                 ));
 
         OwnBook ownBook = OwnBook.builder()
-                .ownbookId(UUID.randomUUID().toString())
+                .ownBookId(UUID.randomUUID().toString())
                 .group(group)
                 .owner(user)
                 .book(book)
@@ -73,7 +73,7 @@ public class GroupBookService {
                 .build();
         OwnBook savedOwnBook = ownBookRepository.save(ownBook);
 
-        return OwnBookRegisterResponse.of(savedOwnBook.getOwnbookId());
+        return OwnBookRegisterResponse.of(savedOwnBook.getOwnBookId());
     }
 
     private Group findGroupById(String groupId) {

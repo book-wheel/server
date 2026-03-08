@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 public class OwnBook {
     @Id
     @Column(name = "ownbook_id", length = 50)
-    private String ownbookId;
+    private String ownBookId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)

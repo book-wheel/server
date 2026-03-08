@@ -4,11 +4,11 @@ import lombok.Builder;
 
 @Builder
 public record OwnBookRegisterResponse(
-        String ownbookId
+        String ownBookId
 ) {
-    public static OwnBookRegisterResponse of(String ownbookId) {
+    public static OwnBookRegisterResponse of(String ownBookId) {
         return OwnBookRegisterResponse.builder()
-                .ownbookId(ownbookId)
+                .ownBookId(ownBookId)
                 .build();
     }
 }
