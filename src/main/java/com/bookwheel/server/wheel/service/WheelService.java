@@ -74,7 +74,7 @@ public class WheelService {
 
     @Transactional(readOnly = true)
     public WheelHistoryBookResponse historyReadingBook(String userId, String groupId, String ownBookId) {
-        // 권한 확인 (내가 그룹원이면 되기 때문에 userId 두 번 삽입)
+        // 1. 권한 확인 (내가 그룹원이면 되기 때문에 userId 두 번 삽입)
         validateGroupAccess(userId, userId, groupId);
         Map<String, Integer> roundNumberMap = getRoundNumberMap(groupId);
 
@@ -82,7 +82,7 @@ public class WheelService {
         OwnBook ownBook = ownBookRepository.findById(ownBookId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        // 특정 책의 완독 기록 가져오기
+        // 2. 특정 책의 완독 기록 가져오기
         List<WheelState> wheelStates = wheelStateRepository.findAllByOwnBookIdWithMemberAndImages(groupId, ownBookId, WheelStatus.COMPLETED);
 
         // 만약 기록이 하나도 없다면 빈 리스트 반환
@@ -90,7 +90,7 @@ public class WheelService {
             return WheelHistoryBookResponse.of(ownBook, Collections.emptyList());
         }
 
-        // 기록이 있다면 데이터 조립
+        // 3. 기록이 있다면 데이터 조립
         List<HistoryDto> histories = wheelStates.stream()
                 .map(ws -> HistoryDto.of(ws, roundNumberMap.getOrDefault(ws.getRoundId(), 0)))
                 .toList();
@@ -107,7 +107,7 @@ public class WheelService {
         }
     }
 
-    // 🗺️ 2. 바코드 번역기 생성 도우미 (Round Map)
+    // 라운드ID 매핑 도우미
     private Map<String, Integer> getRoundNumberMap(String groupId) {
         return roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)
                 .stream()
