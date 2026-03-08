@@ -25,6 +25,12 @@ public enum ErrorCode {
     INACTIVE_USER(HttpStatus.BAD_REQUEST, "AUTH_010", "탈퇴한 사용자입니다."),
     BANNED_USER(HttpStatus.FORBIDDEN, "AUTH_016", "제재 중인 사용자입니다."),
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_015", "인증이 필요합니다."),
+    TOO_MANY_EMAIL_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "AUTH_017", "1분 이내에 재전송할 수 없습니다."),
+    INVALID_RECOVERY_TOKEN(HttpStatus.BAD_REQUEST, "AUTH_018", "유효하지 않은 재설정 토큰입니다."),
+    EXPIRED_RECOVERY_TOKEN(HttpStatus.BAD_REQUEST, "AUTH_019", "재설정 토큰이 만료되었습니다."),
+    SOCIAL_ACCOUNT_CANNOT_USE_RECOVERY(HttpStatus.BAD_REQUEST, "AUTH_020", "소셜 로그인 계정은 계정 찾기 기능을 이용할 수 없습니다."),
+    PASSWORD_SAME_AS_OLD(HttpStatus.BAD_REQUEST, "AUTH_021", "현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다."),
+    INVALID_PASSWORD_FORMAT(HttpStatus.BAD_REQUEST, "AUTH_022", "비밀번호는 8~20자이며, 영문, 숫자, 특수문자를 포함해야 합니다."),
 
     // JWT 토큰 관련 에러
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_011", "유효하지 않은 토큰입니다."),
@@ -52,6 +58,9 @@ public enum ErrorCode {
     GROUP_ORDER_MEMBER_SET_INVALID(HttpStatus.BAD_REQUEST, "GROUP_017", "수동 지정 memberIds가 ACTIVE 멤버 전체와 일치하지 않습니다."),
     GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_018", "종료일은 시작일보다 빠를 수 없습니다."),
     GROUP_SCHEDULE_END_DATE_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_019", "요청한 종료일을 계산된 마지막 종료일이 초과했습니다."),
+    WHEEL_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_020", "해당 도서의 진행 정보를 찾을 수 없습니다."),
+    WHEEL_ALREADY_CERTIFIED(HttpStatus.BAD_REQUEST, "GROUP_021", "이미 독서 완료 인증 정보가 존재합니다."),
+    IMAGES_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_022", "도서 정보를 꼭 등록해야합니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),

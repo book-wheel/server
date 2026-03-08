@@ -27,6 +27,25 @@ public class EmailService {
     private final StringRedisTemplate redisTemplate;
     private final SecureRandom random = new SecureRandom();
 
+    // 계정 복구용 메일 발송
+    public void sendVerificationMail(String email, String code) {
+        try {
+            String subject = "[책바퀴] 계정 복구를 위한 인증번호 안내";
+            String text = String.format(
+                    "안녕하세요. 책바퀴(Book-Wheel)입니다.\n\n" +
+                            "계정 확인을 위한 인증번호는 다음과 같습니다.\n" +
+                            "인증번호: [%s]\n\n" +
+                            "5분 이내에 입력해 주세요.", code);
+
+            sendEmail(email, subject, text);
+            log.info("계정 복구 인증번호 메일 발송 완료: {}", email);
+        } catch (Exception e) {
+            log.error("메일 전송 실패: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.EMAIL_SEND_FAILED);
+        }
+    }
+
+    // 회원가입용 메일 발송
     public void sendVerificationCode(String email) {
         String code = generateVerificationCode();
         try {

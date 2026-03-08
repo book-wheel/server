@@ -39,6 +39,10 @@ public class UserService {
             throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
 
+        if (!isValidPassword(request.password())) {
+            throw new BusinessException(ErrorCode.INVALID_PASSWORD_FORMAT);
+        }
+
         // 일반 회원가입(NONE) 방식 내에서만 중복 및 재가입 체크
         handleExistingUser(request.userId(), request.mail(), SocialType.NONE);
 
@@ -59,6 +63,11 @@ public class UserService {
         log.info("일반 회원가입 1단계 완료: userId={}, tempNickname={}", savedUser.getUserId(), tempNickname);
 
         return UserResponse.from(savedUser);
+    }
+
+    private boolean isValidPassword(String password) {
+        String regex = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[@$!%*#?&])[A-Za-z\\d@$!%*#?&]{8,20}$";
+        return password != null && password.matches(regex);
     }
 
     @Transactional
@@ -235,5 +244,30 @@ public class UserService {
         }
 
         return user;
+    }
+
+    @Transactional
+    public void changePassword(String userId, PasswordChangeRequest request) {
+        // 유저 조회
+        User user = findByUserIdAndValidateActive(userId);
+
+        // 소셜 로그인 유저는 비밀번호 변경 불가
+        if (user.getSocialType() != SocialType.NONE) {
+            throw new BusinessException(ErrorCode.SOCIAL_ACCOUNT_CANNOT_USE_RECOVERY);
+        }
+
+        // 현재 비밀번호가 일치하는지 확인
+        if (!passwordEncoder.matches(request.oldPassword(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_PASSWORD); // "현재 비밀번호가 틀렸습니다"
+        }
+
+        // 새 비밀번호가 현재 비밀번호와 똑같은지 확인 (재사용 방지)
+        if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.PASSWORD_SAME_AS_OLD);
+        }
+
+        // 비밀번호 암호화 및 업데이트
+        user.updatePassword(passwordEncoder.encode(request.newPassword()));
+        log.info("비밀번호 변경 완료: userId={}", userId);
     }
 }

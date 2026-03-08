@@ -10,11 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @RestController
 @RequestMapping("/api/v1/books")
@@ -58,9 +59,8 @@ public class BookController{
     public ApiResponse<String> addBookReview(
         @PathVariable("bookId") String bookId,
         @Valid @RequestBody ReviewCreateRequest request,
-        @AuthenticationPrincipal UserDetails userDetails) {
-
-        bookService.createReview(bookId, request, userDetails.getUsername());
+        @AuthenticationPrincipal Object principal) {
+        bookService.createReview(bookId, request, getUserId(principal));
 
         return ApiResponse.success("리뷰 작성이 완료되었습니다.");
     }
@@ -69,11 +69,9 @@ public class BookController{
     @GetMapping("/{bookId}/reviews")
     public ApiResponse<List<ReviewDetailResponse>> getReviewList(
         @PathVariable("bookId") String bookId,
-        @AuthenticationPrincipal UserDetails userDetails) {
+        @AuthenticationPrincipal Object principal) {
 
-        String userId = userDetails.getUsername();
-        List<ReviewDetailResponse> response = bookService.getReviewList(bookId, userId);
-
+        List<ReviewDetailResponse> response = bookService.getReviewList(bookId, getUserId(principal));
         return ApiResponse.success(response);
     }
 
@@ -90,9 +88,9 @@ public class BookController{
     @PostMapping("/reviews/{reviewId}/likes")
     public ApiResponse<String> toggleReviewLike(
         @PathVariable("reviewId") Long reviewId,
-        @AuthenticationPrincipal UserDetails userDetails) {
+        @AuthenticationPrincipal Object principal) {
 
-        bookService.toggleReviewLike(reviewId, userDetails.getUsername());
+        bookService.toggleReviewLike(reviewId, getUserId(principal));
         return ApiResponse.success("공감 상태가 변경되었습니다.");
     }
 

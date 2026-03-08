@@ -1,10 +1,14 @@
 package com.bookwheel.server.wheel.entity;
 
 import com.bookwheel.server.book.entity.OwnBook;
+import com.bookwheel.server.common.exception.*;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -47,10 +51,34 @@ public class WheelState {
     @Column(name = "review_text", length = 255)
     private String reviewText;
 
-    @Column(name = "auth_image_url", length = 255)
-    private String authImageUrl;
+    // 독서 상태가 지워질 때 사진 데이터도 전부 지움
+    @OneToMany(mappedBy = "wheelState", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<WheelStateImage> authImages = new ArrayList<>();
 
     public void updateStatus(WheelStatus wheelState) {
         this.wheelState = wheelState;
+    }
+
+    public void complete(String reviewText, List<String> imageUrls) {
+        // 이미 정보가 존재한다면 실행 X
+        if (this.isCompleted) {
+            throw new BusinessException(ErrorCode.WHEEL_ALREADY_CERTIFIED);
+        }
+        // 이미지 정보가 없다면 실행 X
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            throw new BusinessException(ErrorCode.IMAGES_NOT_FOUND);
+        }
+
+        // 1. 감상평 저장 및 상태 변경
+        this.reviewText = reviewText;
+        this.wheelState = WheelStatus.COMPLETED;
+        this.isCompleted = true;
+
+        // 2. 저장
+        List<WheelStateImage> images = imageUrls.stream()
+                .map(url -> WheelStateImage.of(url, this))
+                .toList();
+
+        this.authImages.addAll(images);
     }
 }
