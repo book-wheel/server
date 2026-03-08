@@ -173,11 +173,9 @@ public class UserService {
             }
         }
 
-        // [디버깅] 현재 시큐리티 세션에 기록된 진짜 이름을 확인
-        String principalName = org.springframework.security.core.context.SecurityContextHolder.getContext()
-                .getAuthentication().getName();
-        log.info("시큐리티가 기억하는 유저 이름(Principal Name): {}", principalName);
-        log.info("우리가 DB에서 가져온 유저 ID(userId): {}", user.getUserId());
+        // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
+        log.info("회원 탈퇴 처리 시작 - ID: {}", userId);
+        log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
 
         // 구글일 경우 연동 해제용 액세스 토큰 가져오기
         String socialAccessToken = null;

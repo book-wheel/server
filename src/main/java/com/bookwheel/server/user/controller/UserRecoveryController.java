@@ -49,14 +49,4 @@ public class UserRecoveryController {
         userRecoveryService.resetPassword(request);
         return ApiResponse.success(null);
     }
-
-    // 중복 코드 방지를 위한 프라이빗 메서드
-    private String getUserIdFromPrincipal(Object principal) {
-        if (principal instanceof CustomOAuth2User) {
-            return ((CustomOAuth2User) principal).getUserId();
-        } else if (principal instanceof UserDetails) {
-            return ((UserDetails) principal).getUsername();
-        }
-        throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
-    }
 }
