@@ -33,7 +33,7 @@ public class BookReview {
     private User reviewer;
 
     // 리뷰 내용
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false, length = 500, columnDefinition = "TEXT")
     private String content;
 
     // 추천/비추천 (true: 추천, false: 비추천)

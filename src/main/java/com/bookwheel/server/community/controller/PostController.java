@@ -7,6 +7,7 @@ import com.bookwheel.server.community.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
@@ -39,6 +40,15 @@ public class PostController {
     }
 
     //TODO 게시물 좋아요, 댓글 기능 추가
+    @Operation(summary = "게시물 좋아요")
+    @PostMapping("/{postId}/likes")
+    public ApiResponse<String> togglePostLike(
+        @PathVariable("postId") Long postId,
+        @AuthenticationPrincipal Object principal) {
+
+        postService.togglePostLike(postId, getUserId(principal));
+        return ApiResponse.success("공감 상태가 변경되었습니다.");
+    }
 
 
     @Operation(summary = "사진첩 신고")

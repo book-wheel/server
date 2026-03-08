@@ -8,6 +8,8 @@ import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.entity.PostLike;
+import com.bookwheel.server.community.repository.PostLikeRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -22,6 +24,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
+    private final PostLikeRepository postLikeRepository;
 
     @Transactional
     public PostCreateResponse create(String bookId, PostCreateRequest request, String userId) {
@@ -47,6 +50,30 @@ public class PostService {
         return PostCreateResponse.from(savedPost);
 
 
+    }
+
+    @Transactional
+    public void togglePostLike(Long postId, String userId) {
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND)); // 에러 코드는 팀 규칙에 맞게!
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        postLikeRepository.findByPostAndUser(post, user)
+            .ifPresentOrElse(
+                postLike -> {
+                    postLikeRepository.delete(postLike);
+                    post.decreaseLikeCount();
+                },
+
+                () -> {
+                    PostLike newLike = PostLike.builder()
+                        .post(post)
+                        .user(user)
+                        .build();
+                    postLikeRepository.save(newLike);
+                    post.increaseLikeCount();
+                }
+            );
     }
 
 }
