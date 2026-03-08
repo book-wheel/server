@@ -48,13 +48,16 @@ public class EmailService {
     // 회원가입용 메일 발송
     public void sendVerificationCode(String email) {
         String code = generateVerificationCode();
+
+        saveVerificationCode(email, code);
+
         try {
             sendEmail(email, "[책바퀴] 이메일 인증번호 안내",
                     String.format("인증번호: %s\n5분 내에 입력해주세요.", code));
-            saveVerificationCode(email, code);
             log.info("인증번호 발송 완료: {}", email);
         } catch (Exception e) {
-            log.error("이메일 전송 실패: {}", e.getMessage());
+            deleteVerificationCode(email);
+            log.error("이메일 발송 중 오류 발생: {}", e.getMessage());
             throw new BusinessException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
