@@ -8,8 +8,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @Tag(name = "Wheel", description="독서 진행 상태 관리 API")
 @RestController
@@ -23,8 +24,8 @@ public class WheelController {
     public ApiResponse<WheelCompleteResponse> completeReading(
             @PathVariable String wheelStateId,
             @RequestBody @Valid WheelCompleteRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        String userId = userDetails.getUsername();
+            @AuthenticationPrincipal Object principal) {
+        String userId = getUserId(principal);
 
         WheelCompleteResponse response = wheelService.completedReading(userId, wheelStateId, request);
 

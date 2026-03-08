@@ -13,9 +13,6 @@ import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,11 +29,6 @@ public class GroupService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
-    @Transactional
-    public GroupCreateResponse createGroup(GroupCreateRequest request) {
-        return createGroup(request, resolveCurrentUserId());
-    }
 
     @Transactional
     public GroupCreateResponse createGroup(GroupCreateRequest request, String userId) {
@@ -59,11 +51,6 @@ public class GroupService {
 
         memberRepository.save(leader);
         return GroupCreateResponse.of(savedGroup.getGroupId());
-    }
-
-    @Transactional
-    public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request) {
-        return joinGroup(groupId, request, resolveCurrentUserId());
     }
 
     @Transactional
@@ -93,10 +80,6 @@ public class GroupService {
     public Page<GroupSearchResponse> getGroups(GroupSearchCondition condition, Pageable pageable) {
         Page<Group> groupPage = groupRepository.findAll(GroupSpecification.searchWith(condition), pageable);
         return groupPage.map(GroupSearchResponse::from);
-    }
-
-    public GroupDetailResponse getGroup(String groupId) {
-        return getGroup(groupId, resolveCurrentUserId());
     }
 
     public GroupDetailResponse getGroup(String groupId, String userId) {
@@ -221,17 +204,6 @@ public class GroupService {
         }
 
         return user;
-    }
-
-    private String resolveCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken
-                || !StringUtils.hasText(authentication.getName())) {
-            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
-        }
-        return authentication.getName();
     }
 
     private boolean isGroupPasswordMatched(String rawPassword, String savedPassword) {
