@@ -26,7 +26,7 @@ public class GroupBookController {
 
     @Operation(
             summary = "참여 도서 등록",
-            description = "그룹 내 참여 도서를 등록하고 ownbookId를 반환합니다."
+            description = "그룹 내 참여 도서를 등록하고 ownBookId를 반환합니다."
     )
     @PostMapping("/{groupId}/books")
     public ResponseEntity<ApiResponse<OwnBookRegisterResponse>> registerOwnBook(
