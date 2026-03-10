@@ -7,11 +7,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @RestController
 @RequiredArgsConstructor
@@ -28,9 +30,9 @@ public class GroupDashboardController {
     public ApiResponse<DashboardResponse> getDashboard(
             @Parameter(description = "조회할 그룹 ID", example = "group-123")
             @PathVariable String groupId,
-            Authentication authentication
+            @AuthenticationPrincipal Object principal
     ) {
-        String userId = authentication.getName();
+        String userId = getUserId(principal);
         DashboardResponse response = groupDashboardService.getDashboard(groupId, userId);
         return ApiResponse.success(response);
     }
