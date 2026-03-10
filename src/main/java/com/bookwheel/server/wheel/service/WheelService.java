@@ -62,12 +62,8 @@ public class WheelService {
 
         // 4. WheelState 리스트를 WheelHistoryUserResponse 리스트로 변환하기
         return wheelStates.stream()
-                // 라운드 데이터가 존재하는 데이터만 사용
-                .filter(wheelState -> roundNumberMap.containsKey(wheelState.getRoundId()))
-                .map(wheelState -> {
-                    int realRoundNumber = roundNumberMap.get(wheelState.getRoundId());
-                    return WheelHistoryUserResponse.of(wheelState, realRoundNumber);
-                })
+                .filter(ws -> roundNumberMap.containsKey(ws.getRoundId()))
+                .map(ws -> WheelHistoryUserResponse.of(ws, roundNumberMap.get(ws.getRoundId())))
                 .collect(Collectors.toList());
     }
 
@@ -95,14 +91,22 @@ public class WheelService {
                 .map(ws -> HistoryDto.of(ws, roundNumberMap.getOrDefault(ws.getRoundId(), 0)))
                 .toList();
 
-        return WheelHistoryBookResponse.of(wheelStates.get(0).getOwnBook(), histories);
+        return WheelHistoryBookResponse.of(ownBook, histories);
     }
 
     private void validateGroupAccess(String userId, String targetId, String groupId) {
-        boolean isRequesterMember = memberRepository.existsByGroup_GroupIdAndUser_UserId(groupId, userId);
-        boolean isTargetMember = memberRepository.existsByGroup_GroupIdAndUser_UserId(groupId, targetId);
+        // 1. 내 기록을 내가 보는 경우 (또는 책 상세페이지처럼 userId만 넘어온 경우)
+        if (userId.equals(targetId)) {
+            boolean isMember = memberRepository.existsByGroup_GroupIdAndUser_UserId(groupId, userId);
+            if (!isMember) {
+                throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+            }
+            return;
+        }
 
-        if (!isRequesterMember || !isTargetMember) {
+        // 2. 다른 사람의 기록을 보는 경우 (IN 절을 사용해 쿼리 1번으로 2명 동시 검사!)
+        long memberCount = memberRepository.countByGroup_GroupIdAndUser_UserIdIn(groupId, List.of(userId, targetId));
+        if (memberCount != 2) { // 2명 모두 그룹에 속해있어야 하므로 count가 2여야 함
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
     }
