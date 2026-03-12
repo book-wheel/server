@@ -7,6 +7,7 @@ import com.bookwheel.server.wheel.enums.WheelStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,6 +52,9 @@ public class WheelState {
     @Column(name = "review_text", length = 255)
     private String reviewText;
 
+    @Column(name = "review_date")
+    private LocalDateTime reviewedAt;
+
     // 독서 상태가 지워질 때 사진 데이터도 전부 지움
     @OneToMany(mappedBy = "wheelState", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WheelStateImage> authImages = new ArrayList<>();
@@ -73,6 +77,7 @@ public class WheelState {
         this.reviewText = reviewText;
         this.wheelState = WheelStatus.COMPLETED;
         this.isCompleted = true;
+        this.reviewedAt = LocalDateTime.now();
 
         // 2. 저장
         List<WheelStateImage> images = imageUrls.stream()

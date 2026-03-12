@@ -103,7 +103,7 @@ public class GroupDashboardService {
         if (myOwnBookOpt.isPresent()) {
             OwnBook myOwnBook = myOwnBookOpt.get();
             Optional<WheelState> bookWheelStateOpt = wheelStateRepository
-                    .findFirstByRoundIdAndOwnBook_OwnbookId(currentRound.getRoundId(), myOwnBook.getOwnbookId());
+                    .findFirstByRoundIdAndOwnBook_OwnBookId(currentRound.getRoundId(), myOwnBook.getOwnBookId());
 
             if (bookWheelStateOpt.isPresent()) {
                 WheelState ws = bookWheelStateOpt.get();
@@ -141,9 +141,9 @@ public class GroupDashboardService {
 
         return roundRepository
                 .findByGroup_GroupIdAndRoundNumber(groupId, previousRoundNumber)
-                .flatMap(previousRound -> wheelStateRepository.findFirstByRoundIdAndOwnBook_OwnbookId(
+                .flatMap(previousRound -> wheelStateRepository.findFirstByRoundIdAndOwnBook_OwnBookId(
                         previousRound.getRoundId(),
-                        currentWheelState.getOwnBook().getOwnbookId()
+                        currentWheelState.getOwnBook().getOwnBookId()
                 ))
                 .map(previousWheelState -> previousWheelState.getMember().getUser().getNickname())
                 .orElse(null);

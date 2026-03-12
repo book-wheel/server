@@ -2,7 +2,6 @@ package com.bookwheel.server.user.controller;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.common.oauth2.CustomOAuth2User;
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.service.UserService;
@@ -11,10 +10,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import lombok.extern.slf4j.Slf4j;
+
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @Slf4j
 @Tag(name = "Users", description = "회원 정보 관리 API")
@@ -31,7 +31,7 @@ public class UserController {
             @AuthenticationPrincipal Object principal,
             @Valid @RequestBody ProfileSetupRequest request) {
 
-        String userId = getUserIdFromPrincipal(principal);
+        String userId = getUserId(principal);
         LoginResponse response = userService.setupProfile(userId, request);
         return ApiResponse.success(response);
     }
@@ -39,7 +39,7 @@ public class UserController {
     @Operation(summary = "내 정보 조회", description = "로그인한 사용자의 정보를 조회합니다. (소셜 유저도 가능!)")
     @GetMapping("/me")
     public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal Object principal) {
-        String userId = getUserIdFromPrincipal(principal);
+        String userId = getUserId(principal);
         UserResponse response = userService.getMyInfo(userId);
         return ApiResponse.success(response);
     }
@@ -47,7 +47,7 @@ public class UserController {
     @Operation(summary = "로그아웃", description = "사용자를 로그아웃 처리하고 Redis의 Refresh Token을 삭제합니다.")
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal Object principal) {
-        String userId = getUserIdFromPrincipal(principal);
+        String userId = getUserId(principal);
         userService.logout(userId);
         return ApiResponse.success(null);
     }
@@ -57,8 +57,7 @@ public class UserController {
     public ApiResponse<Void> withdraw(
             @AuthenticationPrincipal Object principal,
             @Valid @RequestBody(required = false) UserWithdrawRequest request) {
-
-        String userId = getUserIdFromPrincipal(principal);
+        String userId = getUserId(principal);
         userService.withdraw(userId, request);
         return ApiResponse.success(null);
     }
@@ -71,16 +70,6 @@ public class UserController {
         }
         return ApiResponse.success(true);
     }
-
-     // 소셜 유저인지 일반 유저인지 구분해서 userId를 추출하는 메서드
-     private String getUserIdFromPrincipal(Object principal) {
-         if (principal instanceof CustomOAuth2User oauth2User) {
-             return oauth2User.getUserId();
-         } else if (principal instanceof UserDetails userDetails) {
-             return userDetails.getUsername();
-         }
-         throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
-     }
 
      // 소셜 유저 검증
     private void validateNonSocialUser(String userId) {
@@ -96,7 +85,7 @@ public class UserController {
             @AuthenticationPrincipal Object principal,
             @Valid @RequestBody PasswordChangeRequest request) {
 
-        String userId = getUserIdFromPrincipal(principal);
+        String userId = getUserId(principal);
 
         // 소셜 유저 검증
         validateNonSocialUser(userId);
