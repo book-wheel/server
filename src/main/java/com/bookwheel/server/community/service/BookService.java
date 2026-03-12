@@ -8,8 +8,10 @@ import com.bookwheel.server.community.dto.ReviewCreateRequest;
 import com.bookwheel.server.community.dto.ReviewCreateResponse;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.ReviewLike;
+import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.user.entity.User;
@@ -25,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class BookService {
-    private final BookRepository bookRepository;
+   private final BookInfoRepository bookInfoRepository;
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
@@ -34,10 +36,10 @@ public class BookService {
     @Transactional
     public ReviewCreateResponse createReview(String bookId, ReviewCreateRequest request, String userId) {
 
-        Book book = bookRepository.findById(bookId)
+        BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        if (bookReviewRepository.existsByBookAndReviewer_UserId(book, userId)) {
+        if (bookReviewRepository.existsByBookInfoAndReviewer_UserId(bookInfo, userId)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
         }
 
@@ -46,7 +48,7 @@ public class BookService {
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
-        BookReview review = request.toEntity(book, user);
+        BookReview review = request.toEntity(bookInfo, user);
 
         BookReview savedReview = bookReviewRepository.save(review);
 
@@ -77,11 +79,11 @@ public class BookService {
     }
 
     public ReviewStatsResponse getReviewStats(String bookId) {
-        Book book = bookRepository.findById(bookId)
+        BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        long recommendedCount = bookReviewRepository.countByBookAndIsRecommended(book, true);
-        long notRecommendedCount = bookReviewRepository.countByBookAndIsRecommended(book, false);
+        long recommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, true);
+        long notRecommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, false);
         long totalCount = recommendedCount + notRecommendedCount;
 
         if (totalCount == 0) {
@@ -95,14 +97,14 @@ public class BookService {
     }
 
     public List<ReviewDetailResponse> getReviewList(String bookId, String userId) {
-        Book book = bookRepository.findById(bookId)
+        BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
-        List<BookReview> reviews = bookReviewRepository.findAllByBookOrderByCreatedAtDesc(book);
+        List<BookReview> reviews = bookReviewRepository.findAllByBookInfoOrderByCreatedAtDesc(bookInfo);
 
 
         return reviews.stream().map(review -> {

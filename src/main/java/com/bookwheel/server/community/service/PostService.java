@@ -4,11 +4,12 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
-import com.bookwheel.server.community.entity.Post;
-import com.bookwheel.server.community.entity.PostImage;
-import com.bookwheel.server.community.entity.PostLike;
+import com.bookwheel.server.community.entity.*;
+import com.bookwheel.server.community.repository.BookInfoRepository;
+import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.User;
@@ -23,18 +24,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
-    private final BookRepository bookRepository;
+    private final BookInfoRepository bookInfoRepository;
     private final PostLikeRepository postLikeRepository;
+    private final PostCommentRepository postCommentRepository;
 
     @Transactional
-    public PostCreateResponse create(String bookId, PostCreateRequest request, String userId) {
-        Book book = bookRepository.findById(bookId)
+    public PostCreateResponse create(String bookInfoId, PostCreateRequest request, String userId) {
+        BookInfo bookInfo = bookInfoRepository.findById(bookInfoId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Post post = request.toEntity(book, user);
+        Post post = request.toEntity(bookInfo, user);
 
         if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
             for (String key : request.objectKeys()) {
@@ -55,7 +57,7 @@ public class PostService {
     @Transactional
     public void togglePostLike(Long postId, String userId) {
         Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND)); // 에러 코드는 팀 규칙에 맞게!
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         postLikeRepository.findByPostAndUser(post, user)
@@ -66,14 +68,24 @@ public class PostService {
                 },
 
                 () -> {
-                    PostLike newLike = PostLike.builder()
-                        .post(post)
-                        .user(user)
-                        .build();
-                    postLikeRepository.save(newLike);
+                    postLikeRepository.save(PostLike.create(post, user));
                     post.increaseLikeCount();
                 }
             );
+    }
+
+    @Transactional
+    public void createPostComment(Long postId, PostCommentCreateRequest request, String userId) {
+
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        PostComment comment = request.toEntity(post, user);
+
+        postCommentRepository.save(comment);
     }
 
 }

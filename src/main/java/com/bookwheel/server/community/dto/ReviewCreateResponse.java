@@ -32,7 +32,7 @@ public record ReviewCreateResponse(
     public static ReviewCreateResponse from(BookReview review) {
         return new ReviewCreateResponse(
             review.getReviewId(),
-            review.getBook().getBookId(),
+            review.getBookInfo().getId(),
             review.getIsRecommended(),
             review.getContent(),
             review.getIsHidden(),

@@ -6,6 +6,7 @@ import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -32,14 +33,14 @@ public class PostController {
     @Operation(summary = "게시물 업로드(사진 + 글)")
     @PostMapping("/{bookId}/save")
     public ApiResponse<PostCreateResponse> save(@PathVariable("bookId") String bookId,
-                                                @RequestBody PostCreateRequest request, Object principal) {
+                                                @RequestBody PostCreateRequest request, @AuthenticationPrincipal Object principal) {
 
         String userId = getUserId(principal);
         PostCreateResponse response = postService.create(bookId, request,userId);
         return ApiResponse.success(response);
     }
 
-    //TODO 게시물 좋아요, 댓글 기능 추가
+
     @Operation(summary = "게시물 좋아요")
     @PostMapping("/{postId}/likes")
     public ApiResponse<String> togglePostLike(
@@ -48,6 +49,18 @@ public class PostController {
 
         postService.togglePostLike(postId, getUserId(principal));
         return ApiResponse.success("공감 상태가 변경되었습니다.");
+    }
+
+    @Operation(summary = "게시물 댓글 작성")
+    @PostMapping("/{postId}/comments")
+    public ApiResponse<String> createPostComment(
+        @PathVariable("postId") Long postId,
+        @Valid @RequestBody PostCommentCreateRequest request,
+        @AuthenticationPrincipal Object principal) {
+
+        postService.createPostComment(postId, request, getUserId(principal));
+
+        return ApiResponse.success("댓글이 성공적으로 작성되었습니다.");
     }
 
 

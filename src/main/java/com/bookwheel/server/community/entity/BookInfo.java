@@ -11,8 +11,8 @@ import lombok.*;
 public class BookInfo {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "book_info_id", length = 50)
+    private String id;
 
     @Column(unique = true, nullable = false)
     private String isbn; // 알라딘 도서 고유 식별자
