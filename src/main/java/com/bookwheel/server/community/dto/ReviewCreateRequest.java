@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.dto;
 
 import com.bookwheel.server.book.entity.Book;
+import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.user.entity.User;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,9 +27,9 @@ public record ReviewCreateRequest(
             Boolean isHidden
 )
 {
-    public BookReview toEntity(Book book, User user) {
+    public BookReview toEntity(BookInfo bookInfo, User user) {
         return BookReview.builder()
-            .book(book)
+            .bookInfo(bookInfo)
             .reviewer(user)
             .content(this.comment)
             .isRecommended(this.isRecommended)

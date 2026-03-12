@@ -18,7 +18,7 @@ public record ReviewDetailResponse(
     public static ReviewDetailResponse of(BookReview review, boolean isLikedByMe) {
         return new ReviewDetailResponse(
             review.getReviewId(),
-            review.getBook().getBookId(),
+            review.getBookInfo().getId(),
             review.getReviewer().getNickname(),
             review.getIsRecommended(),
             review.getContent(),

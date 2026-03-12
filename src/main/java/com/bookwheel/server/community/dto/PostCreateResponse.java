@@ -23,7 +23,7 @@ public record PostCreateResponse(
     public static PostCreateResponse from(Post post) {
         return new PostCreateResponse(
             post.getPostId(),
-            post.getBook().getBookId(),
+            post.getBookInfo().getId(),
             post.getContent(),
             post.getImages().stream()
                 .map(PostImage::getObjectKey)

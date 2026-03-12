@@ -22,10 +22,10 @@ public class BookReview {
     @Column(name = "review_id")
     private Long reviewId;
 
-    // 어떤 책에 작성된 리뷰인지 (Book 참조)
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "book_id", referencedColumnName = "book_id", nullable = false)
-    private Book book;
+    @JoinColumn(name = "book_info_id", nullable = false)
+    private BookInfo bookInfo;
 
     // 누가 작성한 리뷰인지 (User 참조)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -33,7 +33,7 @@ public class BookReview {
     private User reviewer;
 
     // 리뷰 내용
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false, length = 500, columnDefinition = "TEXT")
     private String content;
 
     // 추천/비추천 (true: 추천, false: 비추천)

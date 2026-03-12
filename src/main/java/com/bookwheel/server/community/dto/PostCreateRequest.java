@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.dto;
 
 import com.bookwheel.server.book.entity.Book;
+import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.user.entity.User;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,9 +19,9 @@ public record PostCreateRequest(
     List<String> objectKeys
 ) {
 
-    public Post toEntity(Book book, User uploader) {
+    public Post toEntity(BookInfo bookInfo, User uploader) {
         return Post.builder()
-            .book(book)
+            .bookInfo(bookInfo)
             .uploader(uploader)
             .content(this.content)
             .build();
