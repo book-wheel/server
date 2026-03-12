@@ -63,13 +63,13 @@ public class WheelState {
         this.wheelState = wheelState;
     }
 
-    public void complete(String reviewText, List<String> imageUrls) {
+    public void complete(String reviewText, List<String> objectKeys) {
         // 이미 정보가 존재한다면 실행 X
         if (this.isCompleted) {
             throw new BusinessException(ErrorCode.WHEEL_ALREADY_CERTIFIED);
         }
         // 이미지 정보가 없다면 실행 X
-        if (imageUrls == null || imageUrls.isEmpty()) {
+        if (objectKeys == null || objectKeys.isEmpty()) {
             throw new BusinessException(ErrorCode.IMAGES_NOT_FOUND);
         }
 
@@ -80,8 +80,8 @@ public class WheelState {
         this.reviewedAt = LocalDateTime.now();
 
         // 2. 저장
-        List<WheelStateImage> images = imageUrls.stream()
-                .map(url -> WheelStateImage.of(url, this))
+        List<WheelStateImage> images = objectKeys.stream()
+                .map(objectKey -> WheelStateImage.of(objectKey, this))
                 .toList();
 
         this.authImages.addAll(images);

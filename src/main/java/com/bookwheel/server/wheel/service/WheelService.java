@@ -3,6 +3,7 @@ package com.bookwheel.server.wheel.service;
 import com.bookwheel.server.book.entity.OwnBook;
 import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.*;
+import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
@@ -27,6 +28,7 @@ public class WheelService {
     private final MemberRepository memberRepository;
     private final RoundRepository roundRepository;
     private final OwnBookRepository ownBookRepository;
+    private final S3Service s3Service;
 
 
     @Transactional
@@ -43,7 +45,14 @@ public class WheelService {
         // TODO: 북 게시판 사진첩 연동 기능 추가 예정 (BookService 연동)
 
         //3. DB에 데이터 저장하기
-        wheelState.complete(request.reviewText(), request.imageUrls());
+        List<String> objectKeys = request.objectKeys().stream()
+                .map(String::trim)
+                .map(key -> key.startsWith("/") ? key.substring(1) : key)
+                .toList();
+        if (objectKeys.stream().anyMatch(key -> key.startsWith("http://") || key.startsWith("https://"))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        wheelState.complete(request.reviewText(), objectKeys);
 
         return WheelCompleteResponse.of(wheelState.getWheelStateId(), wheelState.getIsCompleted(), wheelState.getWheelState());
     }
@@ -63,7 +72,13 @@ public class WheelService {
         // 4. WheelState 리스트를 WheelHistoryUserResponse 리스트로 변환하기
         return wheelStates.stream()
                 .filter(ws -> roundNumberMap.containsKey(ws.getRoundId()))
-                .map(ws -> WheelHistoryUserResponse.of(ws, roundNumberMap.get(ws.getRoundId())))
+                .map(ws -> {
+                    List<String> authImageUrls = ws.getAuthImages().stream()
+                            .map(WheelStateImage::getObjectKey)
+                            .map(s3Service::getPresignedGetUrl)
+                            .toList();
+                    return WheelHistoryUserResponse.of(ws, roundNumberMap.get(ws.getRoundId()), authImageUrls);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -88,7 +103,13 @@ public class WheelService {
 
         // 3. 기록이 있다면 데이터 조립
         List<HistoryDto> histories = wheelStates.stream()
-                .map(ws -> HistoryDto.of(ws, roundNumberMap.getOrDefault(ws.getRoundId(), 0)))
+                .map(ws -> {
+                    List<String> authImageUrls = ws.getAuthImages().stream()
+                            .map(WheelStateImage::getObjectKey)
+                            .map(s3Service::getPresignedGetUrl)
+                            .toList();
+                    return HistoryDto.of(ws, roundNumberMap.getOrDefault(ws.getRoundId(), 0), authImageUrls);
+                })
                 .toList();
 
         return WheelHistoryBookResponse.of(ownBook, histories);
