@@ -118,7 +118,7 @@ public class WheelService {
             return;
         }
 
-        // 2. 다른 사람의 기록을 보는 경우 (IN 절을 사용해 쿼리 1번으로 2명 동시 검사!)
+        // 2. 다른 사람의 기록을 보는 경우 (IN 절을 사용해 쿼리 1번으로 2명 동시 검사)
         long memberCount = memberRepository.countByGroup_GroupIdAndUser_IdIn(groupId, List.of(userId, targetId));
         if (memberCount != 2) { // 2명 모두 그룹에 속해있어야 하므로 count가 2여야 함
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
