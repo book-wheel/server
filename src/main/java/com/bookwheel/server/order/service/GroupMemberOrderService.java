@@ -40,7 +40,7 @@ public class GroupMemberOrderService {
             String userId
     ) {
         findGroupById(groupId);
-        findActiveUserByUserId(userId);
+        findActiveUserById(userId);
         validateManagerPermission(groupId, userId);
         validateRequestShape(request);
 
@@ -120,7 +120,7 @@ public class GroupMemberOrderService {
     }
 
     private void validateManagerPermission(String groupId, String userId) {
-        Member manager = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+        Member manager = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ORDER_MANAGER_ONLY));
 
         boolean isActive = manager.getMemberStatus() == MemberStatus.ACTIVE;
@@ -136,8 +136,8 @@ public class GroupMemberOrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {

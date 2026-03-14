@@ -50,7 +50,7 @@ public class GroupScheduleService {
             String userId
     ) {
         Group group = findGroupByIdForUpdate(groupId);
-        findActiveUserByUserId(userId);
+        findActiveUserById(userId);
         validateLeaderPermission(groupId, userId);
 
         // 그룹이 소유한 책의 개수를 기준으로 총 라운드 수를 결정
@@ -341,8 +341,8 @@ public class GroupScheduleService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -353,7 +353,7 @@ public class GroupScheduleService {
     }
 
     private void validateLeaderPermission(String groupId, String userId) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
 
         boolean isLeader = member.getMemberRole() == MemberRole.LEADER;

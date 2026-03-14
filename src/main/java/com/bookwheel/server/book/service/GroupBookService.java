@@ -34,7 +34,7 @@ public class GroupBookService {
     @Transactional
     public OwnBookRegisterResponse registerOwnBook(String groupId, OwnBookRegisterRequest request, String userId) {
         Group group = findGroupById(groupId);
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userId);
         Member member = findMember(groupId, userId);
 
         if (member.getMemberStatus() != MemberStatus.ACTIVE) {
@@ -81,8 +81,8 @@ public class GroupBookService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -93,7 +93,7 @@ public class GroupBookService {
     }
 
     private Member findMember(String groupId, String userId) {
-        return memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
     }
 }

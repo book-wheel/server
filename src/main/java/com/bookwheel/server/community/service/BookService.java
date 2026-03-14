@@ -39,12 +39,12 @@ public class BookService {
         BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        if (bookReviewRepository.existsByBookInfoAndReviewer_UserId(bookInfo, userId)) {
+        if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userId)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
         }
 
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
@@ -60,7 +60,7 @@ public class BookService {
         BookReview review = bookReviewRepository.findById(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         reviewLikeRepository.findByReviewAndUser(review, user)
@@ -100,7 +100,7 @@ public class BookService {
         BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 

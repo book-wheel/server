@@ -41,7 +41,7 @@ public class GroupDashboardService {
 
     public DashboardResponse getDashboard(String groupId, String userId) {
         // 1. 유저, 그룹, 멤버 권한 체크
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userId);
         Group group = findGroupById(groupId);
         Member member = findActiveMember(groupId, userId);
 
@@ -176,8 +176,8 @@ public class GroupDashboardService {
         return rounds.get(rounds.size() - 1);
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new BusinessException(ErrorCode.INACTIVE_USER);
@@ -191,7 +191,7 @@ public class GroupDashboardService {
     }
 
     private Member findActiveMember(String groupId, String userId) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         if (member.getMemberStatus() != MemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);

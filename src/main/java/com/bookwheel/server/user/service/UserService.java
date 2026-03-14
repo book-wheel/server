@@ -72,7 +72,7 @@ public class UserService {
 
     @Transactional
     public LoginResponse setupProfile(String userId, ProfileSetupRequest request) {
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userId);
 
         // 닉네임 중복 체크 및 업데이트 (사용자가 입력한 경우에만)
         if (request.getNickname() != null && !request.getNickname().isBlank()) {
@@ -133,7 +133,7 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userId);
 
         // 새 Access Token 발급
         String newAccessToken = jwtTokenProvider.createAccessToken(userId, user.getRole());
@@ -148,7 +148,7 @@ public class UserService {
 
     // 내 정보 조회
     public UserResponse getMyInfo(String userId) {
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userId);
         return UserResponse.from(user);
     }
 
@@ -163,7 +163,7 @@ public class UserService {
     @Transactional
     public void withdraw(String userId, UserWithdrawRequest request) {
         // 유저 조회 및 활성 상태 검증
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userId);
         // [TODO] 추후 탈퇴하려는 회원이 가입된 모임이 있는지 확인하는 로직 추가 필요
 
         if (user.getSocialType() == SocialType.NONE) {
@@ -217,12 +217,28 @@ public class UserService {
     }
 
     private LoginResponse getLoginResponse(User user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getRole());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId(), user.getRole());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getRole());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getRole());
 
-        refreshTokenRepository.save(new RefreshToken(user.getUserId(), refreshToken));
+        refreshTokenRepository.save(new RefreshToken(user.getId(), refreshToken));
 
         return LoginResponse.of(user, accessToken, refreshToken);
+    }
+
+    private User findByIdAndValidateActive(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BusinessException(ErrorCode.INACTIVE_USER);
+        }
+
+        String banStatus = user.getBanStatus();
+        if (!"ACTIVE".equals(banStatus)) {
+            throw new BusinessException(ErrorCode.BANNED_USER);
+        }
+
+        return user;
     }
 
     private User findByUserIdAndValidateActive(String userId) {
@@ -247,7 +263,7 @@ public class UserService {
     @Transactional
     public void changePassword(String userId, PasswordChangeRequest request) {
         // 유저 조회
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userId);
 
         // 소셜 로그인 유저는 비밀번호 변경 불가
         if (user.getSocialType() != SocialType.NONE) {

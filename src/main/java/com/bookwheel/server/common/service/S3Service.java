@@ -8,10 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +25,7 @@ public class S3Service {
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucket;
     private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp");
+    private static final Duration DEFAULT_GET_PRESIGN_DURATION = Duration.ofMinutes(1);
 
     public String getPresignedUrl(String prefix, String fileName) {
         // 중복 방지를 위해 고유한 파일 경로 생성
@@ -70,5 +72,27 @@ public class S3Service {
             return new PostImagePresignedResponse.PresignedInfo(presignedUrl, objectKey);
         }).toList();
         return new PostImagePresignedResponse(presignedInfos);
+    }
+
+    public String getPresignedGetUrl(String objectKey) {
+        return getPresignedGetUrl(objectKey, DEFAULT_GET_PRESIGN_DURATION);
+    }
+
+    public String getPresignedGetUrl(String objectKey, Duration duration) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(duration)
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 }

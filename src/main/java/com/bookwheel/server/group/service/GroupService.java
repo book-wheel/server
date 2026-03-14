@@ -34,7 +34,7 @@ public class GroupService {
     public GroupCreateResponse createGroup(GroupCreateRequest request, String userId) {
         validateGroupCreateRequest(request);
 
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userId);
         Group group = request.toEntity();
         if (!request.groupPublic() && StringUtils.hasText(group.getGroupPassword())) {
             group.updateGroupPassword(passwordEncoder.encode(group.getGroupPassword()));
@@ -56,11 +56,11 @@ public class GroupService {
     @Transactional
     public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userId) {
         Group group = findGroupById(groupId);
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userId);
 
         validateJoinRequest(group, request);
 
-        if (memberRepository.existsByGroup_GroupIdAndUser_UserId(groupId, userId)) {
+        if (memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userId)) {
             throw new BusinessException(ErrorCode.DUPLICATE_GROUP_MEMBER);
         }
 
@@ -157,7 +157,7 @@ public class GroupService {
     }
 
     private void validateLeaderPermission(String groupId, String leaderUserId) {
-        Member leaderMember = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, leaderUserId)
+        Member leaderMember = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, leaderUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
 
         boolean isLeader = leaderMember.getMemberRole() == MemberRole.LEADER;
@@ -168,7 +168,7 @@ public class GroupService {
     }
 
     private GroupDetailButtonType resolveBottomButtonType(String groupId, String userId) {
-        return memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
                 .map(member -> {
                     if (member.getMemberRole() == MemberRole.LEADER
                             && member.getMemberStatus() == MemberStatus.ACTIVE) {
@@ -195,8 +195,8 @@ public class GroupService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {

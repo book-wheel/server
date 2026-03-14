@@ -33,7 +33,7 @@ public class PostService {
         BookInfo bookInfo = bookInfoRepository.findById(bookInfoId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Post post = request.toEntity(bookInfo, user);
@@ -58,7 +58,7 @@ public class PostService {
     public void togglePostLike(Long postId, String userId) {
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         postLikeRepository.findByPostAndUser(post, user)
             .ifPresentOrElse(
@@ -80,7 +80,7 @@ public class PostService {
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         PostComment comment = request.toEntity(post, user);
