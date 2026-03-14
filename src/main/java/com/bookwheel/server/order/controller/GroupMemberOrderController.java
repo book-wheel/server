@@ -13,7 +13,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+
+import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 
 @RestController
 @RequiredArgsConstructor
@@ -88,12 +89,12 @@ public class GroupMemberOrderController {
                     )
             )
             @RequestBody @Valid MemberReadOrderRequest request,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal Object principal
     ) {
         List<MemberReadOrderResponse> response = groupMemberOrderService.assignReadOrder(
                 groupId,
                 request,
-                userDetails.getUsername()
+                getUserId(principal)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
     }
