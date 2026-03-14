@@ -3,6 +3,7 @@ package com.bookwheel.server.common.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
+import com.bookwheel.server.common.util.PathNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -57,7 +58,9 @@ public class S3Service {
     public String getPresignedUrl(String prefix, String fileName) {
         // 중복 방지를 위해 고유한 파일 경로 생성
         // 결과: "profiles/123e4567..._cat.jpg"
-        String objectKey = prefix + "/" + UUID.randomUUID() + "_" + fileName;
+        String normalizedPrefix = PathNormalizer.normalizeSegment(prefix);
+        String normalizedFileName = PathNormalizer.normalizeFileName(fileName);
+        String objectKey = normalizedPrefix + "/" + UUID.randomUUID() + "_" + normalizedFileName;
 
         // S3에 올릴 객체 정보 세팅
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -76,7 +79,7 @@ public class S3Service {
     }
 
     public PostImagePresignedResponse getPostPresignedUrls(String bookId, List<String> fileExtensions) {
-        String prefix = "posts/" + bookId;
+        String prefix = "posts/" + PathNormalizer.normalizeSegment(bookId);
         List<PostImagePresignedResponse.PresignedInfo> presignedInfos = fileExtensions.stream().map(ext -> {
 
             String normalizedExt = ext.toLowerCase().replace(".", "");
