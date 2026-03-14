@@ -66,7 +66,7 @@ public class User {
         this.socialType = socialType != null ? socialType : SocialType.NONE;
         this.socialId = socialId;
         this.comment = comment;
-        this.profileImageKey = profileImageKey;
+        this.profileImageKey = profileImage;
         this.isActive = isActive != null ? isActive : true;
         this.role = role != null ? role : Role.USER;
     }
@@ -81,26 +81,10 @@ public class User {
         this.password = password;
     }
 
-    public void updateProfileImage(String profileImage) {
-        this.profileImageKey = profileImage;
-    }
-
-    public void updateNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public void updateComment(String comment) {
-        this.comment = comment;
-    }
-
     public void updateProfile(String nickname, String comment, String profileImage) {
         this.nickname = nickname;
         this.comment = comment;
-        this.profileImageKey = profileImageKey;
-    }
-
-    public void activate() {
-        this.isActive = true;
+        this.profileImageKey = profileImage;
     }
 
     public void deactivate() {

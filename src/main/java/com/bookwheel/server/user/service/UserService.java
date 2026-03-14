@@ -187,6 +187,11 @@ public class UserService {
             }
         }
 
+        String imageKey = user.getProfileImageKey();
+        if (imageKey != null) {
+            s3Service.deleteObject(imageKey);
+        }
+
         // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
         log.info("회원 탈퇴 처리 시작 - ID: {}", userId);
         log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
@@ -197,11 +202,13 @@ public class UserService {
             org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
                     authorizedClientService.loadAuthorizedClient("google", user.getUserId());
             if (client != null && client.getAccessToken() != null) {
-                socialAccessToken = client.getAccessToken().getTokenValue();     // 토큰
+                socialAccessToken = client.getAccessToken().getTokenValue();
             }
         }
 
         // 계정 비활성화 (Soft Delete)
+        String deletedNickname = "탈퇴한 사용자_" + UUID.randomUUID().toString().substring(0, 8);
+        user.updateProfile("탈퇴한 사용자", null, null);
         user.deactivate();
 
         // Redis에 저장된 Refresh Token 삭제
