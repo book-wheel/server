@@ -1,7 +1,6 @@
 package com.bookwheel.server.wheel.dto;
 
 import com.bookwheel.server.wheel.entity.WheelState;
-import com.bookwheel.server.wheel.entity.WheelStateImage;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,14 +13,12 @@ public record HistoryDto(
         String reviewText,
         LocalDateTime completedAt
 ) {
-    public static HistoryDto of(WheelState ws, int roundNumber) {
+    public static HistoryDto of(WheelState ws, int roundNumber, List<String> authImageUrls) {
         return new HistoryDto(
                 ws.getWheelStateId(),
                 roundNumber,
                 ws.getMember().getUser().getNickname(),
-                ws.getAuthImages().stream()
-                        .map(WheelStateImage::getImageUrl)
-                        .toList(),
+                authImageUrls,
                 ws.getReviewText(),
                 ws.getReviewedAt()
         );
