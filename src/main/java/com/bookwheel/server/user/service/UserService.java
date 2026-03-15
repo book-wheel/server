@@ -207,8 +207,6 @@ public class UserService {
         }
 
         // 계정 비활성화 (Soft Delete)
-        String deletedNickname = "탈퇴한 사용자_" + UUID.randomUUID().toString().substring(0, 8);
-        user.updateProfile("탈퇴한 사용자", null, null);
         user.deactivate();
 
         // Redis에 저장된 Refresh Token 삭제
