@@ -89,11 +89,10 @@ public class User {
 
     public void deactivate() {
         this.isActive = false;
-
-        this.nickname = "탈퇴한 사용자";
+        this.nickname = "탈퇴한 사용자_" + java.util.UUID.randomUUID().toString().substring(0, 8);    // 닉네임 중복 방지
         this.comment = null;
         this.profileImageKey = null;
-        this.password = "DELETED_USER_PASSWORD";
+        this.password = "DELETED_USER_" + java.util.UUID.randomUUID();
     }
 
     public void applyBan(String banType) {
