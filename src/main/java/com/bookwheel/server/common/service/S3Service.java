@@ -5,8 +5,11 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import com.bookwheel.server.common.util.PathNormalizer;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -17,11 +20,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class S3Service {
 
     private final S3Presigner s3Presigner;
+    private final S3Client s3Client;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucket;
@@ -102,5 +107,29 @@ public class S3Service {
             return new PostImagePresignedResponse.PresignedInfo(presignedUrl, objectKey);
         }).toList();
         return new PostImagePresignedResponse(presignedInfos);
+    }
+
+    public void deleteObject(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+
+        try {
+            // 정규화
+            String normalizedKey = objectKey.trim();
+            if (normalizedKey.startsWith("/")) {
+                normalizedKey = normalizedKey.substring(1);
+            }
+
+            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(normalizedKey)
+                    .build();
+
+            s3Client.deleteObject(deleteObjectRequest);
+            log.info("S3 객체 삭제 완료: key={}", normalizedKey);
+        } catch (Exception e) {
+            log.error("S3 객체 삭제 실패: key={}, error={}", objectKey, e.getMessage());
+        }
     }
 }

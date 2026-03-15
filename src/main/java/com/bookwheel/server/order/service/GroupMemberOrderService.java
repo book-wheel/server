@@ -65,7 +65,7 @@ public class GroupMemberOrderService {
                         member.getReadOrder(),
                         member.getMemberId(),
                         member.getUser().getNickname(),
-                        member.getUser().getProfileImage()
+                        member.getUser().getProfileImageKey()
                 ))
                 .toList();
     }
