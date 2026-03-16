@@ -9,7 +9,7 @@ import lombok.Builder;
 public record UserResponse(
         Role role,
         String id,
-        String userId,
+        String loginId,
         String nickname,
         String mail,
         SocialType social,
@@ -20,7 +20,7 @@ public record UserResponse(
         return UserResponse.builder()
                 .role(user.getRole())
                 .id(user.getId())
-                .userId(user.getUserId())
+                .loginId(user.getUserId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
                 .social(user.getSocialType())

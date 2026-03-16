@@ -47,13 +47,13 @@ public class UserService {
         }
 
         // 일반 회원가입(NONE) 방식 내에서만 중복 및 재가입 체크
-        handleExistingUser(request.userId(), request.mail(), SocialType.NONE);
+        handleExistingUser(request.loginId(), request.mail(), SocialType.NONE);
 
         // 임시 닉네임 부여 (프로필 설정에서 실제 닉네임 설정)
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
         User user = User.builder()
-                .userId(request.userId())
+                .userId(request.loginId())
                 .password(passwordEncoder.encode(request.password()))
                 .nickname(tempNickname)
                 .mail(request.mail())
@@ -113,7 +113,7 @@ public class UserService {
 
     @Transactional
     public LoginResponse login(UserLoginRequest request) {
-        User user = findByIdAndValidateActive(request.userId());
+        User user = findByLoginIdAndValidateActive(request.loginId());
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
@@ -220,9 +220,9 @@ public class UserService {
         log.info("회원 탈퇴 완료: userId={}, socialType={}", userId, user.getSocialType());
     }
 
-    private void handleExistingUser(String userId, String mail, SocialType socialType) {
+    private void handleExistingUser(String loginId, String mail, SocialType socialType) {
         // 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
-        userRepository.findByUserId(userId).ifPresent(user -> {
+        userRepository.findByUserId(loginId).ifPresent(user -> {
             if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
             userRepository.delete(user);
         });
@@ -245,7 +245,7 @@ public class UserService {
     }
 
     private User findByIdAndValidateActive(String userId) {
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // 탈퇴 여부 먼저 확인
@@ -257,6 +257,22 @@ public class UserService {
         String banStatus = user.getBanStatus();
         if (!"ACTIVE".equals(banStatus)) {
             // "BANNED"나 "PERMANENT_BANNED"인 경우 에러 발생
+            throw new BusinessException(ErrorCode.BANNED_USER);
+        }
+
+        return user;
+    }
+
+    private User findByLoginIdAndValidateActive(String loginId) {
+        User user = userRepository.findByUserId(loginId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BusinessException(ErrorCode.INACTIVE_USER);
+        }
+
+        String banStatus = user.getBanStatus();
+        if (!"ACTIVE".equals(banStatus)) {
             throw new BusinessException(ErrorCode.BANNED_USER);
         }
 

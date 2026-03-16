@@ -57,16 +57,16 @@ public class WheelService {
     }
 
     @Transactional(readOnly = true)
-    public List<WheelHistoryUserResponse> historyReading(String userId, String targetUserId, String groupId) {
+    public List<WheelHistoryUserResponse> historyReading(String userId, String targetUserPk, String groupId) {
 
         // 1. 소속 권한 확인
-        validateGroupAccess(userId, targetUserId, groupId);
+        validateGroupAccess(userId, targetUserPk, groupId);
 
         // 2. roundId -> roundNumber
         Map<String, Integer> roundNumberMap = getRoundNumberMap(groupId);
 
         // 3. 해당 멤버의 기록 중 COMPLETED 상태인 WheelState 리스트 가져오기
-        List<WheelState> wheelStates = wheelStateRepository.findMyCompletedHistories(groupId, targetUserId, WheelStatus.COMPLETED);
+        List<WheelState> wheelStates = wheelStateRepository.findMyCompletedHistories(groupId, targetUserPk, WheelStatus.COMPLETED);
 
         // 4. WheelState 리스트를 WheelHistoryUserResponse 리스트로 변환하기
         return wheelStates.stream()

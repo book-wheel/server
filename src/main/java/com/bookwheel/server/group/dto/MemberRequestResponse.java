@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Builder
 public record MemberRequestResponse(
         String memberId,
-        String userId,
+        String userPk,
         String nickname,
         String joinMent,
         LocalDateTime requestDate,
@@ -18,7 +18,7 @@ public record MemberRequestResponse(
     public static MemberRequestResponse from(Member member) {
         return MemberRequestResponse.builder()
                 .memberId(member.getMemberId())
-                .userId(member.getUser().getUserId())
+                .userPk(member.getUser().getId())
                 .nickname(member.getUser().getNickname())
                 .joinMent(member.getJoinMent())
                 .requestDate(member.getRequestDate())
@@ -26,3 +26,4 @@ public record MemberRequestResponse(
                 .build();
     }
 }
+

@@ -37,14 +37,14 @@ public class WheelController {
     }
 
     @Operation(summary = "특정 멤버의 독서 내역 조회 기능", description = "특정 사람이 특정 독서 모임에서 어떤 책들을 읽어왔는지 쭉 나열합니다.")
-    @GetMapping("/{groupId}/history/{targetUserId}")
+    @GetMapping("/{groupId}/history/{targetUserPk}")
     public ResponseEntity<ApiResponse<List<WheelHistoryUserResponse>>> getWheelHistoryUser(
             @PathVariable String groupId,
-            @PathVariable String targetUserId,
+            @PathVariable String targetUserPk,
             @AuthenticationPrincipal Object principal
     ) {
         String userId = getUserId(principal);
-        List<WheelHistoryUserResponse> response = wheelService.historyReading(userId, targetUserId, groupId);
+        List<WheelHistoryUserResponse> response = wheelService.historyReading(userId, targetUserPk, groupId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
