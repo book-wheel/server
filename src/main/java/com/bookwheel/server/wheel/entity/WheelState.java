@@ -72,9 +72,6 @@ public class WheelState {
         if (objectKeys == null || objectKeys.isEmpty()) {
             throw new BusinessException(ErrorCode.IMAGES_NOT_FOUND);
         }
-        if (objectKeys.stream().anyMatch(key -> key.startsWith("http://") || key.startsWith("https://"))) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
 
         // 1. 감상평 저장 및 상태 변경
         this.reviewText = reviewText;
@@ -84,11 +81,7 @@ public class WheelState {
 
         // 2. 저장
         List<WheelStateImage> images = objectKeys.stream()
-<<<<<<< HEAD
-                .map(key -> WheelStateImage.of(key, this))
-=======
                 .map(objectKey -> WheelStateImage.of(objectKey, this))
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
                 .toList();
 
         this.authImages.addAll(images);

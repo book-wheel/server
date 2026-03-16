@@ -113,7 +113,7 @@ public class UserService {
 
     @Transactional
     public LoginResponse login(UserLoginRequest request) {
-        User user = findByUserIdAndValidateActive(request.userId());
+        User user = findByIdAndValidateActive(request.userId());
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
@@ -161,14 +161,9 @@ public class UserService {
     // 내 정보 조회 (조회 시 Presigned URL 발급)
     @Transactional(readOnly = true)
     public UserResponse getMyInfo(String userId) {
-<<<<<<< HEAD
         User user = findByIdAndValidateActive(userId);
-        return UserResponse.from(user);
-=======
-        User user = findByUserIdAndValidateActive(userId);
 
         return convertToUserResponse(user);
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
     }
 
     // 로그아웃
@@ -205,7 +200,7 @@ public class UserService {
         String socialAccessToken = null;
         if (user.getSocialType() == SocialType.GOOGLE) {
             org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
-                    authorizedClientService.loadAuthorizedClient("google", user.getUserId());
+                    authorizedClientService.loadAuthorizedClient("google", user.getId());
             if (client != null && client.getAccessToken() != null) {
                 socialAccessToken = client.getAccessToken().getTokenValue();
             }
@@ -250,22 +245,6 @@ public class UserService {
     }
 
     private User findByIdAndValidateActive(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new BusinessException(ErrorCode.INACTIVE_USER);
-        }
-
-        String banStatus = user.getBanStatus();
-        if (!"ACTIVE".equals(banStatus)) {
-            throw new BusinessException(ErrorCode.BANNED_USER);
-        }
-
-        return user;
-    }
-
-    private User findByUserIdAndValidateActive(String userId) {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -308,9 +287,6 @@ public class UserService {
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
         log.info("비밀번호 변경 완료: userId={}", userId);
     }
-<<<<<<< HEAD
-}
-=======
 
     private UserResponse convertToUserResponse(User user) {
         String presignedUrl = null;
@@ -320,4 +296,3 @@ public class UserService {
         return UserResponse.from(user, presignedUrl);
     }
 }
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28

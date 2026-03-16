@@ -4,10 +4,7 @@ import com.bookwheel.server.book.entity.OwnBook;
 import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.*;
 import com.bookwheel.server.common.service.S3Service;
-<<<<<<< HEAD
-=======
 import com.bookwheel.server.common.util.PathNormalizer;
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
@@ -33,10 +30,6 @@ public class WheelService {
     private final RoundRepository roundRepository;
     private final OwnBookRepository ownBookRepository;
     private final S3Service s3Service;
-<<<<<<< HEAD
-
-=======
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
 
     @Transactional
     public WheelCompleteResponse completedReading(String userId, String wheelStateId, WheelCompleteRequest request) {
@@ -52,9 +45,6 @@ public class WheelService {
         // TODO: 북 게시판 사진첩 연동 기능 추가 예정 (BookService 연동)
 
         //3. DB에 데이터 저장하기
-<<<<<<< HEAD
-        wheelState.complete(request.reviewText(), request.objectKeys());
-=======
         List<String> normalizedKeys = PathNormalizer.normalizeUrls(request.objectKeys());
 
         if (normalizedKeys.stream().anyMatch(key -> key.startsWith("http://") || key.startsWith("https://"))) {
@@ -62,7 +52,6 @@ public class WheelService {
         }
 
         wheelState.complete(request.reviewText(), normalizedKeys);
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
 
         return WheelCompleteResponse.of(wheelState.getWheelStateId(), wheelState.getIsCompleted(), wheelState.getWheelState());
     }
@@ -85,11 +74,7 @@ public class WheelService {
                 .map(ws -> {
                     List<String> authImageUrls = ws.getAuthImages().stream()
                             .map(WheelStateImage::getObjectKey)
-<<<<<<< HEAD
-                            .map(s3Service::getPresignedGetUrl)
-=======
                             .map(s3Service::getPresignedGetUrl) // S3 주소로 변환
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
                             .toList();
                     return WheelHistoryUserResponse.of(ws, roundNumberMap.get(ws.getRoundId()), authImageUrls);
                 })
@@ -120,11 +105,7 @@ public class WheelService {
                 .map(ws -> {
                     List<String> authImageUrls = ws.getAuthImages().stream()
                             .map(WheelStateImage::getObjectKey)
-<<<<<<< HEAD
-                            .map(s3Service::getPresignedGetUrl)
-=======
                             .map(s3Service::getPresignedGetUrl) // S3 주소로 변환
->>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
                             .toList();
                     return HistoryDto.of(ws, roundNumberMap.getOrDefault(ws.getRoundId(), 0), authImageUrls);
                 })
@@ -143,7 +124,7 @@ public class WheelService {
             return;
         }
 
-        // 2. 다른 사람의 기록을 보는 경우 (IN 절을 사용해 쿼리 1번으로 2명 동시 검사)
+        // 2. 다른 사람의 기록을 보는 경우 (IN 절을 사용해 쿼리 1번으로 2명 동시 검사!)
         long memberCount = memberRepository.countByGroup_GroupIdAndUser_IdIn(groupId, List.of(userId, targetId));
         if (memberCount != 2) { // 2명 모두 그룹에 속해있어야 하므로 count가 2여야 함
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);

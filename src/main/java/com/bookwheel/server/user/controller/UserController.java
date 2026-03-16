@@ -88,6 +88,8 @@ public class UserController {
         String userId = getUserId(principal);
 
         // 소셜 유저 검증
+        validateNonSocialUser(userId);
+
         userService.changePassword(userId, request);
         return ApiResponse.success(null);
     }
