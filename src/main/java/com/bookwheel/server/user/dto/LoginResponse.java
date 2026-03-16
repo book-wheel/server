@@ -31,7 +31,7 @@ public record LoginResponse(
                 .mail(user.getMail())
                 .social(user.getSocialType())
                 .comment(user.getComment())
-                .profileImage(user.getProfileImage())
+                .profileImage(user.getProfileImageKey())
                 .build();
     }
 }

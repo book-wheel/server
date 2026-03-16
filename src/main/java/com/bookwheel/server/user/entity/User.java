@@ -5,8 +5,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import com.bookwheel.server.user.entity.Role;
-
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -42,8 +40,8 @@ public class User {
     @Column(name = "comment")
     private String comment;
 
-    @Column(name = "profile_image")
-    private String profileImage;
+    @Column(name = "profile_image_key")
+    private String profileImageKey;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
@@ -68,7 +66,7 @@ public class User {
         this.socialType = socialType != null ? socialType : SocialType.NONE;
         this.socialId = socialId;
         this.comment = comment;
-        this.profileImage = profileImage;
+        this.profileImageKey = profileImage;
         this.isActive = isActive != null ? isActive : true;
         this.role = role != null ? role : Role.USER;
     }
@@ -83,30 +81,18 @@ public class User {
         this.password = password;
     }
 
-    public void updateProfileImage(String profileImage) {
-        this.profileImage = profileImage;
-    }
-
-    public void updateNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public void updateComment(String comment) {
-        this.comment = comment;
-    }
-
     public void updateProfile(String nickname, String comment, String profileImage) {
         this.nickname = nickname;
         this.comment = comment;
-        this.profileImage = profileImage;
-    }
-
-    public void activate() {
-        this.isActive = true;
+        this.profileImageKey = profileImage;
     }
 
     public void deactivate() {
         this.isActive = false;
+        this.nickname = "탈퇴한 사용자_" + java.util.UUID.randomUUID().toString().substring(0, 8);    // 닉네임 중복 방지
+        this.comment = null;
+        this.profileImageKey = null;
+        this.password = "DELETED_USER_" + java.util.UUID.randomUUID();
     }
 
     public void applyBan(String banType) {

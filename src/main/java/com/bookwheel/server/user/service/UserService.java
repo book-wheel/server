@@ -5,6 +5,8 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
+import com.bookwheel.server.common.service.S3Service;
+import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
@@ -31,6 +33,7 @@ public class UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
+    private final S3Service s3Service;
     private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
 
     @Transactional
@@ -62,7 +65,7 @@ public class UserService {
         User savedUser = userRepository.save(user);
         log.info("일반 회원가입 1단계 완료: userId={}, tempNickname={}", savedUser.getUserId(), tempNickname);
 
-        return UserResponse.from(savedUser);
+        return UserResponse.from(savedUser, null);
     }
 
     private boolean isValidPassword(String password) {
@@ -74,28 +77,37 @@ public class UserService {
     public LoginResponse setupProfile(String userId, ProfileSetupRequest request) {
         User user = findByIdAndValidateActive(userId);
 
-        // 닉네임 중복 체크 및 업데이트 (사용자가 입력한 경우에만)
-        if (request.getNickname() != null && !request.getNickname().isBlank()) {
-            // 현재 닉네임과 다를 때만 중복 검증 수행
-            if (!user.getNickname().equals(request.getNickname())) {
-                if (userRepository.existsByNickname(request.getNickname())) {
+        // 닉네임 중복 체크 및 업데이트
+        String newNickname = request.nickname();
+        if (newNickname != null && !newNickname.isBlank()) {
+            if (!user.getNickname().equals(newNickname)) {
+                if (userRepository.existsByNickname(newNickname)) {
                     throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
                 }
-                user.updateNickname(request.getNickname());
             }
+        } else {
+            newNickname = user.getNickname(); // 입력이 없으면 기존 닉네임 유지
         }
 
-        // 전달받은 S3 URL을 그대로 저장
-        if (request.getProfileImageUrl() != null) {
-            user.updateProfileImage(request.getProfileImageUrl());
+        // S3 키 정규화 및 유효성 검사
+        String rawKey = request.profileImageKey();
+        String normalizedKey = null;
+
+        if (rawKey != null && !rawKey.isBlank()) {
+            // 전체 URL이 들어오는 경우 방어 (에러 처리)
+            if (rawKey.startsWith("http://") || rawKey.startsWith("https://")) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+            normalizedKey = PathNormalizer.normalizeSegment(rawKey);
         }
 
-        user.updateComment(request.getComment());
-        user.completeProfile(); // 프로필 설정 완료
+        // 3티티 통합 업데이트
+        user.updateProfile(newNickname, request.comment(), normalizedKey);
+        user.completeProfile();
 
-        log.info("프로필 설정 완료 (Stage 2): userId={}, nickname={}", userId, user.getNickname());
+        log.info("프로필 설정 완료 (Stage 2): userId={}, nickname={}, imageKey={}",
+                userId, user.getNickname(), normalizedKey);
 
-        // 최종 로그인 응답 반환 (메인 페이지 이동용 토큰 포함)
         return getLoginResponse(user);
     }
 
@@ -146,10 +158,17 @@ public class UserService {
                 .build();
     }
 
-    // 내 정보 조회
+    // 내 정보 조회 (조회 시 Presigned URL 발급)
+    @Transactional(readOnly = true)
     public UserResponse getMyInfo(String userId) {
+<<<<<<< HEAD
         User user = findByIdAndValidateActive(userId);
         return UserResponse.from(user);
+=======
+        User user = findByUserIdAndValidateActive(userId);
+
+        return convertToUserResponse(user);
+>>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
     }
 
     // 로그아웃
@@ -173,6 +192,11 @@ public class UserService {
             }
         }
 
+        String imageKey = user.getProfileImageKey();
+        if (imageKey != null) {
+            s3Service.deleteObject(imageKey);
+        }
+
         // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
         log.info("회원 탈퇴 처리 시작 - ID: {}", userId);
         log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
@@ -183,7 +207,7 @@ public class UserService {
             org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
                     authorizedClientService.loadAuthorizedClient("google", user.getUserId());
             if (client != null && client.getAccessToken() != null) {
-                socialAccessToken = client.getAccessToken().getTokenValue();     // 토큰
+                socialAccessToken = client.getAccessToken().getTokenValue();
             }
         }
 
@@ -284,4 +308,16 @@ public class UserService {
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
         log.info("비밀번호 변경 완료: userId={}", userId);
     }
+<<<<<<< HEAD
 }
+=======
+
+    private UserResponse convertToUserResponse(User user) {
+        String presignedUrl = null;
+        if (user.getProfileImageKey() != null && !user.getProfileImageKey().isBlank()) {
+            presignedUrl = s3Service.getPresignedGetUrl(user.getProfileImageKey());
+        }
+        return UserResponse.from(user, presignedUrl);
+    }
+}
+>>>>>>> 129a168622091520f9d98c96938c38ee81b18e28

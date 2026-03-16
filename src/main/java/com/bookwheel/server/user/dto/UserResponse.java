@@ -7,16 +7,16 @@ import lombok.Builder;
 
 @Builder
 public record UserResponse(
-    Role role,
-    String id,
-    String userId,
-    String nickname,
-    String mail,
-    SocialType social,
-    String comment,
-    String profileImage
+        Role role,
+        String id,
+        String userId,
+        String nickname,
+        String mail,
+        SocialType social,
+        String comment,
+        String profileImageUrl
 ) {
-    public static UserResponse from(User user) {
+    public static UserResponse from(User user, String profileImageUrl) {
         return UserResponse.builder()
                 .role(user.getRole())
                 .id(user.getId())
@@ -25,8 +25,7 @@ public record UserResponse(
                 .mail(user.getMail())
                 .social(user.getSocialType())
                 .comment(user.getComment())
-                .profileImage(user.getProfileImage())
+                .profileImageUrl(profileImageUrl)
                 .build();
     }
 }
-

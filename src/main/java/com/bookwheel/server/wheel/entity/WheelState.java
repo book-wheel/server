@@ -84,7 +84,11 @@ public class WheelState {
 
         // 2. 저장
         List<WheelStateImage> images = objectKeys.stream()
+<<<<<<< HEAD
                 .map(key -> WheelStateImage.of(key, this))
+=======
+                .map(objectKey -> WheelStateImage.of(objectKey, this))
+>>>>>>> 129a168622091520f9d98c96938c38ee81b18e28
                 .toList();
 
         this.authImages.addAll(images);
