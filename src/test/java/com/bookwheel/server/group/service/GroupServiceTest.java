@@ -15,11 +15,15 @@ import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.TestWatcher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,13 +45,36 @@ class GroupServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @RegisterExtension
+    TestWatcher watcher = new TestWatcher() {
+        @Override
+        public void testSuccessful(ExtensionContext context) {
+            System.out.println("SUCCESS: " + context.getDisplayName());
+        }
+
+        @Override
+        public void testFailed(ExtensionContext context, Throwable cause) {
+            System.out.println("FAIL: " + context.getDisplayName());
+            System.out.println("이유: " + cause.getMessage());
+        }
+    };
+
     @Test
     @DisplayName("비공개 그룹 생성 성공 - 비밀번호가 암호화되고 리더로 등록된다.")
     void createGroup_Private_Success() {
         // given
         String userId = "user1";
         GroupCreateRequest request = new GroupCreateRequest(
-                "테스트 그룹", "설명", 10, false, "1234", true, Region.SEOUL
+                "이름",
+                "설명",
+                "규칙",
+                false,
+                "1234",
+                true,
+                Region.SEOUL,
+                7,
+                LocalDate.now().plusDays(1),
+                10
         );
 
         User mockUser = mock(User.class);
@@ -58,7 +85,6 @@ class GroupServiceTest {
 
         Group mockGroup = mock(Group.class);
         when(mockGroup.getGroupId()).thenReturn("group-uuid");
-        when(mockGroup.getGroupPassword()).thenReturn("1234"); // toEntity 직후 상태 가정
         when(groupRepository.save(any(Group.class))).thenReturn(mockGroup);
 
         // when
@@ -74,7 +100,18 @@ class GroupServiceTest {
     @DisplayName("그룹 생성 실패 - 중복된 그룹명")
     void createGroup_Fail_DuplicateName() {
         // given
-        GroupCreateRequest request = new GroupCreateRequest("중복이름", "설명", 10, true, null, false, null);
+        GroupCreateRequest request = new GroupCreateRequest(
+                "중복이름",
+                "설명",
+                "규칙",
+                true,
+                null,
+                false,
+                null,
+                7,
+                LocalDate.now().plusDays(1),
+                10
+        );
         when(groupRepository.existsByGroupName("중복이름")).thenReturn(true);
 
         // when & then
@@ -86,7 +123,18 @@ class GroupServiceTest {
     @DisplayName("그룹 생성 실패 - 오프라인 그룹인데 지역 정보가 없음")
     void createGroup_Fail_OfflineWithoutRegion() {
         // given
-        GroupCreateRequest request = new GroupCreateRequest("이름", "설명", 10, true, null, true, null); // groupOffline = true, Region = null
+        GroupCreateRequest request = new GroupCreateRequest(
+                "이름",
+                "설명",
+                "규칙",
+                true,
+                null,
+                true,
+                null,
+                7,
+                LocalDate.now().plusDays(1),
+                10
+        );
         when(groupRepository.existsByGroupName(anyString())).thenReturn(false);
 
         // when & then
