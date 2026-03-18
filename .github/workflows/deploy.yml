@@ -57,4 +57,10 @@ jobs:
               -Djwt.secret="${{ secrets.JWT_SECRET }}" \
               -Dspring.mail.username="${{ secrets.MAIL_USERNAME }}" \
               -Dspring.mail.password="${{ secrets.MAIL_PASSWORD }}" \
+              -Dspring.security.oauth2.client.registration.google.client-id="${{ secrets.GOOGLE_CLIENT_ID }}" \
+              -Dspring.security.oauth2.client.registration.google.client-secret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              -Dspring.security.oauth2.client.registration.kakao.client-id="${{ secrets.KAKAO_CLIENT_ID }}" \
+              -Dspring.security.oauth2.client.registration.kakao.client-secret="${{ secrets.KAKAO_CLIENT_SECRET }}" \
+              -Dkakao.admin-key="${{ secrets.ADMIN_KEY }}" \
+              -Dspring.data.redis.host="${{ secrets.REDIS_HOST }}" \
               *SNAPSHOT.jar > app.log 2>&1 &
