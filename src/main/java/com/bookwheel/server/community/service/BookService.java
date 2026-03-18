@@ -112,7 +112,7 @@ public class BookService {
             boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
 
             return ReviewDetailResponse.of(review, isLikedByMe);
-        }).collect(Collectors.toList());
+        }).toList();
     }
 
 

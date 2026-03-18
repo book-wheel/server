@@ -1,6 +1,5 @@
 package com.bookwheel.server.community.dto;
 
-import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.user.entity.User;

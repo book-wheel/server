@@ -25,7 +25,7 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 public class BookController{
     private final BookService bookService;
 
-    @Operation(summary ="도서 검색")
+    @Operation(summary = "도서 검색", description = "알라딘 API를 연동하여 키워드(제목, 저자 등)로 도서를 검색합니다.")
     @GetMapping
     public ApiResponse<String> searchBooks() {
         // TODO: 검색어 파라미터 받기 (@RequestParam 등)
@@ -41,18 +41,13 @@ public class BookController{
 
 
 
-    @Operation(summary ="관심 도서 찜")
+    @Operation(summary ="관심 도서 찜/취소")
     @PostMapping("/{bookId}/likes")
     public ApiResponse<String> addBookLike(@PathVariable("bookId") String bookId) {
         return ApiResponse.success(bookId + "관심 도서 찜 api 연결");
 
     }
 
-    @Operation(summary ="관심 도서 찜 취소")
-    @DeleteMapping("/{bookId}/likes")
-    public ApiResponse<String> deleteBookLike(@PathVariable("bookId") String bookId) {
-        return ApiResponse.success(bookId + "관심 도서 찜 취소 api 연결");
-    }
 
     @Operation(summary = "리뷰 작성", description = "특정 책에 추천/비추천 여부와 함께 코멘트를 남깁니다.")
     @PostMapping("/{bookId}/reviews")
