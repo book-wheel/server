@@ -29,12 +29,12 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
             "JOIN FETCH ob.book b " +
             "LEFT JOIN FETCH ws.authImages " +
             "WHERE ws.member.group.groupId = :groupId " +
-            "AND ws.member.user.id = :userPk " +
+            "AND ws.member.user.id = :userPK " +
             "AND ws.wheelState = :status " +
             "ORDER BY ws.reviewedAt DESC")
     List<WheelState> findMyCompletedHistories(
             @Param("groupId") String groupId,
-            @Param("userPk") String userPk,
+            @Param("userPK") String userPK,
             @Param("status") WheelStatus status
     );
 

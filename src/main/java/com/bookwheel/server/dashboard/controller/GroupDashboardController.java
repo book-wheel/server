@@ -32,8 +32,8 @@ public class GroupDashboardController {
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        String userPk = getUserId(principal);
-        DashboardResponse response = groupDashboardService.getDashboard(groupId, userPk);
+        String userPK = getUserId(principal);
+        DashboardResponse response = groupDashboardService.getDashboard(groupId, userPK);
         return ApiResponse.success(response);
     }
 }

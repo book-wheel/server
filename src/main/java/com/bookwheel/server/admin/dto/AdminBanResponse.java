@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public record AdminBanResponse(
     @Schema(description = "유저 PK", example = "d290f1ee-6c54-4b01-90e6-d701748f0851")
 
-    String userPk,
+    String userPK,
 
     @Schema(description = "닉네임", example = "으내으내으내")
     String nickname,

@@ -31,9 +31,9 @@ public class AdminService {
 
     //회원 강제 탈퇴/정지 시키기
     @Transactional
-    public AdminBanResponse banUser(String userPk, AdminBanRequest request) {
+    public AdminBanResponse banUser(String userPK, AdminBanRequest request) {
 
-        User user = userRepository.findById(userPk)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getRole() == Role.ADMIN) {
@@ -62,7 +62,7 @@ public class AdminService {
         penaltyRepository.save(history);
 
         return AdminBanResponse.builder()
-            .userPk(user.getId())
+            .userPK(user.getId())
             .nickname(user.getNickname())
             .status(user.getBanStatus())
             .banType(request.banType())
@@ -72,8 +72,8 @@ public class AdminService {
             .build();
     }
 
-    public List<PenaltyResponse> getPenalties(String userPk) {
-        User user = userRepository.findById(userPk)
+    public List<PenaltyResponse> getPenalties(String userPK) {
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         List<Penalty> histories = penaltyRepository.findByUserOrderByBannedAtDesc(user);
 

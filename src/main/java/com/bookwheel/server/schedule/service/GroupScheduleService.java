@@ -341,8 +341,8 @@ public class GroupScheduleService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserById(String userPk) {
-        User user = userRepository.findById(userPk)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -352,8 +352,8 @@ public class GroupScheduleService {
         return user;
     }
 
-    private void validateLeaderPermission(String groupId, String userPk) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPk)
+    private void validateLeaderPermission(String groupId, String userPK) {
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
 
         boolean isLeader = member.getMemberRole() == MemberRole.LEADER;

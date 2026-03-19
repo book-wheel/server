@@ -1,4 +1,4 @@
-package com.bookwheel.server.admin.controller;
+﻿package com.bookwheel.server.admin.controller;
 
 import com.bookwheel.server.admin.dto.AdminBanRequest;
 import com.bookwheel.server.admin.dto.AdminBanResponse;
@@ -56,25 +56,25 @@ class AdminControllerTest {
     @DisplayName("유저 밴 API 호출 성공")
     void banUser_Success() throws Exception {
         // given
-        String userPk = "user123";
+        String userPK = "user123";
         AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "스팸/도배");
         AdminBanResponse response = AdminBanResponse.builder()
-                .userPk(userPk)
+                .userPK(userPK)
                 .nickname("테스트유저")
                 .banType("SUSPEND")
                 .reasonMessage("스팸/도배")
                 .build();
 
-        given(adminService.banUser(eq(userPk), any(AdminBanRequest.class))).willReturn(response);
+        given(adminService.banUser(eq(userPK), any(AdminBanRequest.class))).willReturn(response);
 
         // when & then
-        mockMvc.perform(post("/api/v1/admin/users/{userPk}/ban", userPk)
+        mockMvc.perform(post("/api/v1/admin/users/{userPK}/ban", userPK)
                         .with(csrf()) // Security 처리
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userPk").value(userPk))
+                .andExpect(jsonPath("$.data.userPK").value(userPK))
                 .andExpect(jsonPath("$.data.banType").value("SUSPEND"));
     }
 

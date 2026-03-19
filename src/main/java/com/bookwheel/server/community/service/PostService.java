@@ -29,11 +29,11 @@ public class PostService {
     private final PostCommentRepository postCommentRepository;
 
     @Transactional
-    public PostCreateResponse create(String bookInfoId, PostCreateRequest request, String userPk) {
+    public PostCreateResponse create(String bookInfoId, PostCreateRequest request, String userPK) {
         BookInfo bookInfo = bookInfoRepository.findById(bookInfoId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        User user = userRepository.findById(userPk)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Post post = request.toEntity(bookInfo, user);
@@ -55,10 +55,10 @@ public class PostService {
     }
 
     @Transactional
-    public void togglePostLike(Long postId, String userPk) {
+    public void togglePostLike(Long postId, String userPK) {
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
-        User user = userRepository.findById(userPk)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         postLikeRepository.findByPostAndUser(post, user)
             .ifPresentOrElse(
@@ -75,12 +75,12 @@ public class PostService {
     }
 
     @Transactional
-    public void createPostComment(Long postId, PostCommentCreateRequest request, String userPk) {
+    public void createPostComment(Long postId, PostCommentCreateRequest request, String userPK) {
 
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
-        User user = userRepository.findById(userPk)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         PostComment comment = request.toEntity(post, user);

@@ -31,10 +31,10 @@ public class GroupService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public GroupCreateResponse createGroup(GroupCreateRequest request, String userPk) {
+    public GroupCreateResponse createGroup(GroupCreateRequest request, String userPK) {
         validateGroupCreateRequest(request);
 
-        User user = findActiveUserById(userPk);
+        User user = findActiveUserById(userPK);
         Group group = request.toEntity();
         if (!request.groupPublic() && StringUtils.hasText(group.getGroupPassword())) {
             group.updateGroupPassword(passwordEncoder.encode(group.getGroupPassword()));
@@ -54,13 +54,13 @@ public class GroupService {
     }
 
     @Transactional
-    public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userPk) {
+    public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userPK) {
         Group group = findGroupById(groupId);
-        User user = findActiveUserById(userPk);
+        User user = findActiveUserById(userPK);
 
         validateJoinRequest(group, request);
 
-        if (memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userPk)) {
+        if (memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userPK)) {
             throw new BusinessException(ErrorCode.DUPLICATE_GROUP_MEMBER);
         }
 
@@ -82,9 +82,9 @@ public class GroupService {
         return groupPage.map(GroupSearchResponse::from);
     }
 
-    public GroupDetailResponse getGroup(String groupId, String userPk) {
+    public GroupDetailResponse getGroup(String groupId, String userPK) {
         Group group = findGroupById(groupId);
-        GroupDetailButtonType bottomButtonType = resolveBottomButtonType(groupId, userPk);
+        GroupDetailButtonType bottomButtonType = resolveBottomButtonType(groupId, userPK);
         return GroupDetailResponse.from(group, bottomButtonType);
     }
 
@@ -167,8 +167,8 @@ public class GroupService {
         }
     }
 
-    private GroupDetailButtonType resolveBottomButtonType(String groupId, String userPk) {
-        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPk)
+    private GroupDetailButtonType resolveBottomButtonType(String groupId, String userPK) {
+        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .map(member -> {
                     if (member.getMemberRole() == MemberRole.LEADER
                             && member.getMemberStatus() == MemberStatus.ACTIVE) {
@@ -195,8 +195,8 @@ public class GroupService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserById(String userPk) {
-        User user = userRepository.findById(userPk)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {

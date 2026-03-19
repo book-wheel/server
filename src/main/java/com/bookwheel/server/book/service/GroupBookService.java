@@ -81,8 +81,8 @@ public class GroupBookService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserById(String userPk) {
-        User user = userRepository.findById(userPk)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -92,8 +92,8 @@ public class GroupBookService {
         return user;
     }
 
-    private Member findMember(String groupId, String userPk) {
-        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPk)
+    private Member findMember(String groupId, String userPK) {
+        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
     }
 }
