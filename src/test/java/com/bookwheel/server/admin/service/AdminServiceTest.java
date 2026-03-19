@@ -73,7 +73,7 @@ class AdminServiceTest {
 
         // then
         assertNotNull(response);
-        assertEquals(userPk, response.userId());
+        assertEquals(userPk, response.userPk());
         verify(mockUser, times(1)).applyBan(request.banType()); // 도메인 로직 호출 검증
         verify(penaltyRepository, times(1)).save(any(Penalty.class)); // 패널티 이력 저장 검증
     }

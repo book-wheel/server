@@ -8,8 +8,9 @@ import java.time.LocalDateTime;
 @Builder
 @Schema(description = "회원 제재 결과 정보")
 public record AdminBanResponse(
-    @Schema(description = "유저 ID", example = "2unhy2")
-    String userId,
+    @Schema(description = "유저 PK", example = "d290f1ee-6c54-4b01-90e6-d701748f0851")
+
+    String userPk,
 
     @Schema(description = "닉네임", example = "으내으내으내")
     String nickname,

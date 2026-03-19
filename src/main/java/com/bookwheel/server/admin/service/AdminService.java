@@ -62,7 +62,7 @@ public class AdminService {
         penaltyRepository.save(history);
 
         return AdminBanResponse.builder()
-            .userId(user.getId())
+            .userPk(user.getId())
             .nickname(user.getNickname())
             .status(user.getBanStatus())
             .banType(request.banType())
