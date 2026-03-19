@@ -1,12 +1,15 @@
 package com.bookwheel.server.group.controller;
 
-import com.bookwheel.server.common.response.ApiResponse;
+import java.time.LocalDate;
 import com.bookwheel.server.group.dto.*;
-import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.service.GroupService;
+import com.bookwheel.server.member.enums.MemberStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.TestWatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -39,13 +42,37 @@ class GroupControllerTest {
     @MockitoBean
     private GroupService groupService;
 
+    @RegisterExtension
+    TestWatcher watcher = new TestWatcher() {
+        @Override
+        public void testSuccessful(ExtensionContext context) {
+            System.out.println("SUCCESS: " + context.getDisplayName());
+        }
+
+        @Override
+        public void testFailed(ExtensionContext context, Throwable cause) {
+            System.out.println("FAIL: " + context.getDisplayName());
+            System.out.println("이유: " + cause.getMessage());
+        }
+    };
+
     @Test
-    @WithMockUser // 기본 인증된 사용자 모킹 (User ID 파싱은 SecurityUtil 방식에 따라 조정 필요)
+    @WithMockUser // 기본 인증된 사용자 모킹
     @DisplayName("그룹 생성 API 성공")
     void createGroup_Success() throws Exception {
         // given
-        GroupCreateRequest request = new GroupCreateRequest("스프링스터디", "열심히 합시다", "규칙입니다",  true, null, false, null, 5);
-
+        GroupCreateRequest request = new GroupCreateRequest(
+                "스프링스터디",
+                "열심히 합시다",
+                "규칙입니다",
+                true,
+                null,
+                false,
+                null,
+                7,
+                LocalDate.now().plusDays(1),
+                5
+        );
         GroupCreateResponse response = new GroupCreateResponse("group-uuid-1234");
 
         given(groupService.createGroup(any(GroupCreateRequest.class), any())).willReturn(response);
@@ -66,11 +93,11 @@ class GroupControllerTest {
     void joinGroup_Success() throws Exception {
         // given
         String groupId = "group1";
-        GroupJoinRequest request = new GroupJoinRequest("가입하고 싶습니다!", null);
-        // 상태값 Enum 매핑 가정
-        GroupJoinResponse response = new GroupJoinResponse("member-uuid", null); // Enum은 DTO 스펙에 맞게
+        GroupJoinRequest request = new GroupJoinRequest("가입하고 싶습니다!", "1234");
+        GroupJoinResponse response = new GroupJoinResponse("member-uuid", MemberStatus.PENDING);
 
-        given(groupService.joinGroup(eq(groupId), any(GroupJoinRequest.class), any())).willReturn(response);
+        given(groupService.joinGroup(eq(groupId), any(GroupJoinRequest.class), any()))
+                .willReturn(response);
 
         // when & then
         mockMvc.perform(post("/api/v1/groups/{groupId}/join", groupId)

@@ -17,7 +17,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.TestWatcher;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -38,13 +40,26 @@ class AdminServiceTest {
     @Mock
     private PenaltyRepository penaltyRepository;
 
+    @RegisterExtension
+    TestWatcher watcher = new TestWatcher() {
+        @Override
+        public void testSuccessful(ExtensionContext context) {
+            System.out.println("SUCCESS: " + context.getDisplayName());
+        }
+
+        @Override
+        public void testFailed(ExtensionContext context, Throwable cause) {
+            System.out.println("FAIL: " + context.getDisplayName());
+            System.out.println("이유: " + cause.getMessage());
+        }
+    };
+
     @Test
     @DisplayName("유저 밴 성공 - 정상적으로 유저를 제재하고 패널티 이력을 저장한다.")
     void banUser_Success() {
         // given
         String userPk = "user123";
-        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ABUSIVE_LANGUAGE, null);
-
+        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "욕설/비방");
         User mockUser = mock(User.class);
         when(mockUser.getId()).thenReturn(userPk);
         when(mockUser.getRole()).thenReturn(Role.USER); // 일반 유저
@@ -86,8 +101,7 @@ class AdminServiceTest {
     void banUser_Fail_AlreadyBannedUser() {
         // given
         String userPk = "user123";
-        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.SPAM, null);
-
+        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "스팸/도배");
         User mockUser = mock(User.class);
         when(mockUser.getRole()).thenReturn(Role.USER);
         when(mockUser.getIsActive()).thenReturn(false); // 이미 비활성화됨
@@ -104,8 +118,7 @@ class AdminServiceTest {
     void banUser_Fail_UserNotFound() {
         // given
         String invalidUserPk = "invalid";
-        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.SPAM, null);
-
+        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "스팸/도배");
         when(userRepository.findById(invalidUserPk)).thenReturn(Optional.empty());
 
         // when & then
@@ -124,7 +137,6 @@ class AdminServiceTest {
 
         Penalty penalty1 = mock(Penalty.class);
         Penalty penalty2 = mock(Penalty.class);
-        // PenaltyResponse 변환 시 필요한 필드 모킹 생략 (실제 Entity/DTO에 맞게 설정)
 
         when(penaltyRepository.findByUserOrderByBannedAtDesc(mockUser))
                 .thenReturn(List.of(penalty1, penalty2));
