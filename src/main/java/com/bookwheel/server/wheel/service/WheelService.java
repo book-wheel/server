@@ -74,7 +74,7 @@ public class WheelService {
                 .map(ws -> {
                     List<String> authImageUrls = ws.getAuthImages().stream()
                             .map(WheelStateImage::getObjectKey)
-                            .map(s3Service::getPresignedGetUrl) // S3 주소� 볙�
+                            .map(s3Service::getPresignedGetUrl) // S3 주소로 변환
                             .toList();
                     return WheelHistoryUserResponse.of(ws, roundNumberMap.get(ws.getRoundId()), authImageUrls);
                 })
@@ -84,7 +84,7 @@ public class WheelService {
 
     @Transactional(readOnly = true)
     public WheelHistoryBookResponse historyReadingBook(String userPK, String groupId, String ownBookId) {
-        // 1. 권한 확인 (내가 그룹원이면 되기 때문에 userId 두 번 삽입)
+        // 1. 권한 확인 (내가 그룹원이면 되기 때문에 userPK 두 번 삽입)
         validateGroupAccess(userPK, userPK, groupId);
         Map<String, Integer> roundNumberMap = getRoundNumberMap(groupId);
 
@@ -105,7 +105,7 @@ public class WheelService {
                 .map(ws -> {
                     List<String> authImageUrls = ws.getAuthImages().stream()
                             .map(WheelStateImage::getObjectKey)
-                            .map(s3Service::getPresignedGetUrl) // S3 주소� 볙�
+                            .map(s3Service::getPresignedGetUrl) // S3 주소로 변환
                             .toList();
                     return HistoryDto.of(ws, roundNumberMap.getOrDefault(ws.getRoundId(), 0), authImageUrls);
                 })
@@ -115,7 +115,7 @@ public class WheelService {
     }
 
     private void validateGroupAccess(String userPK, String targetId, String groupId) {
-        // 1. 내 기록을 내가 보는 경우 (또는 책 상세페이지처럼 userId만 넘어온 경우)
+        // 1. 내 기록을 내가 보는 경우 (또는 책 상세페이지처럼 userPK만 넘어온 경우)
         if (userPK.equals(targetId)) {
             boolean isMember = memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userPK);
             if (!isMember) {

@@ -4,7 +4,7 @@ import com.bookwheel.server.book.dto.OwnBookRegisterRequest;
 import com.bookwheel.server.book.dto.OwnBookRegisterResponse;
 import com.bookwheel.server.book.service.GroupBookService;
 import com.bookwheel.server.common.response.ApiResponse;
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -37,7 +37,7 @@ public class GroupBookController {
         OwnBookRegisterResponse response = groupBookService.registerOwnBook(
                 groupId,
                 request,
-                getUserId(principal)
+                getUserPK(principal)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
     }

@@ -26,15 +26,15 @@ public class BookLike {
     private BookInfo bookInfo;
 
     @Column(nullable = false)
-    private String userId;
+    private String userPK;
 
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public BookLike(BookInfo bookInfo, String userId) {
+    public BookLike(BookInfo bookInfo, String userPK) {
         this.bookInfo = bookInfo;
-        this.userId = userId;
+        this.userPK = userPK;
     }
 }

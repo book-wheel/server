@@ -249,7 +249,7 @@ public class UserService {
         User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // ���� ��� 먼� ����
+        // 탈퇴 여부 먼저 확인
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new BusinessException(ErrorCode.INACTIVE_USER);
         }

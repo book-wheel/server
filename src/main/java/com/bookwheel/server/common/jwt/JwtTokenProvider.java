@@ -47,12 +47,12 @@ public class JwtTokenProvider {
     }
 
     // Refresh Token 생성
-    public String createRefreshToken(String userId, Role role) {
+    public String createRefreshToken(String userPK, Role role) {
         long now = (new Date()).getTime();
         Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
-                .setSubject(userId)
+                .setSubject(userPK)
                 .claim("auth", role.getKey())
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)

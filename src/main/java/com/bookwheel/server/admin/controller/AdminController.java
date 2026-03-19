@@ -46,7 +46,7 @@ public class AdminController {
 
     @Operation(summary = "패널티 이력 조회", description = "특정 회원의 과거 제재 이력을 최신순으로 조회")
     @GetMapping("/users/{userPK}/histories")
-    public ApiResponse<List<PenaltyResponse>> getPenaltyHistories(@PathVariable("userPk") String userPK) {
+    public ApiResponse<List<PenaltyResponse>> getPenaltyHistories(@PathVariable("userPK") String userPK) {
         List<PenaltyResponse> response = adminService.getPenalties(userPK);
         return ApiResponse.success(response);
     }
