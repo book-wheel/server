@@ -37,11 +37,11 @@ public class GroupMemberOrderService {
     public List<MemberReadOrderResponse> assignReadOrder(
             String groupId,
             MemberReadOrderRequest request,
-            String userId
+            String userPk
     ) {
         findGroupById(groupId);
-        findActiveUserById(userId);
-        validateManagerPermission(groupId, userId);
+        findActiveUserById(userPk);
+        validateManagerPermission(groupId, userPk);
         validateRequestShape(request);
 
         List<Member> activeMembers = memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE);
@@ -119,8 +119,8 @@ public class GroupMemberOrderService {
         return orderedMembers;
     }
 
-    private void validateManagerPermission(String groupId, String userId) {
-        Member manager = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
+    private void validateManagerPermission(String groupId, String userPk) {
+        Member manager = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPk)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ORDER_MANAGER_ONLY));
 
         boolean isActive = manager.getMemberStatus() == MemberStatus.ACTIVE;
@@ -136,8 +136,8 @@ public class GroupMemberOrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserById(String userId) {
-        User user = userRepository.findById(userId)
+    private User findActiveUserById(String userPk) {
+        User user = userRepository.findById(userPk)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {

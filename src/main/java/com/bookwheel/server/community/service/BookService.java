@@ -34,17 +34,17 @@ public class BookService {
 
 
     @Transactional
-    public ReviewCreateResponse createReview(String bookId, ReviewCreateRequest request, String userId) {
+    public ReviewCreateResponse createReview(String bookId, ReviewCreateRequest request, String userPk) {
 
         BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userId)) {
+        if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userPk)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
         }
 
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(userPk)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
@@ -56,11 +56,11 @@ public class BookService {
     }
 
     @Transactional
-    public void toggleReviewLike(Long reviewId, String userId) {
+    public void toggleReviewLike(Long reviewId, String userPk) {
         BookReview review = bookReviewRepository.findById(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(userPk)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         reviewLikeRepository.findByReviewAndUser(review, user)
@@ -96,11 +96,11 @@ public class BookService {
         return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio);
     }
 
-    public List<ReviewDetailResponse> getReviewList(String bookId, String userId) {
+    public List<ReviewDetailResponse> getReviewList(String bookId, String userPk) {
         BookInfo bookInfo = bookInfoRepository.findById(bookId)
             .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(userPk)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 

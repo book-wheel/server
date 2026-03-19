@@ -29,9 +29,9 @@ public class WheelController {
             @PathVariable String wheelStateId,
             @RequestBody @Valid WheelCompleteRequest request,
             @AuthenticationPrincipal Object principal) {
-        String userId = getUserId(principal);
+        String userPk = getUserId(principal);
 
-        WheelCompleteResponse response = wheelService.completedReading(userId, wheelStateId, request);
+        WheelCompleteResponse response = wheelService.completedReading(userPk, wheelStateId, request);
 
         return ApiResponse.success(response);
     }
@@ -43,8 +43,8 @@ public class WheelController {
             @PathVariable String targetUserPk,
             @AuthenticationPrincipal Object principal
     ) {
-        String userId = getUserId(principal);
-        List<WheelHistoryUserResponse> response = wheelService.historyReading(userId, targetUserPk, groupId);
+        String userPk = getUserId(principal);
+        List<WheelHistoryUserResponse> response = wheelService.historyReading(userPk, targetUserPk, groupId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -55,8 +55,8 @@ public class WheelController {
             @PathVariable String ownBookId,
             @AuthenticationPrincipal Object principal
     ) {
-        String userId = getUserId(principal);
-        WheelHistoryBookResponse response = wheelService.historyReadingBook(userId, groupId, ownBookId);
+        String userPk = getUserId(principal);
+        WheelHistoryBookResponse response = wheelService.historyReadingBook(userPk, groupId, ownBookId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

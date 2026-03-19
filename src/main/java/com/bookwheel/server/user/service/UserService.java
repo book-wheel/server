@@ -1,4 +1,4 @@
-package com.bookwheel.server.user.service;
+﻿package com.bookwheel.server.user.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -74,8 +74,8 @@ public class UserService {
     }
 
     @Transactional
-    public LoginResponse setupProfile(String userId, ProfileSetupRequest request) {
-        User user = findByIdAndValidateActive(userId);
+    public LoginResponse setupProfile(String userPk, ProfileSetupRequest request) {
+        User user = findByIdAndValidateActive(userPk);
 
         // 닉네임 중복 체크 및 업데이트
         String newNickname = request.nickname();
@@ -105,8 +105,8 @@ public class UserService {
         user.updateProfile(newNickname, request.comment(), normalizedKey);
         user.completeProfile();
 
-        log.info("프로필 설정 완료 (Stage 2): userId={}, nickname={}, imageKey={}",
-                userId, user.getNickname(), normalizedKey);
+        log.info("프로필 설정 완료 (Stage 2): userPk={}, nickname={}, imageKey={}",
+                userPk, user.getNickname(), normalizedKey);
 
         return getLoginResponse(user);
     }
@@ -134,10 +134,10 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        String userId = jwtTokenProvider.getAuthentication(refreshToken).getName();
+        String userPk = jwtTokenProvider.getAuthentication(refreshToken).getName();
 
         // Redis에서 저장된 토큰 가져오기
-        RefreshToken storedToken = refreshTokenRepository.findById(userId)
+        RefreshToken storedToken = refreshTokenRepository.findById(userPk)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_NOT_FOUND));
 
         // 받은 토큰과 현재 거 동일한지 비교
@@ -145,12 +145,12 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        User user = findByIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userPk);
 
         // 새 Access Token 발급
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId, user.getRole());
+        String newAccessToken = jwtTokenProvider.createAccessToken(userPk, user.getRole());
 
-        log.info("토큰 재발급 성공: userId={}", userId);
+        log.info("토큰 재발급 성공: userPk={}", userPk);
 
         return TokenResponse.builder()
                 .accessToken(newAccessToken)
@@ -160,24 +160,24 @@ public class UserService {
 
     // 내 정보 조회 (조회 시 Presigned URL 발급)
     @Transactional(readOnly = true)
-    public UserResponse getMyInfo(String userId) {
-        User user = findByIdAndValidateActive(userId);
+    public UserResponse getMyInfo(String userPk) {
+        User user = findByIdAndValidateActive(userPk);
 
         return convertToUserResponse(user);
     }
 
     // 로그아웃
     @Transactional
-    public void logout(String userId) {
-        refreshTokenRepository.deleteById(userId);
-        log.info("로그아웃 완료: userId={}", userId);
+    public void logout(String userPk) {
+        refreshTokenRepository.deleteById(userPk);
+        log.info("로그아웃 완료: userPk={}", userPk);
     }
 
     // 회원 탈퇴
     @Transactional
-    public void withdraw(String userId, UserWithdrawRequest request) {
+    public void withdraw(String userPk, UserWithdrawRequest request) {
         // 유저 조회 및 활성 상태 검증
-        User user = findByIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userPk);
         // [TODO] 추후 탈퇴하려는 회원이 가입된 모임이 있는지 확인하는 로직 추가 필요
 
         if (user.getSocialType() == SocialType.NONE) {
@@ -193,7 +193,7 @@ public class UserService {
         }
 
         // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
-        log.info("회원 탈퇴 처리 시작 - ID: {}", userId);
+        log.info("회원 탈퇴 처리 시작 - userPk: {}", userPk);
         log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
 
         // 구글일 경우 연동 해제용 액세스 토큰 가져오기
@@ -210,14 +210,15 @@ public class UserService {
         user.deactivate();
 
         // Redis에 저장된 Refresh Token 삭제
-        refreshTokenRepository.deleteById(userId);
+        refreshTokenRepository.deleteById(userPk);
+
 
         // 소셜 연동 해제
         if (user.getSocialType() != SocialType.NONE) {
             socialUnlinkService.unlink(user.getSocialType(), user.getSocialId(), socialAccessToken);
         }
 
-        log.info("회원 탈퇴 완료: userId={}, socialType={}", userId, user.getSocialType());
+        log.info("회원 탈퇴 완료: userPk={}, socialType={}", userPk, user.getSocialType());
     }
 
     private void handleExistingUser(String loginId, String mail, SocialType socialType) {
@@ -244,8 +245,8 @@ public class UserService {
         return LoginResponse.of(user, accessToken, refreshToken);
     }
 
-    private User findByIdAndValidateActive(String userId) {
-        User user = userRepository.findById(userId)
+    private User findByIdAndValidateActive(String userPk) {
+        User user = userRepository.findById(userPk)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // 탈퇴 여부 먼저 확인
@@ -280,9 +281,10 @@ public class UserService {
     }
 
     @Transactional
-    public void changePassword(String userId, PasswordChangeRequest request) {
+    public void changePassword(String userPk, PasswordChangeRequest request) {
         // 유저 조회
-        User user = findByIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userPk);
+
 
         // 소셜 로그인 유저는 비밀번호 변경 불가
         if (user.getSocialType() != SocialType.NONE) {
@@ -301,7 +303,7 @@ public class UserService {
 
         // 비밀번호 암호화 및 업데이트
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
-        log.info("비밀번호 변경 완료: userId={}", userId);
+        log.info("비밀번호 변경 완료: userPk={}", userPk);
     }
 
     private UserResponse convertToUserResponse(User user) {

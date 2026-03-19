@@ -32,10 +32,10 @@ public class GroupBookService {
     private final OwnBookRepository ownBookRepository;
 
     @Transactional
-    public OwnBookRegisterResponse registerOwnBook(String groupId, OwnBookRegisterRequest request, String userId) {
+    public OwnBookRegisterResponse registerOwnBook(String groupId, OwnBookRegisterRequest request, String userPK) {
         Group group = findGroupById(groupId);
-        User user = findActiveUserById(userId);
-        Member member = findMember(groupId, userId);
+        User user = findActiveUserById(userPK);
+        Member member = findMember(groupId, userPK);
 
         if (member.getMemberStatus() != MemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
@@ -81,8 +81,8 @@ public class GroupBookService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserById(String userId) {
-        User user = userRepository.findById(userId)
+    private User findActiveUserById(String userPk) {
+        User user = userRepository.findById(userPk)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -92,8 +92,8 @@ public class GroupBookService {
         return user;
     }
 
-    private Member findMember(String groupId, String userId) {
-        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userId)
+    private Member findMember(String groupId, String userPk) {
+        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPk)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
     }
 }
