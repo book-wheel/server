@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 public class MemberService {
     private final MemberRepository memberRepository;
 
-    public boolean isUserInGroup(String id) {
-        return memberRepository.existsByUser_IdAndMemberStatus(id, MemberStatus.ACTIVE);
+    public boolean isUserInGroup(String userPK) {
+        return memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE);
     }
 }
