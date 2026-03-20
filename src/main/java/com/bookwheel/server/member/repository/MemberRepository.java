@@ -15,7 +15,7 @@ import java.util.Optional;
 public interface MemberRepository extends JpaRepository<Member, String> {
     // 특정 그룹에 특정 사용자가 이미 멤버로 등록되어 있는지 확인
     // 특정 사용자가 해당 그룹에 속하는 유저인지 확인하는 용도 (중복 방지 시 사용)
-    boolean existsByGroup_GroupIdAndUser_UserId(String groupId, String userId);
+    boolean existsByGroup_GroupIdAndUser_Id(String groupId, String userPK);
 
     // 특정 사용자가 그룹에 소속되어 있는지 확인
     // 회원 탈퇴 시, 그룹에 소속되어있는지 확인하는 용도
@@ -23,7 +23,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
 
     // 특정 그룹 안에서 이 사용자가 '어떤 멤버'로 등록되어 있는지 단 한 명의 정보 조회
     // 로그인한 '나(User)'의 정보를 기준으로 해당 그룹에서의 멤버 프로필을 찾는 용도
-    Optional<Member> findByGroup_GroupIdAndUser_UserId(String groupId, String userId);
+    Optional<Member> findByGroup_GroupIdAndUser_Id(String groupId, String userPK);
 
     // 모임에 속한 특정 멤버 한 명을 조회하는 기능
     // 특정 멤버의 '가입 번호(MemberId)'를 알고 있을 때, 그 멤버가 우리 그룹 소속이 맞는지 콕 집어 확인할 때 사용
@@ -51,5 +51,5 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     List<Member> findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(List<String> groupIds, MemberStatus memberStatus);
 
     // IN 절을 사용하여 여러 유저가 그룹에 속해있는지 한 번에 확인
-    long countByGroup_GroupIdAndUser_UserIdIn(String groupId, List<String> userIds);
+    long countByGroup_GroupIdAndUser_IdIn(String groupId, List<String> userPK);
 }

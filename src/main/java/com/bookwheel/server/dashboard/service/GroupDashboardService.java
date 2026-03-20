@@ -39,11 +39,11 @@ public class GroupDashboardService {
     private final WheelStateRepository wheelStateRepository;
     private final RoundRepository roundRepository;
 
-    public DashboardResponse getDashboard(String groupId, String userId) {
+    public DashboardResponse getDashboard(String groupId, String userPK) {
         // 1. 유저, 그룹, 멤버 권한 체크
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userPK);
         Group group = findGroupById(groupId);
-        Member member = findActiveMember(groupId, userId);
+        Member member = findActiveMember(groupId, userPK);
 
         // 2. 현재 라운드 조회
         Round currentRound = getCurrentRound(groupId);
@@ -176,8 +176,8 @@ public class GroupDashboardService {
         return rounds.get(rounds.size() - 1);
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new BusinessException(ErrorCode.INACTIVE_USER);
@@ -190,8 +190,8 @@ public class GroupDashboardService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private Member findActiveMember(String groupId, String userId) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+    private Member findActiveMember(String groupId, String userPK) {
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         if (member.getMemberStatus() != MemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);

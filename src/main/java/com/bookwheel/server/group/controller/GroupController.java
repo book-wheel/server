@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,7 +36,7 @@ public class GroupController {
             @RequestBody @Valid GroupCreateRequest groupCreateRequest,
             @AuthenticationPrincipal Object principal
     ) {
-        GroupCreateResponse response = groupService.createGroup(groupCreateRequest, getUserId(principal));
+        GroupCreateResponse response = groupService.createGroup(groupCreateRequest, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -65,7 +65,7 @@ public class GroupController {
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        GroupDetailResponse response = groupService.getGroup(groupId, getUserId(principal));
+        GroupDetailResponse response = groupService.getGroup(groupId, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -76,7 +76,7 @@ public class GroupController {
             @RequestBody @Valid GroupJoinRequest groupJoinRequest,
             @AuthenticationPrincipal Object principal
     ) {
-        GroupJoinResponse response = groupService.joinGroup(groupId, groupJoinRequest, getUserId(principal));
+        GroupJoinResponse response = groupService.joinGroup(groupId, groupJoinRequest, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -86,7 +86,7 @@ public class GroupController {
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        List<MemberRequestResponse> response = groupService.getMemberRequests(groupId, getUserId(principal));
+        List<MemberRequestResponse> response = groupService.getMemberRequests(groupId, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -101,7 +101,7 @@ public class GroupController {
         MemberRequestStatusUpdateResponse response = groupService.updateMemberRequestStatus(
                 groupId,
                 memberId,
-                getUserId(principal),
+                getUserPK(principal),
                 request.status()
         );
         return ResponseEntity.ok(ApiResponse.success(response));

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequiredArgsConstructor
@@ -94,7 +94,7 @@ public class GroupMemberOrderController {
         List<MemberReadOrderResponse> response = groupMemberOrderService.assignReadOrder(
                 groupId,
                 request,
-                getUserId(principal)
+                getUserPK(principal)
         );
         return ResponseEntity.ok(ApiResponse.success(response));
     }

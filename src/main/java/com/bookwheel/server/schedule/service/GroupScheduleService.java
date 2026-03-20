@@ -47,11 +47,11 @@ public class GroupScheduleService {
     public List<GroupScheduleRoundResponse> createSchedule(
             String groupId,
             GroupScheduleCreateRequest request,
-            String userId
+            String userPK
     ) {
         Group group = findGroupByIdForUpdate(groupId);
-        findActiveUserByUserId(userId);
-        validateLeaderPermission(groupId, userId);
+        findActiveUserById(userPK);
+        validateLeaderPermission(groupId, userPK);
 
         // 그룹이 소유한 책의 개수를 기준으로 총 라운드 수를 결정
         long ownBookCount = ownBookRepository.countByGroup_GroupId(groupId);
@@ -341,8 +341,8 @@ public class GroupScheduleService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -352,8 +352,8 @@ public class GroupScheduleService {
         return user;
     }
 
-    private void validateLeaderPermission(String groupId, String userId) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+    private void validateLeaderPermission(String groupId, String userPK) {
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
 
         boolean isLeader = member.getMemberRole() == MemberRole.LEADER;
