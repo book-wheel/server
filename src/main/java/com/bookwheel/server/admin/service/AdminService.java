@@ -1,18 +1,20 @@
 package com.bookwheel.server.admin.service;
 
 
-import com.bookwheel.server.admin.dto.AdminBanRequest;
-import com.bookwheel.server.admin.dto.AdminBanResponse;
-import com.bookwheel.server.admin.dto.BanReason;
-import com.bookwheel.server.admin.dto.PenaltyResponse;
+import com.bookwheel.server.admin.dto.*;
 import com.bookwheel.server.admin.entity.Penalty;
 import com.bookwheel.server.admin.repository.PenaltyRepository;
+import com.bookwheel.server.admin.repository.PostImageRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.entity.Post;
+import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,14 +22,17 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AdminService {
-    // TODO: 신고 목록 조회, 패널티 목록 조회 등의 로직 처리 할 예정
+    // TODO: 신고 목록 조회, 신고처리 로직 추가
 
     private final UserRepository userRepository;
     private final PenaltyRepository penaltyRepository;
+    private final PostImageRepository postImageRepository;
+    private final PostRepository postRepository;
 
     //회원 강제 탈퇴/정지 시키기
     @Transactional
@@ -81,6 +86,24 @@ public class AdminService {
             .map(PenaltyResponse::from)
             .collect(Collectors.toList());
 
+    }
+
+    public List<AdminPostResponse> getAllPost() {
+        List<PostImage> images = postImageRepository.findAll();
+        return images.stream()
+            .map(AdminPostResponse::from)
+            .toList();
+    }
+
+    @Transactional
+    public void deletePostByPost(Long photoId, AdminPostDeleteRequest request) {
+        PostImage postImage = postImageRepository.findById(photoId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        Post post = postImage.getPost();
+
+        log.info("게시물 삭제 - ID: {}, 사유: {}", post.getPostId(), request.reason());//TODO: 알림 기능과 연결
+        postRepository.delete(post);
     }
 }
 

@@ -36,6 +36,10 @@ public class Post {
     private List<PostImage> images = new ArrayList<>();
 
     @Builder.Default
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PostReport> reports = new ArrayList<>();
+
+    @Builder.Default
     @Column(name = "like_count", nullable = false)
     private int likeCount = 0;
 

@@ -83,7 +83,9 @@ public enum ErrorCode {
     INVALID_FILE_FORMAT(HttpStatus.BAD_REQUEST, "FILE_002", "지원하지 않는 파일 형식입니다."),
 
     //게시물관련 에러
-    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "해당 게시물을 찾을 수 없습니다."),
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_001", "해당 게시물을 찾을 수 없습니다."),
+    ALREADY_REPORTED(HttpStatus.BAD_REQUEST, "POST_002", "이미 신고한 게시물입니다."),
+    CANNOT_REPORT_OWN_POST(HttpStatus.BAD_REQUEST, "POST_003", "자신의 게시물은 신고할 수 없습니다."),
 
     //리뷰 관련 에러
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "해당 리뷰를 찾을 수 없습니다."),

@@ -1,7 +1,6 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.service.S3Service;
-import com.bookwheel.server.community.dto.PhotoReportRequest;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
