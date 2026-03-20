@@ -35,7 +35,7 @@ public class Round {
     @Column(name = "round_number", nullable = false)
     private Integer roundNumber;
 
-    @Column(name = "start_date")
+    @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
     @Column(name = "end_date")

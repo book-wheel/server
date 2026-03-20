@@ -13,14 +13,23 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, String> {
-    boolean existsByGroup_GroupIdAndUser_UserId(String groupId, String userId);
+    // 특정 그룹에 특정 사용자가 이미 멤버로 등록되어 있는지 확인
+    // 특정 사용자가 해당 그룹에 속하는 유저인지 확인하는 용도 (중복 방지 시 사용)
+    boolean existsByGroup_GroupIdAndUser_Id(String groupId, String userPK);
 
-    Optional<Member> findByGroup_GroupIdAndUser_UserId(String groupId, String userId);
+    // 특정 그룹 안에서 이 사용자가 '어떤 멤버'로 등록되어 있는지 단 한 명의 정보 조회
+    // 로그인한 '나(User)'의 정보를 기준으로 해당 그룹에서의 멤버 프로필을 찾는 용도
+    Optional<Member> findByGroup_GroupIdAndUser_Id(String groupId, String userPK);
 
+    // 모임에 속한 특정 멤버 한 명을 조회하는 기능
+    // 특정 멤버의 '가입 번호(MemberId)'를 알고 있을 때, 그 멤버가 우리 그룹 소속이 맞는지 콕 집어 확인할 때 사용
+    Optional<Member> findByMemberIdAndGroup_GroupId(String memberId, String groupId);
+
+    // 특정 그룹 내 특정 상태(ex. PENDING, ACTIVE)의 멤버 목록 조회
     List<Member> findByGroup_GroupIdAndMemberStatus(String groupId, MemberStatus memberStatus);
 
-    List<Member> findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(String groupId, MemberStatus memberStatus);
-
+    // 모임 멤버들의 명단을 불러오는 기능
+    // 독서 순서를 바꾸는 동안 다른 사람이 건드리지 못하게 잠금(Lock)을 걸고 이름 정보(User)까지 한 번에 조회
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "user")
     @Query("""
@@ -34,5 +43,9 @@ public interface MemberRepository extends JpaRepository<Member, String> {
             @Param("memberStatus") MemberStatus memberStatus
     );
 
-    Optional<Member> findByMemberIdAndGroup_GroupId(String memberId, String groupId);
+    // 해당 그룹 안에 특정 상태의 멤버들을 정렬해서 전부 가져오기
+    List<Member> findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(List<String> groupIds, MemberStatus memberStatus);
+
+    // IN 절을 사용하여 여러 유저가 그룹에 속해있는지 한 번에 확인
+    long countByGroup_GroupIdAndUser_IdIn(String groupId, List<String> userPK);
 }

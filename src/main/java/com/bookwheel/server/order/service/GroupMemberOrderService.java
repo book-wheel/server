@@ -37,11 +37,11 @@ public class GroupMemberOrderService {
     public List<MemberReadOrderResponse> assignReadOrder(
             String groupId,
             MemberReadOrderRequest request,
-            String userId
+            String userPK
     ) {
         findGroupById(groupId);
-        findActiveUserByUserId(userId);
-        validateManagerPermission(groupId, userId);
+        findActiveUserById(userPK);
+        validateManagerPermission(groupId, userPK);
         validateRequestShape(request);
 
         List<Member> activeMembers = memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE);
@@ -65,7 +65,7 @@ public class GroupMemberOrderService {
                         member.getReadOrder(),
                         member.getMemberId(),
                         member.getUser().getNickname(),
-                        member.getUser().getProfileImage()
+                        member.getUser().getProfileImageKey()
                 ))
                 .toList();
     }
@@ -119,8 +119,8 @@ public class GroupMemberOrderService {
         return orderedMembers;
     }
 
-    private void validateManagerPermission(String groupId, String userId) {
-        Member manager = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+    private void validateManagerPermission(String groupId, String userPK) {
+        Member manager = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ORDER_MANAGER_ONLY));
 
         boolean isActive = manager.getMemberStatus() == MemberStatus.ACTIVE;
@@ -136,8 +136,8 @@ public class GroupMemberOrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
