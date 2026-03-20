@@ -43,13 +43,13 @@ class MemberServiceTest {
     @DisplayName("사용자가 활동 중인 모임이 있으면 true를 반환한다.")
     void isUserInGroup_ReturnsTrue_WhenActive() {
         // given (준비 단계)
-        String userId = UUID.randomUUID().toString();
+        String userPK = UUID.randomUUID().toString();
         // Repository가 호출되었을 때, true를 반환하도록 세팅
-        given(memberRepository.existsByUser_IdAndMemberStatus(userId, MemberStatus.ACTIVE))
+        given(memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE))
                 .willReturn(true);
 
         // when (실행 단계)
-        boolean result = memberService.isUserInGroup(userId);
+        boolean result = memberService.isUserInGroup(userPK);
 
         // then (검증 단계)
         assertThat(result).isTrue();
@@ -59,13 +59,13 @@ class MemberServiceTest {
     @DisplayName("사용자가 활동 중인 모임이 없으면 false를 반환한다.")
     void isUserInGroup_ReturnsFalse_WhenNotActive() {
         // given (준비 단계)
-        String userId = UUID.randomUUID().toString();
+        String userPK = UUID.randomUUID().toString();
         // Repository가 호출되었을 때, false를 반환하도록 세팅
-        given(memberRepository.existsByUser_IdAndMemberStatus(userId, MemberStatus.ACTIVE))
+        given(memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE))
                 .willReturn(false);
 
         // when (실행 단계)
-        boolean result = memberService.isUserInGroup(userId);
+        boolean result = memberService.isUserInGroup(userPK);
 
         // then (검증 단계)
         assertThat(result).isFalse();
