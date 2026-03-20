@@ -17,15 +17,15 @@ public class WheelStateImage {
     private Long imageId;
 
     @Column(name = "image_url", nullable = false, length = 255)
-    private String imageUrl;
+    private String objectKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wheel_state_id", nullable = false)
     private WheelState wheelState;
 
-    public static WheelStateImage of(String imageUrl, WheelState wheelState) {
+    public static WheelStateImage of(String objectKey, WheelState wheelState) {
         return WheelStateImage.builder()
-                .imageUrl(imageUrl)
+                .objectKey(objectKey)
                 .wheelState(wheelState)
                 .build();
     }

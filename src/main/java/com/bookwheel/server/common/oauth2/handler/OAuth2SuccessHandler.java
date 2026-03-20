@@ -25,12 +25,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {        log.info("OAuth2 로그인 성공! JWT 토큰 발행을 시작합니다.");
 
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
-        String userId = oAuth2User.getUserId();
+        String userPK = oAuth2User.getUserPK();
         Role role = oAuth2User.getRole();
 
         // JWT 토큰 생성
-        String accessToken = jwtTokenProvider.createAccessToken(userId, role);
-        String refreshToken = jwtTokenProvider.createRefreshToken(userId, role);
+        String accessToken = jwtTokenProvider.createAccessToken(userPK, role);
+        String refreshToken = jwtTokenProvider.createRefreshToken(userPK, role);
 
         // 소셜 신규 유저인지 판단
         boolean isFirstLogin = oAuth2User.getNickname().startsWith("USER_");

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 
 @Tag(name = "Group-Inner", description="독서 진행 상태 관리 API")
@@ -29,22 +29,22 @@ public class WheelController {
             @PathVariable String wheelStateId,
             @RequestBody @Valid WheelCompleteRequest request,
             @AuthenticationPrincipal Object principal) {
-        String userId = getUserId(principal);
+        String userPK = getUserPK(principal);
 
-        WheelCompleteResponse response = wheelService.completedReading(userId, wheelStateId, request);
+        WheelCompleteResponse response = wheelService.completedReading(userPK, wheelStateId, request);
 
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "특정 멤버의 독서 내역 조회 기능", description = "특정 사람이 특정 독서 모임에서 어떤 책들을 읽어왔는지 쭉 나열합니다.")
-    @GetMapping("/{groupId}/history/{targetUserId}")
+    @GetMapping("/{groupId}/history/{targetUserPk}")
     public ResponseEntity<ApiResponse<List<WheelHistoryUserResponse>>> getWheelHistoryUser(
             @PathVariable String groupId,
-            @PathVariable String targetUserId,
+            @PathVariable String targetUserPk,
             @AuthenticationPrincipal Object principal
     ) {
-        String userId = getUserId(principal);
-        List<WheelHistoryUserResponse> response = wheelService.historyReading(userId, targetUserId, groupId);
+        String userPK = getUserPK(principal);
+        List<WheelHistoryUserResponse> response = wheelService.historyReading(userPK, targetUserPk, groupId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -55,8 +55,8 @@ public class WheelController {
             @PathVariable String ownBookId,
             @AuthenticationPrincipal Object principal
     ) {
-        String userId = getUserId(principal);
-        WheelHistoryBookResponse response = wheelService.historyReadingBook(userId, groupId, ownBookId);
+        String userPK = getUserPK(principal);
+        WheelHistoryBookResponse response = wheelService.historyReadingBook(userPK, groupId, ownBookId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

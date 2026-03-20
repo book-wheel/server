@@ -34,25 +34,25 @@ public class JwtTokenProvider {
     }
 
     // Access Token 생성
-    public String createAccessToken(String userId, Role role) {
+    public String createAccessToken(String userPK, Role role) {
         long now = (new Date()).getTime();
         Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
-                .setSubject(userId)
-                .claim("auth", role.getKey()) //
+                .setSubject(userPK)
+                .claim("auth", role.getKey())
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     // Refresh Token 생성
-    public String createRefreshToken(String userId, Role role) {
+    public String createRefreshToken(String userPK, Role role) {
         long now = (new Date()).getTime();
         Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
-                .setSubject(userId)
+                .setSubject(userPK)
                 .claim("auth", role.getKey())
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
