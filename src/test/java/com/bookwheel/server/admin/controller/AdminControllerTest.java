@@ -1,4 +1,4 @@
-﻿package com.bookwheel.server.admin.controller;
+package com.bookwheel.server.admin.controller;
 
 import com.bookwheel.server.admin.dto.AdminBanRequest;
 import com.bookwheel.server.admin.dto.AdminBanResponse;
