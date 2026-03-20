@@ -10,7 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -35,8 +35,8 @@ public class PostController {
     public ApiResponse<PostCreateResponse> save(@PathVariable("bookId") String bookId,
                                                 @RequestBody PostCreateRequest request, @AuthenticationPrincipal Object principal) {
 
-        String userId = getUserId(principal);
-        PostCreateResponse response = postService.create(bookId, request,userId);
+        String userPK = getUserPK(principal);
+        PostCreateResponse response = postService.create(bookId, request,userPK);
         return ApiResponse.success(response);
     }
 
@@ -47,7 +47,7 @@ public class PostController {
         @PathVariable("postId") Long postId,
         @AuthenticationPrincipal Object principal) {
 
-        postService.togglePostLike(postId, getUserId(principal));
+        postService.togglePostLike(postId, getUserPK(principal));
         return ApiResponse.success("공감 상태가 변경되었습니다.");
     }
 
@@ -58,7 +58,7 @@ public class PostController {
         @Valid @RequestBody PostCommentCreateRequest request,
         @AuthenticationPrincipal Object principal) {
 
-        postService.createPostComment(postId, request, getUserId(principal));
+        postService.createPostComment(postId, request, getUserPK(principal));
 
         return ApiResponse.success("댓글이 성공적으로 작성되었습니다.");
     }

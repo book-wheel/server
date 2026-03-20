@@ -12,7 +12,7 @@ public record UserSignupRequest(
         @NotBlank(message = "아이디를 입력해주세요")
         @Size(min = 4, max = 20, message = "아이디는 4자 이상 20자 이하로 입력해주세요")
 
-        String userId,
+        String loginId,
 
         @NotBlank(message = "비밀번호는 필수입니다.")
         @Pattern(

@@ -1,7 +1,7 @@
 package com.bookwheel.server.user.dto;
 
 public record IdRecoveryResponse(
-        String userId
+        String loginId
 ) {
     public static IdRecoveryResponse from(String maskedUserId) {
         return new IdRecoveryResponse(maskedUserId);

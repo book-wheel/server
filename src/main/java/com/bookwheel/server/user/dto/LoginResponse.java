@@ -12,7 +12,7 @@ public record LoginResponse(
         boolean isProfileSet,
         Role role,
         String id,
-        String userId,
+        String loginId,
         String nickname,
         String mail,
         SocialType social,
@@ -26,7 +26,7 @@ public record LoginResponse(
                 .isProfileSet(user.isProfileSet())
                 .role(user.getRole())
                 .id(user.getId())
-                .userId(user.getUserId())
+                .loginId(user.getUserId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
                 .social(user.getSocialType())
