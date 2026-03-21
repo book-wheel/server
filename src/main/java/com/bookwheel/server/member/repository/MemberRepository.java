@@ -17,6 +17,10 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     // 특정 사용자가 해당 그룹에 속하는 유저인지 확인하는 용도 (중복 방지 시 사용)
     boolean existsByGroup_GroupIdAndUser_Id(String groupId, String userPK);
 
+    // 특정 사용자가 그룹에 소속되어 있는지 확인
+    // 회원 탈퇴 시, 그룹에 소속되어있는지 확인하는 용도
+    boolean existsByUser_IdAndMemberStatus(String userPK, MemberStatus memberStatus);
+
     // 특정 그룹 안에서 이 사용자가 '어떤 멤버'로 등록되어 있는지 단 한 명의 정보 조회
     // 로그인한 '나(User)'의 정보를 기준으로 해당 그룹에서의 멤버 프로필을 찾는 용도
     Optional<Member> findByGroup_GroupIdAndUser_Id(String groupId, String userPK);
