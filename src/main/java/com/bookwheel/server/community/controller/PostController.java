@@ -66,7 +66,7 @@ public class PostController {
 
     @Operation(summary = "게시물 신고")
     @PostMapping("/{postId}/reports")
-    public ApiResponse<String> reportPhoto(
+    public ApiResponse<String> reportPost(
         @PathVariable("postId") Long postId,
         @Valid @RequestBody PostReportRequest request,
         @AuthenticationPrincipal Object principal) {

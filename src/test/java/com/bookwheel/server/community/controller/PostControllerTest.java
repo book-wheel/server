@@ -161,7 +161,7 @@ class PostControllerTest {
     @Test
     @WithMockUser
     @DisplayName("Community Gallery: report photo success")
-    void reportPhoto_Success() throws Exception {
+    void reportPost_Success() throws Exception {
         Long photoId = 99L;
 
         mockMvc.perform(post("/api/v1/posts/{postId}/reports", photoId)
