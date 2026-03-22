@@ -58,11 +58,11 @@ public class AdminController {
 
     @Operation(summary = "사진 강제 삭제 (해당 게시물 전체 삭제)")
     @DeleteMapping("/post/{postId}")
-    public ApiResponse<String> deletePhoto(
+    public ApiResponse<String> deletePost(
         @PathVariable("postId") Long postId,
         @Valid @RequestBody AdminPostDeleteRequest request) {
 
-        adminService.deletePostByPost(postId, request);
+        adminService.deletePost(postId, request);
 
         return ApiResponse.success(postId + "번 게시물이 [" + request.reason().getDescription() + "] 사유로 성공적으로 삭제되었습니다.");
     }

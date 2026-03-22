@@ -1,21 +1,25 @@
 package com.bookwheel.server.admin.dto;
 
+import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
 
 public record AdminPostResponse(
-    Long photoId,
+    Long postId,
     String objectKey,
     String bookId,
     String uploaderNickname,
-    String uploaderId
+    String uploaderPK
 ) {
-    public static AdminPostResponse from(PostImage postImage) {
+    public static AdminPostResponse from(Post post) {
+
+        String thumbnailKey = post.getImages().isEmpty() ? null : post.getImages().get(0).getObjectKey();
+
         return new AdminPostResponse(
-            postImage.getPostImageId(),
-            postImage.getObjectKey(),
-            postImage.getPost().getBookInfo().getId(),
-            postImage.getPost().getUploader().getNickname(),
-            postImage.getPost().getUploader().getUserId()
+            post.getPostId(),
+            thumbnailKey,// 대표사진 한장만 전송.
+            post.getBookInfo().getId(),
+            post.getUploader().getNickname(),
+            post.getUploader().getId()
         );
     }
 }

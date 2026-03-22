@@ -4,11 +4,9 @@ package com.bookwheel.server.admin.service;
 import com.bookwheel.server.admin.dto.*;
 import com.bookwheel.server.admin.entity.Penalty;
 import com.bookwheel.server.admin.repository.PenaltyRepository;
-import com.bookwheel.server.admin.repository.PostImageRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.entity.Post;
-import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.User;
@@ -31,7 +29,6 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final PenaltyRepository penaltyRepository;
-    private final PostImageRepository postImageRepository;
     private final PostRepository postRepository;
 
     //회원 강제 탈퇴/정지 시키기
@@ -89,18 +86,16 @@ public class AdminService {
     }
 
     public List<AdminPostResponse> getAllPost() {
-        List<PostImage> images = postImageRepository.findAll();
-        return images.stream()
+        List<Post> posts = postRepository.findAll();
+        return posts.stream()
             .map(AdminPostResponse::from)
             .toList();
     }
 
     @Transactional
-    public void deletePostByPost(Long photoId, AdminPostDeleteRequest request) {
-        PostImage postImage = postImageRepository.findById(photoId)
+    public void deletePost(Long postId, AdminPostDeleteRequest request) {
+        Post post = postRepository.findById(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
-
-        Post post = postImage.getPost();
 
         log.info("게시물 삭제 - ID: {}, 사유: {}", post.getPostId(), request.reason());//TODO: 알림 기능과 연결
         postRepository.delete(post);
