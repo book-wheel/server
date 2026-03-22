@@ -24,17 +24,32 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 public class BookController{
     private final BookService bookService;
 
-    @Operation(summary = "도서 검색", description = "알라딘 API를 연동하여 키워드(제목, 저자 등)로 도서를 검색합니다.")
-    @GetMapping
-    public ApiResponse<String> searchBooks() {
-        // TODO: 검색어 파라미터 받기 (@RequestParam 등)
-        return ApiResponse.success("도서 검색 api 연결");
+    @Operation(summary = "도서 검색 (목록 조회)", description = "카카오 API를 활용해 도서를 검색합니다.")
+    @GetMapping("/search")
+    public ApiResponse<List<BookSearchResponse>> searchBooks(
+        @RequestParam(name = "query") String query,                                   // 검색어 (제목, 저자 출판사 등)
+        @RequestParam(name = "category", required = false) String category,           // 카테고리
+        @RequestParam(name = "pubDate", required = false) String pubDate,             // 출간일 필터
+        @RequestParam(name = "length", required = false) String length,               // 분량 (페이지 수)
+        @RequestParam(name = "minRating", required = false) Integer minRating,        // 별점 (예: 4점 이상)
+        @RequestParam(name = "excludeLiked", defaultValue = "false") boolean excludeLiked, // 관심도서 제외 체크박스
+        @RequestParam(name = "page", defaultValue = "1") int page,
+        @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
+        // TODO: bookService.searchBooks(query, page, size) 호출
+        return ApiResponse.success("도서 검색 api 연결"); // 임시 리턴
     }
 
-    @Operation(summary ="도서 상세 조회")
-    @GetMapping("/{bookId}")
-    public ApiResponse<String> getBookDetail(@PathVariable("bookId") String bookId) {
-        return ApiResponse.success(bookId + "도서 상세 조회 api 연결");
+
+
+
+    @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서의 상세 정보와 모임 정보를 조회합니다.")
+    @GetMapping("/{isbn}")
+    public ApiResponse<BookDetailResponse> getBookDetail(
+        @PathVariable("isbn") String isbn
+    ) {
+        // TODO: bookService.getBookDetail(isbn) 호출
+        return ApiResponse.success(isbn + "도서 상세 조회 api 연결"); // 임시 리턴
     }
 
 
