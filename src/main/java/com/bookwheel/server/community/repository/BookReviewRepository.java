@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface BookReviewRepository extends JpaRepository<BookReview, Long> {
-    boolean existsByBookInfoAndReviewer_UserId(BookInfo bookInfo, String userId);
+    boolean existsByBookInfoAndReviewer_Id(BookInfo bookInfo, String userPK);
     long countByBookInfoAndIsRecommended(BookInfo bookInfo, boolean isRecommended);
 
     List<BookReview> findAllByBookInfoOrderByCreatedAtDesc(BookInfo bookInfo);

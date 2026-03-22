@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequiredArgsConstructor
@@ -32,8 +32,8 @@ public class GroupDashboardController {
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        String userId = getUserId(principal);
-        DashboardResponse response = groupDashboardService.getDashboard(groupId, userId);
+        String userPK = getUserPK(principal);
+        DashboardResponse response = groupDashboardService.getDashboard(groupId, userPK);
         return ApiResponse.success(response);
     }
 }

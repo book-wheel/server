@@ -5,6 +5,8 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
+import com.bookwheel.server.common.service.S3Service;
+import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
@@ -31,6 +33,7 @@ public class UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
+    private final S3Service s3Service;
     private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
 
     @Transactional
@@ -44,13 +47,13 @@ public class UserService {
         }
 
         // 일반 회원가입(NONE) 방식 내에서만 중복 및 재가입 체크
-        handleExistingUser(request.userId(), request.mail(), SocialType.NONE);
+        handleExistingUser(request.loginId(), request.mail(), SocialType.NONE);
 
         // 임시 닉네임 부여 (프로필 설정에서 실제 닉네임 설정)
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
         User user = User.builder()
-                .userId(request.userId())
+                .userId(request.loginId())
                 .password(passwordEncoder.encode(request.password()))
                 .nickname(tempNickname)
                 .mail(request.mail())
@@ -62,7 +65,7 @@ public class UserService {
         User savedUser = userRepository.save(user);
         log.info("일반 회원가입 1단계 완료: userId={}, tempNickname={}", savedUser.getUserId(), tempNickname);
 
-        return UserResponse.from(savedUser);
+        return UserResponse.from(savedUser, null);
     }
 
     private boolean isValidPassword(String password) {
@@ -71,37 +74,46 @@ public class UserService {
     }
 
     @Transactional
-    public LoginResponse setupProfile(String userId, ProfileSetupRequest request) {
-        User user = findByUserIdAndValidateActive(userId);
+    public LoginResponse setupProfile(String userPK, ProfileSetupRequest request) {
+        User user = findByIdAndValidateActive(userPK);
 
-        // 닉네임 중복 체크 및 업데이트 (사용자가 입력한 경우에만)
-        if (request.getNickname() != null && !request.getNickname().isBlank()) {
-            // 현재 닉네임과 다를 때만 중복 검증 수행
-            if (!user.getNickname().equals(request.getNickname())) {
-                if (userRepository.existsByNickname(request.getNickname())) {
+        // 닉네임 중복 체크 및 업데이트
+        String newNickname = request.nickname();
+        if (newNickname != null && !newNickname.isBlank()) {
+            if (!user.getNickname().equals(newNickname)) {
+                if (userRepository.existsByNickname(newNickname)) {
                     throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
                 }
-                user.updateNickname(request.getNickname());
             }
+        } else {
+            newNickname = user.getNickname(); // 입력이 없으면 기존 닉네임 유지
         }
 
-        // 전달받은 S3 URL을 그대로 저장
-        if (request.getProfileImageUrl() != null) {
-            user.updateProfileImage(request.getProfileImageUrl());
+        // S3 키 정규화 및 유효성 검사
+        String rawKey = request.profileImageKey();
+        String normalizedKey = null;
+
+        if (rawKey != null && !rawKey.isBlank()) {
+            // 전체 URL이 들어오는 경우 방어 (에러 처리)
+            if (rawKey.startsWith("http://") || rawKey.startsWith("https://")) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+            normalizedKey = PathNormalizer.normalizeSegment(rawKey);
         }
 
-        user.updateComment(request.getComment());
-        user.completeProfile(); // 프로필 설정 완료
+        // 3티티 통합 업데이트
+        user.updateProfile(newNickname, request.comment(), normalizedKey);
+        user.completeProfile();
 
-        log.info("프로필 설정 완료 (Stage 2): userId={}, nickname={}", userId, user.getNickname());
+        log.info("프로필 설정 완료 (Stage 2): userPK={}, nickname={}, imageKey={}",
+                userPK, user.getNickname(), normalizedKey);
 
-        // 최종 로그인 응답 반환 (메인 페이지 이동용 토큰 포함)
         return getLoginResponse(user);
     }
 
     @Transactional
     public LoginResponse login(UserLoginRequest request) {
-        User user = findByUserIdAndValidateActive(request.userId());
+        User user = findByLoginIdAndValidateActive(request.loginId());
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
@@ -122,10 +134,10 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        String userId = jwtTokenProvider.getAuthentication(refreshToken).getName();
+        String userPK = jwtTokenProvider.getAuthentication(refreshToken).getName();
 
         // Redis에서 저장된 토큰 가져오기
-        RefreshToken storedToken = refreshTokenRepository.findById(userId)
+        RefreshToken storedToken = refreshTokenRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_NOT_FOUND));
 
         // 받은 토큰과 현재 거 동일한지 비교
@@ -133,12 +145,12 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userPK);
 
         // 새 Access Token 발급
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId, user.getRole());
+        String newAccessToken = jwtTokenProvider.createAccessToken(userPK, user.getRole());
 
-        log.info("토큰 재발급 성공: userId={}", userId);
+        log.info("토큰 재발급 성공: userPK={}", userPK);
 
         return TokenResponse.builder()
                 .accessToken(newAccessToken)
@@ -146,24 +158,26 @@ public class UserService {
                 .build();
     }
 
-    // 내 정보 조회
-    public UserResponse getMyInfo(String userId) {
-        User user = findByUserIdAndValidateActive(userId);
-        return UserResponse.from(user);
+    // 내 정보 조회 (조회 시 Presigned URL 발급)
+    @Transactional(readOnly = true)
+    public UserResponse getMyInfo(String userPK) {
+        User user = findByIdAndValidateActive(userPK);
+
+        return convertToUserResponse(user);
     }
 
     // 로그아웃
     @Transactional
-    public void logout(String userId) {
-        refreshTokenRepository.deleteById(userId);
-        log.info("로그아웃 완료: userId={}", userId);
+    public void logout(String userPK) {
+        refreshTokenRepository.deleteById(userPK);
+        log.info("로그아웃 완료: userPK={}", userPK);
     }
 
     // 회원 탈퇴
     @Transactional
-    public void withdraw(String userId, UserWithdrawRequest request) {
+    public void withdraw(String userPK, UserWithdrawRequest request) {
         // 유저 조회 및 활성 상태 검증
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userPK);
         // [TODO] 추후 탈퇴하려는 회원이 가입된 모임이 있는지 확인하는 로직 추가 필요
 
         if (user.getSocialType() == SocialType.NONE) {
@@ -173,17 +187,22 @@ public class UserService {
             }
         }
 
+        String imageKey = user.getProfileImageKey();
+        if (imageKey != null) {
+            s3Service.deleteObject(imageKey);
+        }
+
         // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
-        log.info("회원 탈퇴 처리 시작 - ID: {}", userId);
+        log.info("회원 탈퇴 처리 시작 - userPK: {}", userPK);
         log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
 
         // 구글일 경우 연동 해제용 액세스 토큰 가져오기
         String socialAccessToken = null;
         if (user.getSocialType() == SocialType.GOOGLE) {
             org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
-                    authorizedClientService.loadAuthorizedClient("google", user.getUserId());
+                    authorizedClientService.loadAuthorizedClient("google", user.getId());
             if (client != null && client.getAccessToken() != null) {
-                socialAccessToken = client.getAccessToken().getTokenValue();     // 토큰
+                socialAccessToken = client.getAccessToken().getTokenValue();
             }
         }
 
@@ -191,19 +210,20 @@ public class UserService {
         user.deactivate();
 
         // Redis에 저장된 Refresh Token 삭제
-        refreshTokenRepository.deleteById(userId);
+        refreshTokenRepository.deleteById(userPK);
+
 
         // 소셜 연동 해제
         if (user.getSocialType() != SocialType.NONE) {
             socialUnlinkService.unlink(user.getSocialType(), user.getSocialId(), socialAccessToken);
         }
 
-        log.info("회원 탈퇴 완료: userId={}, socialType={}", userId, user.getSocialType());
+        log.info("회원 탈퇴 완료: userPK={}, socialType={}", userPK, user.getSocialType());
     }
 
-    private void handleExistingUser(String userId, String mail, SocialType socialType) {
+    private void handleExistingUser(String loginId, String mail, SocialType socialType) {
         // 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
-        userRepository.findByUserId(userId).ifPresent(user -> {
+        userRepository.findByUserId(loginId).ifPresent(user -> {
             if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
             userRepository.delete(user);
         });
@@ -217,16 +237,16 @@ public class UserService {
     }
 
     private LoginResponse getLoginResponse(User user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getRole());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId(), user.getRole());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getRole());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getRole());
 
-        refreshTokenRepository.save(new RefreshToken(user.getUserId(), refreshToken));
+        refreshTokenRepository.save(new RefreshToken(user.getId(), refreshToken));
 
         return LoginResponse.of(user, accessToken, refreshToken);
     }
 
-    private User findByUserIdAndValidateActive(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findByIdAndValidateActive(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // 탈퇴 여부 먼저 확인
@@ -244,10 +264,27 @@ public class UserService {
         return user;
     }
 
+    private User findByLoginIdAndValidateActive(String loginId) {
+        User user = userRepository.findByUserId(loginId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BusinessException(ErrorCode.INACTIVE_USER);
+        }
+
+        String banStatus = user.getBanStatus();
+        if (!"ACTIVE".equals(banStatus)) {
+            throw new BusinessException(ErrorCode.BANNED_USER);
+        }
+
+        return user;
+    }
+
     @Transactional
-    public void changePassword(String userId, PasswordChangeRequest request) {
+    public void changePassword(String userPK, PasswordChangeRequest request) {
         // 유저 조회
-        User user = findByUserIdAndValidateActive(userId);
+        User user = findByIdAndValidateActive(userPK);
+
 
         // 소셜 로그인 유저는 비밀번호 변경 불가
         if (user.getSocialType() != SocialType.NONE) {
@@ -266,6 +303,14 @@ public class UserService {
 
         // 비밀번호 암호화 및 업데이트
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
-        log.info("비밀번호 변경 완료: userId={}", userId);
+        log.info("비밀번호 변경 완료: userPK={}", userPK);
+    }
+
+    private UserResponse convertToUserResponse(User user) {
+        String presignedUrl = null;
+        if (user.getProfileImageKey() != null && !user.getProfileImageKey().isBlank()) {
+            presignedUrl = s3Service.getPresignedGetUrl(user.getProfileImageKey());
+        }
+        return UserResponse.from(user, presignedUrl);
     }
 }

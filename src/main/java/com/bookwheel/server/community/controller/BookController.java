@@ -11,11 +11,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequestMapping("/api/v1/books")
@@ -55,7 +54,7 @@ public class BookController{
         @PathVariable("bookId") String bookId,
         @Valid @RequestBody ReviewCreateRequest request,
         @AuthenticationPrincipal Object principal) {
-        bookService.createReview(bookId, request, getUserId(principal));
+        bookService.createReview(bookId, request, getUserPK(principal));
 
         return ApiResponse.success("리뷰 작성이 완료되었습니다.");
     }
@@ -66,7 +65,7 @@ public class BookController{
         @PathVariable("bookId") String bookId,
         @AuthenticationPrincipal Object principal) {
 
-        List<ReviewDetailResponse> response = bookService.getReviewList(bookId, getUserId(principal));
+        List<ReviewDetailResponse> response = bookService.getReviewList(bookId, getUserPK(principal));
         return ApiResponse.success(response);
     }
 
@@ -85,7 +84,7 @@ public class BookController{
         @PathVariable("reviewId") Long reviewId,
         @AuthenticationPrincipal Object principal) {
 
-        bookService.toggleReviewLike(reviewId, getUserId(principal));
+        bookService.toggleReviewLike(reviewId, getUserPK(principal));
         return ApiResponse.success("공감 상태가 변경되었습니다.");
     }
 

@@ -35,19 +35,19 @@ public class AdminController {
 
 
     @Operation(summary = "회원 강제 탈퇴/정지 시키기")
-    @PostMapping("/users/{userId}/ban")
+    @PostMapping("/users/{userPK}/ban")
     public ApiResponse<AdminBanResponse> banUser(
-        @PathVariable("userId") String userId,
+        @PathVariable("userPK") String userPK,
         @RequestBody AdminBanRequest request) {
 
-        AdminBanResponse response = adminService.banUser(userId, request);
+        AdminBanResponse response = adminService.banUser(userPK, request);
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "패널티 이력 조회", description = "특정 회원의 과거 제재 이력을 최신순으로 조회")
-    @GetMapping("/users/{userId}/histories")
-    public ApiResponse<List<PenaltyResponse>> getPenaltyHistories(@PathVariable("userId") String userId) {
-        List<PenaltyResponse> response = adminService.getPenalties(userId);
+    @GetMapping("/users/{userPK}/histories")
+    public ApiResponse<List<PenaltyResponse>> getPenaltyHistories(@PathVariable("userPK") String userPK) {
+        List<PenaltyResponse> response = adminService.getPenalties(userPK);
         return ApiResponse.success(response);
     }
 
@@ -63,3 +63,4 @@ public class AdminController {
         return ApiResponse.success(photoId + "번 사진 강제 삭제 API 연결 성공");
     }
 }
+
