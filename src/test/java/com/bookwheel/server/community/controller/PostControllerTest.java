@@ -1,7 +1,6 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.service.S3Service;
-import com.bookwheel.server.community.dto.PhotoReportRequest;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
@@ -161,11 +160,11 @@ class PostControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("Community Gallery: report photo success")
-    void reportPhoto_Success() throws Exception {
-        Long photoId = 99L;
+    @DisplayName("Community Gallery: report post success")
+    void reportPost_Success() throws Exception {
+        Long postId = 99L;
 
-        mockMvc.perform(post("/api/v1/posts/{postId}/reports", photoId)
+        mockMvc.perform(post("/api/v1/posts/{postId}/reports", postId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
