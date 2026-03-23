@@ -160,11 +160,11 @@ class PostControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("Community Gallery: report photo success")
+    @DisplayName("Community Gallery: report post success")
     void reportPost_Success() throws Exception {
-        Long photoId = 99L;
+        Long postId = 99L;
 
-        mockMvc.perform(post("/api/v1/posts/{postId}/reports", photoId)
+        mockMvc.perform(post("/api/v1/posts/{postId}/reports", postId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))

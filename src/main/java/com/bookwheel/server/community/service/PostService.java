@@ -96,10 +96,10 @@ public class PostService {
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // 검증 1: 자기 자신의 게시물을 신고하는지 확인 (User 객체끼리 비교)
-        if (post.getUploader().equals(user)) {
+        if (post.getUploader().getId().equals(user.getId())) {
             throw new BusinessException(ErrorCode.CANNOT_REPORT_OWN_POST);
         }
+
 
         if (postReportRepository.existsByPostAndReporter(post, user)) {
             throw new BusinessException(ErrorCode.ALREADY_REPORTED);

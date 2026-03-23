@@ -6,6 +6,7 @@ import com.bookwheel.server.admin.entity.Penalty;
 import com.bookwheel.server.admin.repository.PenaltyRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.Role;
@@ -30,6 +31,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final PenaltyRepository penaltyRepository;
     private final PostRepository postRepository;
+    private final S3Service s3Service;
 
     //회원 강제 탈퇴/정지 시키기
     @Transactional
@@ -86,7 +88,7 @@ public class AdminService {
     }
 
     public List<AdminPostResponse> getAllPost() {
-        List<Post> posts = postRepository.findAll();
+        List<Post> posts = postRepository.findAllWithDetails();
         return posts.stream()
             .map(AdminPostResponse::from)
             .toList();
@@ -98,6 +100,10 @@ public class AdminService {
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         log.info("게시물 삭제 - ID: {}, 사유: {}", post.getPostId(), request.reason());//TODO: 알림 기능과 연결
+
+        post.getImages().forEach(postImage -> {
+            s3Service.deleteObject(postImage.getObjectKey());
+        });
         postRepository.delete(post);
     }
 }
