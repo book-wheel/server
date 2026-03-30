@@ -4,10 +4,7 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.community.dto.ReviewCreateRequest;
-import com.bookwheel.server.community.dto.ReviewCreateResponse;
-import com.bookwheel.server.community.dto.ReviewDetailResponse;
-import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.ReviewLike;
@@ -25,12 +22,15 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+
 @Transactional(readOnly = true)
 public class BookService {
    private final BookInfoRepository bookInfoRepository;
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final KaKaoService kaKaoService;
+    private final NlkService nlkService;
 
 
     @Transactional
@@ -114,6 +114,16 @@ public class BookService {
             return ReviewDetailResponse.of(review, isLikedByMe);
         }).toList();
     }
+
+    public KakaoBookSearchResponse searchBooks(BookSearchRequest request) {
+        return kaKaoService.searchBooks(request);
+    }
+
+    public NlkBookSearchResponse getBookDetail(String isbn) {
+        return nlkService.searchBookDetailByIsbn(isbn);
+    }
+
+
 
 
 }

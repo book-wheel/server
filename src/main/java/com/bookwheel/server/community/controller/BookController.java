@@ -1,14 +1,13 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
-import com.bookwheel.server.community.dto.ReviewCreateRequest;
-import com.bookwheel.server.community.dto.ReviewDetailResponse;
-import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,31 +25,23 @@ public class BookController{
 
     @Operation(summary = "도서 검색 (목록 조회)", description = "카카오 API를 활용해 도서를 검색합니다.")
     @GetMapping("/search")
-    public ApiResponse<List<BookSearchResponse>> searchBooks(
-        @RequestParam(name = "query") String query,                                   // 검색어 (제목, 저자 출판사 등)
-        @RequestParam(name = "category", required = false) String category,           // 카테고리
-        @RequestParam(name = "pubDate", required = false) String pubDate,             // 출간일 필터
-        @RequestParam(name = "length", required = false) String length,               // 분량 (페이지 수)
-        @RequestParam(name = "minRating", required = false) Integer minRating,        // 별점 (예: 4점 이상)
-        @RequestParam(name = "excludeLiked", defaultValue = "false") boolean excludeLiked, // 관심도서 제외 체크박스
-        @RequestParam(name = "page", defaultValue = "1") int page,
-        @RequestParam(name = "size", defaultValue = "10") int size
+    public ResponseEntity<KakaoBookSearchResponse> searchBooks(
+        @ModelAttribute BookSearchRequest request
     ) {
-        // TODO: bookService.searchBooks(query, page, size) 호출
-        return ApiResponse.success("도서 검색 api 연결"); // 임시 리턴
+        KakaoBookSearchResponse response = bookService.searchBooks(request);
+        return ResponseEntity.ok(response);
     }
-
-
 
 
     @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서의 상세 정보와 모임 정보를 조회합니다.")
     @GetMapping("/{isbn}")
-    public ApiResponse<BookDetailResponse> getBookDetail(
+    public ResponseEntity<NlkBookSearchResponse> getBookDetail(
         @PathVariable("isbn") String isbn
     ) {
-        // TODO: bookService.getBookDetail(isbn) 호출
-        return ApiResponse.success(isbn + "도서 상세 조회 api 연결"); // 임시 리턴
+        NlkBookSearchResponse response = bookService.getBookDetail(isbn);
+        return ResponseEntity.ok(response);
     }
+
 
 
 
