@@ -23,27 +23,24 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 public class BookController{
     private final BookService bookService;
 
-    @Operation(summary = "도서 검색 (목록 조회)", description = "카카오 API를 활용해 도서를 검색합니다.")
+    @Operation(summary = "도서 검색 (목록 조회)", description = "카카오 API를 활용해 가공된 도서 목록을 검색합니다.")
     @GetMapping("/search")
-    public ResponseEntity<KakaoBookSearchResponse> searchBooks(
-        @ModelAttribute BookSearchRequest request
+    public ResponseEntity<BookSearchListResponse> searchBooks(
+                                                               @ModelAttribute BookSearchRequest request
     ) {
-        KakaoBookSearchResponse response = bookService.searchBooks(request);
+        BookSearchListResponse response = bookService.searchBooks(request);
         return ResponseEntity.ok(response);
     }
 
 
-    @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서의 상세 정보와 모임 정보를 조회합니다.")
+    @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서의 상세 정보를 조회합니다.")
     @GetMapping("/{isbn}")
-    public ResponseEntity<NlkBookSearchResponse> getBookDetail(
-        @PathVariable("isbn") String isbn
+    public ResponseEntity<BookDetailResponse> getBookDetail(
+                                                             @PathVariable("isbn") String isbn
     ) {
-        NlkBookSearchResponse response = bookService.getBookDetail(isbn);
+        BookDetailResponse response = bookService.getBookDetail(isbn);
         return ResponseEntity.ok(response);
     }
-
-
-
 
 
     @Operation(summary ="관심 도서 찜/취소")

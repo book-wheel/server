@@ -13,7 +13,7 @@ public record KakaoBookSearchResponse(
         Boolean is_end           // 현재 페이지가 마지막 페이지인지 여부
     ) {}
 
-    // 2. 실제 책 데이터
+    // 실제 책 데이터
     public record Document(
         String title,         // 도서 제목
         String contents,      // 도서 소개

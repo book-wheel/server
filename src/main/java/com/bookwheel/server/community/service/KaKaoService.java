@@ -1,6 +1,8 @@
 package com.bookwheel.server.community.service;
 
+import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchRequest;
+import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.KakaoBookSearchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Slf4j
@@ -24,7 +28,7 @@ public class KaKaoService {
 
     private final RestClient restClient = RestClient.create();
 
-    public KakaoBookSearchResponse searchBooks(BookSearchRequest request) {
+    public BookSearchListResponse searchBooks(BookSearchRequest request) {
         log.info("카카오 도서 검색 요청 - query: {}, page: {}", request.query(), request.page());
 
         //한글 검색어 자동 인코딩
@@ -36,11 +40,33 @@ public class KaKaoService {
             .build()
             .toUri();
 
-        //조립된 URI로 카카오 공식 문서 기준에 맞춰 요청 보냄
-        return restClient.get()
+        KakaoBookSearchResponse kakaoResponse = restClient.get()
             .uri(uri)
             .header("Authorization", "KakaoAK " + kakaoApiKey)
             .retrieve()
             .body(KakaoBookSearchResponse.class);
+
+        if (kakaoResponse == null || kakaoResponse.documents() == null) {
+            return new BookSearchListResponse(List.of(), 0, true);
+        }
+
+        List<BookSearchResponse> processedBooks = kakaoResponse.documents().stream()
+            .map(doc -> BookSearchResponse.of(doc, extractIsbn13(doc.isbn())))
+            .toList();
+
+        return new BookSearchListResponse(
+            processedBooks,
+            kakaoResponse.meta().total_count(),
+            kakaoResponse.meta().is_end()
+        );
+    }
+
+    private String extractIsbn13(String isbn) {
+        if (isbn == null || isbn.isBlank()) return "";
+        String[] parts = isbn.split(" ");
+        for (String part : parts) {
+            if (part.length() == 13) return part;
+        }
+        return (parts.length > 0) ? parts[0] : "";
     }
 }

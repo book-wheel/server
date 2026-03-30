@@ -1,7 +1,5 @@
 package com.bookwheel.server.community.service;
 
-import com.bookwheel.server.book.entity.Book;
-import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.*;
@@ -18,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +27,7 @@ public class BookService {
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
     private final KaKaoService kaKaoService;
-    private final NlkService nlkService;
+    private final AladinService aladinService;
 
 
     @Transactional
@@ -115,15 +112,14 @@ public class BookService {
         }).toList();
     }
 
-    public KakaoBookSearchResponse searchBooks(BookSearchRequest request) {
+
+    public BookSearchListResponse searchBooks(BookSearchRequest request) {
         return kaKaoService.searchBooks(request);
     }
 
-    public NlkBookSearchResponse getBookDetail(String isbn) {
-        return nlkService.searchBookDetailByIsbn(isbn);
+
+    public BookDetailResponse getBookDetail(String isbn) {
+        return aladinService.getBookDetailByIsbn(isbn);
     }
-
-
-
 
 }
