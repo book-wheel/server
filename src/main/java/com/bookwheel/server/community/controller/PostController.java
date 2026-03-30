@@ -64,10 +64,13 @@ public class PostController {
     }
 
 
-    @Operation(summary = "사진첩 신고")
+    @Operation(summary = "게시물 신고")
     @PostMapping("/{postId}/reports")
-    public ApiResponse<String> reportPhoto(@PathVariable("postId") Long photoId,@RequestBody PhotoReportRequest request) {
-        // TODO: 신고 사유(DTO) 받아서 Service로 넘기기
-        return ApiResponse.success(photoId +"신고처리 api 연결 성공");
+    public ApiResponse<String> reportPost(
+        @PathVariable("postId") Long postId,
+        @Valid @RequestBody PostReportRequest request,
+        @AuthenticationPrincipal Object principal) {
+        postService.reportPost(postId, request, getUserPK(principal));
+        return ApiResponse.success("게시물이 성공적으로 신고 접수되었습니다.");
     }
 }
