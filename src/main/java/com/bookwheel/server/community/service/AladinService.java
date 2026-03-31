@@ -26,7 +26,7 @@ public class AladinService {
     @Value("${aladin.api.url}")
     private String aladinApiUrl;
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
 
 
     public BookDetailResponse getBookDetailByIsbn(String isbn) {

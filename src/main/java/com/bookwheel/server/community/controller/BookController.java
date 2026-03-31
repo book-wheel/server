@@ -25,21 +25,19 @@ public class BookController{
 
     @Operation(summary = "도서 검색 (목록 조회)", description = "카카오 API를 활용해 가공된 도서 목록을 검색합니다.")
     @GetMapping("/search")
-    public ResponseEntity<BookSearchListResponse> searchBooks(
-                                                               @ModelAttribute BookSearchRequest request
+    public ApiResponse<BookSearchListResponse> searchBooks(@ModelAttribute BookSearchRequest request
     ) {
         BookSearchListResponse response = bookService.searchBooks(request);
-        return ResponseEntity.ok(response);
+        return ApiResponse.success(response);
     }
 
 
     @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서의 상세 정보를 조회합니다.")
     @GetMapping("/{isbn}")
-    public ResponseEntity<BookDetailResponse> getBookDetail(
-                                                             @PathVariable("isbn") String isbn
+    public ApiResponse<BookDetailResponse> getBookDetail(@PathVariable("isbn") String isbn
     ) {
         BookDetailResponse response = bookService.getBookDetail(isbn);
-        return ResponseEntity.ok(response);
+        return ApiResponse.success(response);
     }
 
 
