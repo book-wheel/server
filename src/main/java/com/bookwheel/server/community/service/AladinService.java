@@ -41,7 +41,7 @@ public class AladinService {
             .build()
             .toUri();
 
-        log.info("알라딘 도서 상세 조회 요청 - ISBN: {}, URI: {}", isbn, uri);
+        log.info("알라딘 도서 상세 조회 요청 - ISBN: {}", isbn);
 
         AladinBookSearchResponse response;
         try {
