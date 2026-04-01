@@ -1,14 +1,13 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
-import com.bookwheel.server.community.dto.ReviewCreateRequest;
-import com.bookwheel.server.community.dto.ReviewDetailResponse;
-import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,34 +23,31 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 public class BookController{
     private final BookService bookService;
 
-    @Operation(summary ="도서 검색")
-    @GetMapping
-    public ApiResponse<String> searchBooks() {
-        // TODO: 검색어 파라미터 받기 (@RequestParam 등)
-        return ApiResponse.success("도서 검색 api 연결");
-    }
-
-    @Operation(summary ="도서 상세 조회")
-    @GetMapping("/{bookId}")
-    public ApiResponse<String> getBookDetail(@PathVariable("bookId") String bookId) {
-        return ApiResponse.success(bookId + "도서 상세 조회 api 연결");
+    @Operation(summary = "도서 검색 (목록 조회)", description = "카카오 API를 활용해 가공된 도서 목록을 검색합니다.")
+    @GetMapping("/search")
+    public ApiResponse<BookSearchListResponse> searchBooks(@ModelAttribute BookSearchRequest request
+    ) {
+        BookSearchListResponse response = bookService.searchBooks(request);
+        return ApiResponse.success(response);
     }
 
 
+    @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서의 상세 정보를 조회합니다.")
+    @GetMapping("/{isbn}")
+    public ApiResponse<BookDetailResponse> getBookDetail(@PathVariable("isbn") String isbn
+    ) {
+        BookDetailResponse response = bookService.getBookDetail(isbn);
+        return ApiResponse.success(response);
+    }
 
 
-    @Operation(summary ="관심 도서 찜")
+    @Operation(summary ="관심 도서 찜/취소")
     @PostMapping("/{bookId}/likes")
     public ApiResponse<String> addBookLike(@PathVariable("bookId") String bookId) {
         return ApiResponse.success(bookId + "관심 도서 찜 api 연결");
 
     }
 
-    @Operation(summary ="관심 도서 찜 취소")
-    @DeleteMapping("/{bookId}/likes")
-    public ApiResponse<String> deleteBookLike(@PathVariable("bookId") String bookId) {
-        return ApiResponse.success(bookId + "관심 도서 찜 취소 api 연결");
-    }
 
     @Operation(summary = "리뷰 작성", description = "특정 책에 추천/비추천 여부와 함께 코멘트를 남깁니다.")
     @PostMapping("/{bookId}/reviews")

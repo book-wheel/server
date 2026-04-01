@@ -1,13 +1,8 @@
 package com.bookwheel.server.community.service;
 
-import com.bookwheel.server.book.entity.Book;
-import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.community.dto.ReviewCreateRequest;
-import com.bookwheel.server.community.dto.ReviewCreateResponse;
-import com.bookwheel.server.community.dto.ReviewDetailResponse;
-import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.ReviewLike;
@@ -21,16 +16,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+
 @Transactional(readOnly = true)
 public class BookService {
    private final BookInfoRepository bookInfoRepository;
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final KaKaoService kaKaoService;
+    private final AladinService aladinService;
 
 
     @Transactional
@@ -112,8 +109,17 @@ public class BookService {
             boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
 
             return ReviewDetailResponse.of(review, isLikedByMe);
-        }).collect(Collectors.toList());
+        }).toList();
     }
 
+
+    public BookSearchListResponse searchBooks(BookSearchRequest request) {
+        return kaKaoService.searchBooks(request);
+    }
+
+
+    public BookDetailResponse getBookDetail(String isbn) {
+        return aladinService.getBookDetailByIsbn(isbn);
+    }
 
 }
