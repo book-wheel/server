@@ -28,9 +28,10 @@ public class PostService {
     private final PostReportRepository postReportRepository;
 
     @Transactional
-    public PostCreateResponse create(String bookInfoId, PostCreateRequest request, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findById(bookInfoId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    public PostCreateResponse create(PostCreateRequest request, String userPK) {
+        String isbn = request.isbn();
+        BookInfo bookInfo = bookInfoRepository.findById(isbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
