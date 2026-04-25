@@ -30,7 +30,7 @@ public class PostService {
     @Transactional
     public PostCreateResponse create(PostCreateRequest request, String userPK) {
         String isbn = request.isbn();
-        BookInfo bookInfo = bookInfoRepository.findById(isbn)
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
             .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
         User user = userRepository.findById(userPK)

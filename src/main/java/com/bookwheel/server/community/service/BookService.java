@@ -34,7 +34,7 @@ public class BookService {
     public ReviewCreateResponse createReview(ReviewCreateRequest request, String userPK) {
         String isbn = request.isbn();
 
-        BookInfo bookInfo = bookInfoRepository.findById(isbn)
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
             .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
         if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userPK)) {
@@ -78,7 +78,7 @@ public class BookService {
 
     public ReviewStatsResponse getReviewStats(String isbn) {
 
-        BookInfo bookInfo = bookInfoRepository.findById(isbn).orElse(null);
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
         if (bookInfo == null) {
             return new ReviewStatsResponse(0, 0);
@@ -99,7 +99,7 @@ public class BookService {
     }
 
     public List<ReviewDetailResponse> getReviewList(String isbn, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findById(isbn).orElse(null);
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
