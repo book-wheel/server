@@ -126,6 +126,11 @@ public class UserService {
         return userRepository.existsByNickname(nickname);
     }
 
+    public void checkEmailDuplication(String mail) {
+        userRepository.findByMailAndSocialTypeAndIsActiveTrue(mail, SocialType.NONE)
+                .ifPresent(user -> { throw new BusinessException(ErrorCode.DUPLICATE_EMAIL); });
+    }
+
     @Transactional
     public TokenResponse reissue(TokenReissueRequest request) {
         String refreshToken = request.refreshToken();
