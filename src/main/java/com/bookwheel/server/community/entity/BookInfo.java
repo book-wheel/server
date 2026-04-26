@@ -16,6 +16,6 @@ public class BookInfo {
     private Long bookInfoId;
 
 
-    @Column(name = "isbn", length = 20, nullable = false)
+    @Column(name = "isbn", length = 20, nullable = false, unique = true)
     private String isbn;
 }
