@@ -6,7 +6,7 @@ import com.bookwheel.server.community.entity.PostImage;
 public record AdminPostResponse(
     Long postId,
     String objectKey,
-    String bookId,
+    String isbn,
     String uploaderNickname,
     String uploaderPK
 ) {
@@ -17,7 +17,7 @@ public record AdminPostResponse(
         return new AdminPostResponse(
             post.getPostId(),
             thumbnailKey,// 대표사진 한장만 전송.
-            post.getBookInfo().getId(),
+            post.getBookInfo().getIsbn(),
             post.getUploader().getNickname(),
             post.getUploader().getId()
         );

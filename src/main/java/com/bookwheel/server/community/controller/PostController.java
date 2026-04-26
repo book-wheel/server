@@ -22,21 +22,21 @@ public class PostController {
     private final PostService postService;
 
     @Operation(summary = "게시물 사진 업로드용 Presigned URL 다중 발급")
-    @PostMapping("/{bookId}/images/presigned-urls")
+    @PostMapping("/{isbn}/images/presigned-urls")
     public ApiResponse<PostImagePresignedResponse> getPresignedUrls(
-        @PathVariable("bookId") String bookId,
+        @PathVariable("isbn") String isbn,
         @RequestBody PostImagePresignedRequest request) {
-        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(bookId, request.fileExtensions());
+        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, request.fileExtensions());
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "게시물 업로드(사진 + 글)")
-    @PostMapping("/{bookId}/save")
-    public ApiResponse<PostCreateResponse> save(@PathVariable("bookId") String bookId,
-                                                @RequestBody PostCreateRequest request, @AuthenticationPrincipal Object principal) {
+    @PostMapping("/{isbn}/save")
+    public ApiResponse<PostCreateResponse> save(@Valid @RequestBody PostCreateRequest request,
+                                                @AuthenticationPrincipal Object principal) {
 
         String userPK = getUserPK(principal);
-        PostCreateResponse response = postService.create(bookId, request,userPK);
+        PostCreateResponse response = postService.create(request,userPK);
         return ApiResponse.success(response);
     }
 
