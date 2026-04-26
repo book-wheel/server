@@ -34,7 +34,6 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
     private final S3Service s3Service;
-    private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -197,19 +196,7 @@ public class UserService {
             s3Service.deleteObject(imageKey);
         }
 
-        // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
-        log.info("회원 탈퇴 처리 시작 - userPK: {}", userPK);
-        log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
-
-        // 구글일 경우 연동 해제용 액세스 토큰 가져오기
-        String socialAccessToken = null;
-        if (user.getSocialType() == SocialType.GOOGLE) {
-            org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
-                    authorizedClientService.loadAuthorizedClient("google", user.getId());
-            if (client != null && client.getAccessToken() != null) {
-                socialAccessToken = client.getAccessToken().getTokenValue();
-            }
-        }
+        log.info("회원 탈퇴 처리 시작 - userPK: {}, socialType: {}", userPK, user.getSocialType());
 
         // 계정 비활성화 (Soft Delete)
         user.deactivate();
@@ -217,10 +204,9 @@ public class UserService {
         // Redis에 저장된 Refresh Token 삭제
         refreshTokenRepository.deleteById(userPK);
 
-
-        // 소셜 연동 해제
+        // 소셜 연동 해제 (카카오만 서버에서 처리, 구글은 사용자가 직접 처리)
         if (user.getSocialType() != SocialType.NONE) {
-            socialUnlinkService.unlink(user.getSocialType(), user.getSocialId(), socialAccessToken);
+            socialUnlinkService.unlink(user.getSocialType(), user.getSocialId());
         }
 
         log.info("회원 탈퇴 완료: userPK={}, socialType={}", userPK, user.getSocialType());

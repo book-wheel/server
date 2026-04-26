@@ -13,9 +13,6 @@ public class GoogleOAuth2UserInfo implements OAuth2UserInfo {
     public String getSocialId() { return (String) attributes.get("sub"); }
 
     @Override
-    public String getNickname() { return (String) attributes.get("name"); }
-
-    @Override
     public String getEmail() { return (String) attributes.get("email"); }
 
     @Override
