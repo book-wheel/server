@@ -219,12 +219,10 @@ public class UserService {
             userRepository.delete(user);
         });
 
-        // 이메일 중복 확인: 현재 시도하려는 가입 방식(socialType)에 대해서만 중복 체크
-        userRepository.findByMailAndSocialType(mail, socialType).ifPresent(user -> {
-            if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
-            // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
-            userRepository.delete(user);
-        });
+        // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
+        userRepository.findByMailAndSocialType(mail, socialType)
+                .filter(user -> !user.getIsActive())
+                .ifPresent(userRepository::delete);
     }
 
     private LoginResponse getLoginResponse(User user) {
