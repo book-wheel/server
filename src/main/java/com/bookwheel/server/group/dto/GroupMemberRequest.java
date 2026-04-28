@@ -6,7 +6,7 @@ import lombok.Builder;
 
 @Builder
 public record GroupMemberRequest(
-        @NotNull Long userPK,
+        @NotNull String userPK,
         @NotNull MemberRole role
 ) {
 }
