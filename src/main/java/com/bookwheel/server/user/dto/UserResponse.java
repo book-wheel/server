@@ -20,7 +20,7 @@ public record UserResponse(
         return UserResponse.builder()
                 .role(user.getRole())
                 .id(user.getId())
-                .loginId(user.getUserId())
+                .loginId(user.getLoginId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
                 .social(user.getSocialType())

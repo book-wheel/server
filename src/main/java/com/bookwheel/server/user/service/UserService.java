@@ -52,7 +52,7 @@ public class UserService {
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
         User user = User.builder()
-                .userId(request.loginId())
+                .loginId(request.loginId())
                 .password(passwordEncoder.encode(request.password()))
                 .nickname(tempNickname)
                 .mail(request.mail())
@@ -62,7 +62,7 @@ public class UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("일반 회원가입 1단계 완료: userId={}, tempNickname={}", savedUser.getUserId(), tempNickname);
+        log.info("일반 회원가입 1단계 완료: loginId={}, tempNickname={}", savedUser.getLoginId(), tempNickname);
 
         return UserResponse.from(savedUser, null);
     }
@@ -214,7 +214,7 @@ public class UserService {
 
     private void handleExistingUser(String loginId, String mail, SocialType socialType) {
         // 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
-        userRepository.findByUserId(loginId).ifPresent(user -> {
+        userRepository.findByLoginId(loginId).ifPresent(user -> {
             if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
             userRepository.delete(user);
         });
@@ -254,7 +254,7 @@ public class UserService {
     }
 
     private User findByLoginIdAndValidateActive(String loginId) {
-        User user = userRepository.findByUserId(loginId)
+        User user = userRepository.findByLoginId(loginId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {

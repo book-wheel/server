@@ -18,8 +18,8 @@ public class User {
     @Column(name = "id", length = 50)
     private String id;
 
-    @Column(name = "user_id", length = 50, unique = true, nullable = false)
-    private String userId;
+    @Column(name = "login_id", length = 50, unique = true, nullable = false)
+    private String loginId;
 
     @Column(name = "password")
     private String password;
@@ -50,16 +50,18 @@ public class User {
     @Column(name = "role", nullable = false)
     private Role role;
 
-
     @Column(name = "ban_expired_at")
     private LocalDateTime banExpiredAt;
 
+    @Column(name = "is_profile_set")
+    private Boolean isProfileSet = false;
+
     @Builder
-    public User(String userId, String password, String nickname, String mail,
-                SocialType socialType, String socialId, String comment, String profileImage,
+    public User(String loginId, String password, String nickname, String mail,
+                SocialType socialType, String socialId, String comment, String profileImageKey,
                 Role role, Boolean isActive) {
         this.id = UUID.randomUUID().toString();
-        this.userId = userId;
+        this.loginId = loginId;
         this.password = password;
         this.nickname = nickname;
         this.mail = mail;
@@ -71,8 +73,6 @@ public class User {
         this.role = role != null ? role : Role.USER;
     }
 
-    private boolean isProfileSet = false;
-
     public void completeProfile() {
         this.isProfileSet = true;
     }
@@ -81,10 +81,10 @@ public class User {
         this.password = password;
     }
 
-    public void updateProfile(String nickname, String comment, String profileImage) {
+    public void updateProfile(String nickname, String comment, String profileImageKey) {
         this.nickname = nickname;
         this.comment = comment;
-        this.profileImageKey = profileImage;
+        this.profileImageKey = profileImageKey;
     }
 
     public void deactivate() {
