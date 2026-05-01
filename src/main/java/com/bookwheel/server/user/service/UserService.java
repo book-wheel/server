@@ -7,6 +7,8 @@ import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bookwheel.server.user.dto.ProfileSetupRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -34,6 +37,7 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
     private final S3Service s3Service;
+    private final MemberRepository memberRepository;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -182,13 +186,19 @@ public class UserService {
     public void withdraw(String userPK, UserWithdrawRequest request) {
         // 유저 조회 및 활성 상태 검증
         User user = findByIdAndValidateActive(userPK);
-        // [TODO] 추후 탈퇴하려는 회원이 가입된 모임이 있는지 확인하는 로직 추가 필요
 
         if (user.getSocialType() == SocialType.NONE) {
             if (request == null || request.password() == null ||
                     !passwordEncoder.matches(request.password(), user.getPassword())) {
                 throw new BusinessException(ErrorCode.INVALID_PASSWORD);
             }
+        }
+
+        // 가입된 모임이 있으면 탈퇴 차단 (ACTIVE/PENDING 멤버십)
+        boolean hasGroupMembership = memberRepository.existsByUser_IdAndMemberStatusIn(
+                userPK, List.of(MemberStatus.ACTIVE, MemberStatus.PENDING));
+        if (hasGroupMembership) {
+            throw new BusinessException(ErrorCode.WITHDRAW_BLOCKED_BY_GROUP_MEMBERSHIP);
         }
 
         String imageKey = user.getProfileImageKey();
