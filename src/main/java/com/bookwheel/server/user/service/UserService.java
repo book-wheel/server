@@ -194,12 +194,14 @@ public class UserService {
             }
         }
 
-        // 가입된 모임이 있으면 탈퇴 차단 (ACTIVE/PENDING 멤버십)
-        boolean hasGroupMembership = memberRepository.existsByUser_IdAndMemberStatusIn(
-                userPK, List.of(MemberStatus.ACTIVE, MemberStatus.PENDING));
-        if (hasGroupMembership) {
+        // 가입된 모임이 있으면 탈퇴 차단
+        boolean hasActiveGroup = memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE);
+        if (hasActiveGroup) {
             throw new BusinessException(ErrorCode.WITHDRAW_BLOCKED_BY_GROUP_MEMBERSHIP);
         }
+
+        // 가입 대기 중인(PENDING) 모든 요청 건 삭제
+        memberRepository.deleteByUser_IdAndMemberStatus(userPK, MemberStatus.PENDING);
 
         String imageKey = user.getProfileImageKey();
         if (imageKey != null) {
