@@ -71,9 +71,8 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: get book detail success")
     void getBookDetail_Success() throws Exception {
-        String bookId = "book-123";
-
-        mockMvc.perform(get("/api/v1/books/{bookId}", bookId))
+        String isbn = "9788966263158";
+        mockMvc.perform(get("/api/v1/books{isbn}", isbn))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -83,9 +82,9 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: add book like success")
     void addBookLike_Success() throws Exception {
-        String bookId = "book-123";
+        String isbn = "9788966263158";
 
-        mockMvc.perform(post("/api/v1/books/{bookId}/likes", bookId)
+        mockMvc.perform(post("/api/v1/books/{isbn}/likes", isbn)
                         .with(csrf()))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -96,9 +95,9 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: delete book like success")
     void deleteBookLike_Success() throws Exception {
-        String bookId = "book-123";
+        String isbn = "9788966263158";
 
-        mockMvc.perform(delete("/api/v1/books/{bookId}/likes", bookId)
+        mockMvc.perform(delete("/api/v1/books/{isbn}/likes", isbn)
                         .with(csrf()))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -109,14 +108,14 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: add book review success")
     void addBookReview_Success() throws Exception {
-        String bookId = "book-123";
         ReviewCreateRequest request = new ReviewCreateRequest(
+            "9788966263158",
                 "Great read",
                 true,
                 false
         );
 
-        mockMvc.perform(post("/api/v1/books/{bookId}/reviews", bookId)
+        mockMvc.perform(post("/api/v1/books/reviews")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -129,14 +128,14 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: add book review validation error")
     void addBookReview_ValidationError() throws Exception {
-        String bookId = "book-123";
         ReviewCreateRequest request = new ReviewCreateRequest(
+                "",
                 "",
                 null,
                 null
         );
 
-        mockMvc.perform(post("/api/v1/books/{bookId}/reviews", bookId)
+        mockMvc.perform(post("/api/v1/books/reviews")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -149,10 +148,10 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: get review list success")
     void getReviewList_Success() throws Exception {
-        String bookId = "book-123";
+        String isbn = "9788966263158";
         ReviewDetailResponse detailResponse = new ReviewDetailResponse(
                 1L,
-                bookId,
+                isbn,
                 "reviewer",
                 true,
                 "Great read",
@@ -161,9 +160,9 @@ class BookControllerTest {
                 true,
                 LocalDateTime.of(2024, 1, 1, 10, 0)
         );
-        given(bookService.getReviewList(eq(bookId), any())).willReturn(List.of(detailResponse));
+        given(bookService.getReviewList(eq(isbn), any())).willReturn(List.of(detailResponse));
 
-        mockMvc.perform(get("/api/v1/books/{bookId}/reviews", bookId))
+        mockMvc.perform(get("/api/v1/books/{isbn}/reviews", isbn))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].reviewId").value(1L));
@@ -173,11 +172,11 @@ class BookControllerTest {
     @WithMockUser
     @DisplayName("Community Comment: get review stats success")
     void getReviewStats_Success() throws Exception {
-        String bookId = "book-123";
+        String isbn = "9788966263158";
         ReviewStatsResponse response = new ReviewStatsResponse(70, 30);
-        given(bookService.getReviewStats(eq(bookId))).willReturn(response);
+        given(bookService.getReviewStats(eq(isbn))).willReturn(response);
 
-        mockMvc.perform(get("/api/v1/books/{bookId}/reviews/stats", bookId))
+        mockMvc.perform(get("/api/v1/books/{isbn}/reviews/stats", isbn))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recommendedRatio").value(70))
