@@ -16,14 +16,14 @@ public record MemberReadOrderResponse(
         String nickname,
 
         @Schema(description = "프로필 이미지 URL", example = "http://...")
-        String profileImage
+        String profileImageKey
 ) {
     public static MemberReadOrderResponse of(int order, String memberId, String nickname, String profileImage) {
         return MemberReadOrderResponse.builder()
                 .order(order)
                 .memberId(memberId)
                 .nickname(nickname)
-                .profileImage(profileImage)
+                .profileImageKey(profileImage)
                 .build();
     }
 }

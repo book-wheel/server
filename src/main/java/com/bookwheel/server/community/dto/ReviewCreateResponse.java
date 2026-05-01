@@ -14,7 +14,7 @@ public record ReviewCreateResponse(
     String bookId,
 
     //@Schema(description = "작성자 프로필 이미지 URL", example = "https://...")
-    //String reviewerProfileImageUrl, 추후 프론트에서 프로필 보일때 추가할게요!
+    //String reviewerProfileImageKey, 추후 프론트에서 프로필 보일때 추가할게요!
 
     @Schema(description = "추천 여부", example = "true")
     boolean isRecommended,

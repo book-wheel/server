@@ -66,7 +66,7 @@ public class User {
         this.socialType = socialType != null ? socialType : SocialType.NONE;
         this.socialId = socialId;
         this.comment = comment;
-        this.profileImageKey = profileImage;
+        this.profileImageKey = profileImageKey;
         this.isActive = isActive != null ? isActive : true;
         this.role = role != null ? role : Role.USER;
     }

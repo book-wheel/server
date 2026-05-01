@@ -14,9 +14,9 @@ public record UserResponse(
         String mail,
         SocialType social,
         String comment,
-        String profileImageUrl
+        String profileImageKey
 ) {
-    public static UserResponse from(User user, String profileImageUrl) {
+    public static UserResponse from(User user, String profileImageKey) {
         return UserResponse.builder()
                 .role(user.getRole())
                 .id(user.getId())
@@ -25,7 +25,7 @@ public record UserResponse(
                 .mail(user.getMail())
                 .social(user.getSocialType())
                 .comment(user.getComment())
-                .profileImageUrl(profileImageUrl)
+                .profileImageKey(profileImageKey)
                 .build();
     }
 }

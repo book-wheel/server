@@ -17,7 +17,7 @@ public record LoginResponse(
         String mail,
         SocialType social,
         String comment,
-        String profileImage
+        String profileImageKey
 ) {
     public static LoginResponse of(User user, String accessToken, String refreshToken) {
         return LoginResponse.builder()
@@ -31,7 +31,7 @@ public record LoginResponse(
                 .mail(user.getMail())
                 .social(user.getSocialType())
                 .comment(user.getComment())
-                .profileImage(user.getProfileImageKey())
+                .profileImageKey(user.getProfileImageKey())
                 .build();
     }
 }
