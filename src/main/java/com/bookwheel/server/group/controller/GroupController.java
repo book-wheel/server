@@ -2,6 +2,9 @@ package com.bookwheel.server.group.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.group.dto.*;
+import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.search.*;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.service.GroupService;

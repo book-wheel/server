@@ -1,4 +1,4 @@
-package com.bookwheel.server.group.dto;
+package com.bookwheel.server.group.dto.search;
 
 import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.enums.State;

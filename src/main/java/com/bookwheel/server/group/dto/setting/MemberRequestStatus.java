@@ -1,4 +1,4 @@
-package com.bookwheel.server.group.dto;
+package com.bookwheel.server.group.dto.setting;
 
 public enum MemberRequestStatus {
     APPROVED,

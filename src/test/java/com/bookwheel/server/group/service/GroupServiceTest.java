@@ -3,6 +3,8 @@ package com.bookwheel.server.group.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
+import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.repository.GroupRepository;
