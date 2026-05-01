@@ -31,7 +31,7 @@ public class User {
     private String mail;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "social_type", length = 20)
+    @Column(name = "social_type", columnDefinition = "VARCHAR(20) DEFAULT 'NONE'")
     private SocialType socialType = SocialType.NONE;
 
     @Column(name = "social_id", length = 100)
