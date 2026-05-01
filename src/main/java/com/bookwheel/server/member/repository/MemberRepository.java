@@ -34,6 +34,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     Optional<Member> findByMemberIdAndGroup_GroupId(String memberId, String groupId);
 
     // 특정 그룹 내 특정 상태(ex. PENDING, ACTIVE)의 멤버 목록 조회
+    @EntityGraph(attributePaths = "user")
     List<Member> findByGroup_GroupIdAndMemberStatus(String groupId, MemberStatus memberStatus);
 
     // 모임 멤버들의 명단을 불러오는 기능
