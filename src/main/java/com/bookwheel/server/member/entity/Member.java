@@ -117,4 +117,10 @@ public class Member {
             throw new BusinessException(ErrorCode.GROUP_MEMBER_ONLY);
         }
     }
+
+    // 그룹 읽기 순서 설정
+    public void updateReadOrder(int num) {
+        this.readOrder = num;
+    }
+
 }
