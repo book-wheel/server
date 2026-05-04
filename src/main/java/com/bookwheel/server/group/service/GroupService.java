@@ -124,9 +124,9 @@ public class GroupService {
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
-            targetMember.setMemberStatus(MemberStatus.ACTIVE);
+            targetMember.approve();
         } else {
-            targetMember.setMemberStatus(MemberStatus.REJECTED);
+            targetMember.reject();
         }
 
         return MemberRequestStatusUpdateResponse.of(targetMember.getMemberId(), status);
