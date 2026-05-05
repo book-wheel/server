@@ -63,7 +63,7 @@ class GroupServiceTest {
     @DisplayName("비공개 그룹 생성 성공 - 비밀번호가 암호화되고 리더로 등록된다.")
     void createGroup_Private_Success() {
         // given
-        String userId = "user1";
+        String userPK = "user1";
         GroupCreateRequest request = new GroupCreateRequest(
                 "이름",
                 "설명",
@@ -79,7 +79,7 @@ class GroupServiceTest {
 
         User mockUser = mock(User.class);
         when(mockUser.getIsActive()).thenReturn(true);
-        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(userPK)).thenReturn(Optional.of(mockUser));
         when(groupRepository.existsByGroupName(request.groupName())).thenReturn(false);
         when(passwordEncoder.encode("1234")).thenReturn("encoded_1234");
 
@@ -88,7 +88,7 @@ class GroupServiceTest {
         when(groupRepository.save(any(Group.class))).thenReturn(mockGroup);
 
         // when
-        GroupCreateResponse response = groupService.createGroup(request, userId);
+        GroupCreateResponse response = groupService.createGroup(request, userPK);
 
         // then
         assertNotNull(response);
@@ -147,7 +147,7 @@ class GroupServiceTest {
     void joinGroup_Success() {
         // given
         String groupId = "group1";
-        String userId = "user1";
+        String userPK = "user1";
         GroupJoinRequest request = new GroupJoinRequest("가입인사", null); // 공개 그룹
 
         Group mockGroup = mock(Group.class);
@@ -158,9 +158,9 @@ class GroupServiceTest {
 
         User mockUser = mock(User.class);
         when(mockUser.getIsActive()).thenReturn(true);
-        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(userPK)).thenReturn(Optional.of(mockUser));
 
-        when(memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userId)).thenReturn(false);
+        when(memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userPK)).thenReturn(false);
 
         Member mockMember = mock(Member.class);
         when(mockMember.getMemberId()).thenReturn("member-uuid");
@@ -168,7 +168,7 @@ class GroupServiceTest {
         when(memberRepository.save(any(Member.class))).thenReturn(mockMember);
 
         // when
-        GroupJoinResponse response = groupService.joinGroup(groupId, request, userId);
+        GroupJoinResponse response = groupService.joinGroup(groupId, request, userPK);
 
         // then
         assertNotNull(response);

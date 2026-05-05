@@ -1,6 +1,5 @@
 package com.bookwheel.server.user.dto;
 
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import lombok.Builder;
@@ -10,8 +9,7 @@ public record LoginResponse(
         String accessToken,
         String refreshToken,
         boolean isProfileSet,
-        Role role,
-        String id,
+        String userPK,
         String loginId,
         String nickname,
         String mail,
@@ -24,8 +22,7 @@ public record LoginResponse(
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .isProfileSet(user.getIsProfileSet())
-                .role(user.getRole())
-                .id(user.getId())
+                .userPK(user.getId())
                 .loginId(user.getLoginId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())

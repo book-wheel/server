@@ -1,8 +1,8 @@
 package com.bookwheel.server.common.oauth2.handler;
 
+import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.oauth2.CustomOAuth2User;
-import com.bookwheel.server.user.entity.Role;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
         String userPK = oAuth2User.getUserPK();
-        Role role = oAuth2User.getRole();
+        AuthRole role = oAuth2User.getRole();
 
         // JWT 토큰 생성
         String accessToken = jwtTokenProvider.createAccessToken(userPK, role);
