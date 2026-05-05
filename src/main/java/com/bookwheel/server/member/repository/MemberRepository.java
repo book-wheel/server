@@ -19,7 +19,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     boolean existsByUser_IdAndMemberStatus(String userPK, MemberStatus memberStatus);
 
     // 사용자 회원 탈퇴 시 PENDING 요청 삭제 용도
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("delete from Member m where m.user.id = :userPK and m.memberStatus = :status")
     void deleteByUser_IdAndMemberStatus(@Param("userPK") String userPK, @Param("status") MemberStatus status);
 

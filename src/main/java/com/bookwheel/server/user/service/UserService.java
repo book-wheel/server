@@ -130,8 +130,9 @@ public class UserService {
     }
 
     public void checkEmailDuplication(String mail) {
-        userRepository.findByMailAndSocialTypeAndIsActiveTrue(mail, SocialType.NONE)
-                .ifPresent(user -> { throw new BusinessException(ErrorCode.DUPLICATE_EMAIL); });
+        if (userRepository.existsByMailAndSocialTypeAndIsActiveTrue(mail, SocialType.NONE)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
+        }
     }
 
     @Transactional
