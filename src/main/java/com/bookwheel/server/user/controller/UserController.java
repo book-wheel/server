@@ -12,11 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import lombok.extern.slf4j.Slf4j;
-
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
-@Slf4j
 @Tag(name = "Users", description = "회원 정보 관리 API")
 @RestController
 @RequestMapping("/api/v1/users")
@@ -71,14 +68,6 @@ public class UserController {
         return ApiResponse.success(true);
     }
 
-    // 소셜 유저 검증
-    private void validateNonSocialUser(String userPK) {
-        if (userPK.startsWith("GOOGLE_") || userPK.startsWith("KAKAO_")) {
-            log.warn("=> [경고] 소셜 유저가 금지된 기능(비밀번호 변경 등)에 접근함. ID: {}", userPK);
-            throw new BusinessException(ErrorCode.SOCIAL_ACCOUNT_CANNOT_USE_RECOVERY);
-        }
-    }
-
     @Operation(summary = "비밀번호 직접 변경", description = "로그인한 사용자가 현재 비밀번호를 확인한 후 새로운 비밀번호로 변경합니다.")
     @PatchMapping("/change-password")
     public ApiResponse<Void> changePassword(
@@ -86,10 +75,6 @@ public class UserController {
             @Valid @RequestBody PasswordChangeRequest request) {
 
         String userPK = getUserPK(principal);
-
-        // 소셜 유저 검증
-        validateNonSocialUser(userPK);
-
         userService.changePassword(userPK, request);
         return ApiResponse.success(null);
     }

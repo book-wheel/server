@@ -14,18 +14,18 @@ public record UserResponse(
         String mail,
         SocialType social,
         String comment,
-        String profileImageUrl
+        String profileImageKey
 ) {
-    public static UserResponse from(User user, String profileImageUrl) {
+    public static UserResponse from(User user, String profileImageKey) {
         return UserResponse.builder()
                 .role(user.getRole())
                 .id(user.getId())
-                .loginId(user.getUserId())
+                .loginId(user.getLoginId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
                 .social(user.getSocialType())
                 .comment(user.getComment())
-                .profileImageUrl(profileImageUrl)
+                .profileImageKey(profileImageKey)
                 .build();
     }
 }

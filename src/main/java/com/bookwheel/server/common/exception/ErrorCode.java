@@ -61,6 +61,7 @@ public enum ErrorCode {
     WHEEL_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_020", "해당 도서의 진행 정보를 찾을 수 없습니다."),
     WHEEL_ALREADY_CERTIFIED(HttpStatus.BAD_REQUEST, "GROUP_021", "이미 독서 완료 인증 정보가 존재합니다."),
     IMAGES_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_022", "도서 정보를 꼭 등록해야합니다."),
+    WITHDRAW_BLOCKED_BY_GROUP_MEMBERSHIP(HttpStatus.BAD_REQUEST, "GROUP_023", "가입된 모임이 있어 탈퇴할 수 없습니다. 모든 모임을 탈퇴한 후 다시 시도해주세요."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
