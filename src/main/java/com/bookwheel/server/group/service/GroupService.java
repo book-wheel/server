@@ -32,6 +32,7 @@ public class GroupService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final GroupMemberPermissionValidator memberPermissionValidator;
 
     @Transactional
     public GroupCreateResponse createGroup(GroupCreateRequest request, String userPK) {
@@ -93,7 +94,7 @@ public class GroupService {
 
     public List<MemberRequestResponse> getMemberRequests(String groupId, String leaderUserPk) {
         findGroupById(groupId);
-        validateLeaderPermission(groupId, leaderUserPk);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPk);
 
         return memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.PENDING)
                 .stream()
@@ -111,7 +112,7 @@ public class GroupService {
         Group group = (status == MemberRequestStatus.APPROVED)
                 ? findGroupByIdForUpdate(groupId)
                 : findGroupById(groupId);
-        validateLeaderPermission(groupId, leaderUserPk);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPk);
 
         Member targetMember = memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
@@ -156,17 +157,6 @@ public class GroupService {
 
         if (group.getCurrentMembers() >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
-        }
-    }
-
-    private void validateLeaderPermission(String groupId, String leaderUserPk) {
-        Member leaderMember = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, leaderUserPk)
-                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
-
-        boolean isLeader = leaderMember.getMemberRole() == MemberRole.LEADER;
-        boolean isActive = leaderMember.getMemberStatus() == MemberStatus.ACTIVE;
-        if (!isLeader || !isActive) {
-            throw new BusinessException(ErrorCode.GROUP_LEADER_ONLY);
         }
     }
 
