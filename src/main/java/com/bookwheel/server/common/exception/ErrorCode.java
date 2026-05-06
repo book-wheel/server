@@ -45,7 +45,7 @@ public enum ErrorCode {
     GROUP_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_004", "존재하지 않는 그룹입니다."),
     INVALID_GROUP_PASSWORD(HttpStatus.BAD_REQUEST, "GROUP_005", "비밀번호가 틀렸습니다."),
     GROUP_FULL(HttpStatus.BAD_REQUEST, "GROUP_006", "그룹 정원이 초과되었습니다."),
-    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 가입 요청을 처리할 수 있습니다."),
+    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 수행할 수 있는 작업입니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_008", "해당 멤버를 찾을 수 없습니다."),
     MEMBER_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "GROUP_009", "대기 중인 가입 요청만 처리할 수 있습니다."),
     DUPLICATE_GROUP_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_010", "이미 가입했거나 가입 요청을 보낸 모임입니다."),
