@@ -37,3 +37,7 @@ out/
 .vscode/
 
 **/application-dev.properties
+
+.DS_Store
+
+.omc/

@@ -31,10 +31,11 @@ public class BookService {
 
 
     @Transactional
-    public ReviewCreateResponse createReview(String bookId, ReviewCreateRequest request, String userPK) {
+    public ReviewCreateResponse createReview(ReviewCreateRequest request, String userPK) {
+        String isbn = request.isbn();
 
-        BookInfo bookInfo = bookInfoRepository.findById(bookId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
         if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userPK)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
@@ -75,9 +76,13 @@ public class BookService {
             );
     }
 
-    public ReviewStatsResponse getReviewStats(String bookId) {
-        BookInfo bookInfo = bookInfoRepository.findById(bookId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    public ReviewStatsResponse getReviewStats(String isbn) {
+
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+
+        if (bookInfo == null) {
+            return new ReviewStatsResponse(0, 0);
+        }
 
         long recommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, true);
         long notRecommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, false);
@@ -93,9 +98,8 @@ public class BookService {
         return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio);
     }
 
-    public List<ReviewDetailResponse> getReviewList(String bookId, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findById(bookId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    public List<ReviewDetailResponse> getReviewList(String isbn, String userPK) {
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));

@@ -42,40 +42,40 @@ public class BookController{
 
 
     @Operation(summary ="관심 도서 찜/취소")
-    @PostMapping("/{bookId}/likes")
-    public ApiResponse<String> addBookLike(@PathVariable("bookId") String bookId) {
-        return ApiResponse.success(bookId + "관심 도서 찜 api 연결");
+    @PostMapping("/{isbn}/likes")
+    public ApiResponse<String> addBookLike(@PathVariable("isbn") String isbn) {
+        return ApiResponse.success(isbn + "관심 도서 찜 api 연결");
 
     }
 
 
     @Operation(summary = "리뷰 작성", description = "특정 책에 추천/비추천 여부와 함께 코멘트를 남깁니다.")
-    @PostMapping("/{bookId}/reviews")
+    @PostMapping("/{isbn}/reviews")
     public ApiResponse<String> addBookReview(
-        @PathVariable("bookId") String bookId,
+        @PathVariable("isbn") String isbn,
         @Valid @RequestBody ReviewCreateRequest request,
         @AuthenticationPrincipal Object principal) {
-        bookService.createReview(bookId, request, getUserPK(principal));
+        bookService.createReview(request, getUserPK(principal));
 
         return ApiResponse.success("리뷰 작성이 완료되었습니다.");
     }
 
     @Operation(summary = "리뷰 목록 조회", description = "특정 책에 달린 모든 코멘트와 하트 개수, 내 공감 여부를 최신순으로 가져옵니다.")
-    @GetMapping("/{bookId}/reviews")
+    @GetMapping("/{isbn}/reviews")
     public ApiResponse<List<ReviewDetailResponse>> getReviewList(
-        @PathVariable("bookId") String bookId,
+        @PathVariable("isbn") String isbn,
         @AuthenticationPrincipal Object principal) {
 
-        List<ReviewDetailResponse> response = bookService.getReviewList(bookId, getUserPK(principal));
+        List<ReviewDetailResponse> response = bookService.getReviewList(isbn, getUserPK(principal));
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "리뷰 추천/비추천 통계 조회", description = "특정 책의 전체 리뷰 중 추천/비추천 비율을 조회합니다.")
-    @GetMapping("/{bookId}/reviews/stats")
+    @GetMapping("/{isbn}/reviews/stats")
     public ApiResponse<ReviewStatsResponse> getReviewStats(
-        @PathVariable("bookId") String bookId) {
+        @PathVariable("isbn") String isbn) {
 
-        ReviewStatsResponse response = bookService.getReviewStats(bookId);
+        ReviewStatsResponse response = bookService.getReviewStats(isbn);
         return ApiResponse.success(response);
     }
 

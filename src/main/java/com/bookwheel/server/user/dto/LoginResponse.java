@@ -17,21 +17,21 @@ public record LoginResponse(
         String mail,
         SocialType social,
         String comment,
-        String profileImage
+        String profileImageKey
 ) {
     public static LoginResponse of(User user, String accessToken, String refreshToken) {
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .isProfileSet(user.isProfileSet())
+                .isProfileSet(user.getIsProfileSet())
                 .role(user.getRole())
                 .id(user.getId())
-                .loginId(user.getUserId())
+                .loginId(user.getLoginId())
                 .nickname(user.getNickname())
                 .mail(user.getMail())
                 .social(user.getSocialType())
                 .comment(user.getComment())
-                .profileImage(user.getProfileImageKey())
+                .profileImageKey(user.getProfileImageKey())
                 .build();
     }
 }

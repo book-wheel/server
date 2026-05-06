@@ -84,7 +84,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
         // 탈퇴했었던 유저 처리
         if (!findUser.getIsActive()) {
-            log.info("탈퇴했던 소셜 유저의 재접속: 기존 데이터를 삭제하고 신규 가입 처리합니다. userId={}", findUser.getUserId());
+            log.info("탈퇴했던 소셜 유저의 재접속: 기존 데이터를 삭제하고 신규 가입 처리합니다. loginId={}", findUser.getLoginId());
 
             // 기존 데이터 삭제 (Hard Delete)
             userRepository.delete(findUser);
@@ -101,19 +101,19 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     }
 
     private User saveUser(OAuth2UserInfo userInfo, SocialType socialType) {
-        // 이메일이 있으면 이메일, 없으면 소셜 고유 ID를 userId로 사용
+        // 소셜 타입 + 소셜 고유 ID로 loginId 생성
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
-        String uniqueUserId = socialType.name() + "_" + userInfo.getSocialId();
+        String uniqueLoginId = socialType.name() + "_" + userInfo.getSocialId();
 
         User user = User.builder()
-                .userId(uniqueUserId)
+                .loginId(uniqueLoginId)
                 .password(UUID.randomUUID().toString())
                 .socialType(socialType)
                 .socialId(userInfo.getSocialId())
                 .mail(userInfo.getEmail())
                 .nickname(tempNickname)
-                .profileImage(userInfo.getProfileImage())
+                .profileImageKey(userInfo.getProfileImage())
                 .role(Role.USER)
                 .build();
 

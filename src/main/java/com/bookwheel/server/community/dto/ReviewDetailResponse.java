@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 public record ReviewDetailResponse(
     Long reviewId,
-    String bookId,
+    String isbn,
     String reviewerName,
     boolean isRecommended,
     String comment,
@@ -18,7 +18,7 @@ public record ReviewDetailResponse(
     public static ReviewDetailResponse of(BookReview review, boolean isLikedByMe) {
         return new ReviewDetailResponse(
             review.getReviewId(),
-            review.getBookInfo().getId(),
+            review.getBookInfo().getIsbn(),
             review.getReviewer().getNickname(),
             review.getIsRecommended(),
             review.getContent(),
