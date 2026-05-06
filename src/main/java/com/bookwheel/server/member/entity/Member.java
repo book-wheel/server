@@ -58,7 +58,7 @@ public class Member {
     private String joinMent;
 
     // 강퇴
-    public void ban() {
+    public void kick() {
         validateActiveMember();
         changeStatusAndRole(MemberStatus.BANNED, MemberRole.OUT);
     }
