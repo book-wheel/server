@@ -23,6 +23,10 @@ public class GroupSettingService {
         Member targetMember = memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
+        if (targetMember.getUser().getId().equals(leaderUserPk)) {
+            throw new BusinessException(ErrorCode.CANNOT_KICK_YOURSELF);
+        }
+
         targetMember.kick();
 
         return MemberKickResponse.of(targetMember.getMemberId(), targetMember.getMemberStatus());

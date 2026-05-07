@@ -59,7 +59,7 @@ public class Member {
 
     // 강퇴
     public void kick() {
-        validateActiveMember();
+        validateKickable();
         changeStatusAndRole(MemberStatus.BANNED, MemberRole.OUT);
     }
 
@@ -114,6 +114,15 @@ public class Member {
     }
     private void validateActiveMember() {
         if (this.memberStatus != MemberStatus.ACTIVE || this.memberRole != MemberRole.MEMBER) {
+            throw new BusinessException(ErrorCode.GROUP_MEMBER_ONLY);
+        }
+    }
+
+    private void validateKickable() {
+        if (this.memberStatus != MemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.INVALID_TARGET_MEMBER);
+        }
+        if (this.memberRole != MemberRole.MEMBER) {
             throw new BusinessException(ErrorCode.GROUP_MEMBER_ONLY);
         }
     }
