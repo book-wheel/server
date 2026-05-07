@@ -1,9 +1,9 @@
 package com.bookwheel.server.common.oauth2;
 
+import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.oauth2.userinfo.GoogleOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.KakaoOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.OAuth2UserInfo;
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -53,11 +53,11 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
         // 커스텀 유저 객체 반환
         return new CustomOAuth2User(
-                Collections.singleton(new SimpleGrantedAuthority(user.getRole().getKey())),
+                Collections.singleton(new SimpleGrantedAuthority(AuthRole.USER.getKey())),
                 attributes,
                 userNameAttributeName,
                 user.getId(),
-                user.getRole(),
+                AuthRole.USER,
                 user.getNickname()
         );
     }
@@ -114,7 +114,6 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 .mail(userInfo.getEmail())
                 .nickname(tempNickname)
                 .profileImageKey(userInfo.getProfileImage())
-                .role(Role.USER)
                 .build();
 
         return userRepository.save(user);

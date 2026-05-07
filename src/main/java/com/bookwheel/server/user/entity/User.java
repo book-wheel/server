@@ -46,10 +46,6 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private Role role;
-
     @Column(name = "ban_expired_at")
     private LocalDateTime banExpiredAt;
 
@@ -59,7 +55,7 @@ public class User {
     @Builder
     public User(String loginId, String password, String nickname, String mail,
                 SocialType socialType, String socialId, String comment, String profileImageKey,
-                Role role, Boolean isActive) {
+                Boolean isActive) {
         this.id = UUID.randomUUID().toString();
         this.loginId = loginId;
         this.password = password;
@@ -70,7 +66,6 @@ public class User {
         this.comment = comment;
         this.profileImageKey = profileImageKey;
         this.isActive = isActive != null ? isActive : true;
-        this.role = role != null ? role : Role.USER;
     }
 
     public void completeProfile() {

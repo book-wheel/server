@@ -2,6 +2,7 @@ package com.bookwheel.server.user.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
@@ -10,7 +11,6 @@ import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.user.dto.*;
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -60,7 +60,6 @@ public class UserService {
                 .password(passwordEncoder.encode(request.password()))
                 .nickname(tempNickname)
                 .mail(request.mail())
-                .role(Role.USER)
                 .socialType(SocialType.NONE)
                 .isActive(true)
                 .build();
@@ -157,7 +156,7 @@ public class UserService {
         User user = findByIdAndValidateActive(userPK);
 
         // 새 Access Token 발급
-        String newAccessToken = jwtTokenProvider.createAccessToken(userPK, user.getRole());
+        String newAccessToken = jwtTokenProvider.createAccessToken(userPK, AuthRole.USER);
 
         log.info("토큰 재발급 성공: userPK={}", userPK);
 
@@ -239,8 +238,8 @@ public class UserService {
     }
 
     private LoginResponse getLoginResponse(User user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getRole());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getRole());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), AuthRole.USER);
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), AuthRole.USER);
 
         refreshTokenRepository.save(new RefreshToken(user.getId(), refreshToken));
 

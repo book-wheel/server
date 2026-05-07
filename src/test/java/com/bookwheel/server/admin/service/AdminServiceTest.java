@@ -8,7 +8,6 @@ import com.bookwheel.server.admin.entity.Penalty;
 import com.bookwheel.server.admin.repository.PenaltyRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +61,6 @@ class AdminServiceTest {
         AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "욕설/비방");
         User mockUser = mock(User.class);
         when(mockUser.getId()).thenReturn(userPK);
-        when(mockUser.getRole()).thenReturn(Role.USER); // 일반 유저
         when(mockUser.getIsActive()).thenReturn(true); // 활성 상태
         when(mockUser.getNickname()).thenReturn("테스트유저");
 
@@ -79,31 +77,12 @@ class AdminServiceTest {
     }
 
     @Test
-    @DisplayName("유저 밴 실패 - 대상 유저가 관리자(ADMIN)인 경우 예외 발생")
-    void banUser_Fail_CannotBanAdmin() {
-        // given
-        String adminPk = "admin123";
-        AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "관리자 밴 시도");
-
-        User mockAdmin = mock(User.class);
-        when(mockAdmin.getRole()).thenReturn(Role.ADMIN);
-        when(userRepository.findById(adminPk)).thenReturn(Optional.of(mockAdmin));
-
-        // when & then
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> adminService.banUser(adminPk, request));
-        assertEquals(ErrorCode.CANNOT_BAN_ADMIN, exception.getErrorCode());
-        verify(penaltyRepository, never()).save(any());
-    }
-
-    @Test
     @DisplayName("유저 밴 실패 - 이미 정지되었거나 탈퇴한(비활성) 유저인 경우 예외 발생")
     void banUser_Fail_AlreadyBannedUser() {
         // given
         String userPK = "user123";
         AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "스팸/도배");
         User mockUser = mock(User.class);
-        when(mockUser.getRole()).thenReturn(Role.USER);
         when(mockUser.getIsActive()).thenReturn(false); // 이미 비활성화됨
         when(userRepository.findById(userPK)).thenReturn(Optional.of(mockUser));
 

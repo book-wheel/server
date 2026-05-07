@@ -77,6 +77,8 @@ public enum ErrorCode {
     ALREADY_PROCESSED_REPORT(HttpStatus.BAD_REQUEST, "REPORT_002", "이미 처리 완료된 신고입니다."),
     CANNOT_BAN_ADMIN(HttpStatus.BAD_REQUEST, "ADMIN_001", "관리자 계정은 제재할 수 없습니다."),
     ALREADY_BANNED_USER(HttpStatus.BAD_REQUEST, "ADMIN_002", "이미 정지된 사용자입니다."),
+    ADMIN_NOT_FOUND(HttpStatus.NOT_FOUND, "ADMIN_003", "관리자 계정을 찾을 수 없습니다."),
+    INACTIVE_ADMIN(HttpStatus.BAD_REQUEST, "ADMIN_004", "비활성화된 관리자 계정입니다."),
     LREADY_REPORTED(HttpStatus.BAD_REQUEST, "REPORT_003", "이미 신고가 접수된 사진입니다."),
 
     // 파일 관련 에러

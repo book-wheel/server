@@ -9,7 +9,6 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.repository.PostRepository;
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,10 +38,6 @@ public class AdminService {
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        if (user.getRole() == Role.ADMIN) {
-            throw new BusinessException(ErrorCode.CANNOT_BAN_ADMIN);
-        }
 
         if (!user.getIsActive()) {
             throw new BusinessException(ErrorCode.ALREADY_BANNED_USER);
