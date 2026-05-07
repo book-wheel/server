@@ -2,6 +2,8 @@ package com.bookwheel.server.admin.controller;
 
 import com.bookwheel.server.admin.dto.AdminLoginRequest;
 import com.bookwheel.server.admin.dto.AdminLoginResponse;
+import com.bookwheel.server.admin.dto.AdminTokenReissueRequest;
+import com.bookwheel.server.admin.dto.AdminTokenResponse;
 import com.bookwheel.server.admin.service.AdminAuthService;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
@@ -70,5 +72,24 @@ class AdminAuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.adminPK").value("admin-pk"))
                 .andExpect(jsonPath("$.data.accessToken").value("access"));
+    }
+
+    @Test
+    @DisplayName("관리자 토큰 재발급 API는 인증 없이 호출 가능")
+    void reissue_PermitAll() throws Exception {
+        AdminTokenResponse response = AdminTokenResponse.builder()
+                .accessToken("new-access")
+                .refreshToken("refresh")
+                .build();
+
+        given(adminAuthService.reissue(any(AdminTokenReissueRequest.class))).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/admin/auth/reissue")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AdminTokenReissueRequest("refresh"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh"));
     }
 }

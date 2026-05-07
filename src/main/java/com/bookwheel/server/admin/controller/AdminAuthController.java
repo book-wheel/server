@@ -2,6 +2,8 @@ package com.bookwheel.server.admin.controller;
 
 import com.bookwheel.server.admin.dto.AdminLoginRequest;
 import com.bookwheel.server.admin.dto.AdminLoginResponse;
+import com.bookwheel.server.admin.dto.AdminTokenReissueRequest;
+import com.bookwheel.server.admin.dto.AdminTokenResponse;
 import com.bookwheel.server.admin.service.AdminAuthService;
 import com.bookwheel.server.common.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -21,5 +23,10 @@ public class AdminAuthController {
     @PostMapping("/login")
     public ApiResponse<AdminLoginResponse> login(@Valid @RequestBody AdminLoginRequest request) {
         return ApiResponse.success(adminAuthService.login(request));
+    }
+
+    @PostMapping("/reissue")
+    public ApiResponse<AdminTokenResponse> reissue(@Valid @RequestBody AdminTokenReissueRequest request) {
+        return ApiResponse.success(adminAuthService.reissue(request));
     }
 }
