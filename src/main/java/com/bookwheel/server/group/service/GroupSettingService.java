@@ -7,6 +7,7 @@ import com.bookwheel.server.group.dto.setting.MemberKickResponse;
 import com.bookwheel.server.group.dto.setting.MemberRoleChangeResponse;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
+import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -91,6 +92,11 @@ public class GroupSettingService {
 
         Member targetMember = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, targetUserPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        // ACTIVE 아닌 멤버에게는 위임 불가
+        if (targetMember.getMemberStatus() != MemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.INVALID_TARGET_MEMBER);
+        }
 
         MemberRole targetCurrentRole = targetMember.getMemberRole();
         // 타겟 유저의 권한이 이상하면 오류 발생
