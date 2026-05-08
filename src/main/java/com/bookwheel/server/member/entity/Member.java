@@ -76,7 +76,7 @@ public class Member {
     }
 
     // 일반 멤버로 변경
-    private void demoteToMember() {
+    public void demoteToMember() {
         this.memberRole = MemberRole.MEMBER;
     }
 
