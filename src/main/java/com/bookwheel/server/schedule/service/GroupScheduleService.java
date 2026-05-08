@@ -7,8 +7,8 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
 import com.bookwheel.server.member.entity.Member;
-import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.ExcludedDateRange;
@@ -42,6 +42,7 @@ public class GroupScheduleService {
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final GroupMemberPermissionValidator memberPermissionValidator;
 
     @Transactional
     public List<GroupScheduleRoundResponse> createSchedule(
@@ -51,7 +52,7 @@ public class GroupScheduleService {
     ) {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
-        validateLeaderPermission(groupId, userPK);
+        memberPermissionValidator.validateLeader(groupId, userPK);
 
         // 그룹이 소유한 책의 개수를 기준으로 총 라운드 수를 결정
         long ownBookCount = ownBookRepository.countByGroup_GroupId(groupId);
@@ -350,17 +351,6 @@ public class GroupScheduleService {
         }
 
         return user;
-    }
-
-    private void validateLeaderPermission(String groupId, String userPK) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
-                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
-
-        boolean isLeader = member.getMemberRole() == MemberRole.LEADER;
-        boolean isActive = member.getMemberStatus() == MemberStatus.ACTIVE;
-        if (!isLeader || !isActive) {
-            throw new BusinessException(ErrorCode.GROUP_LEADER_ONLY);
-        }
     }
 
     private static final class ExcludedCalendar {

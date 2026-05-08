@@ -1,8 +1,8 @@
 package com.bookwheel.server.member.service;
 
 import com.bookwheel.server.common.service.S3Service;
-import com.bookwheel.server.group.dto.GroupMemberListResponse;
-import com.bookwheel.server.group.dto.GroupMemberResponse;
+import com.bookwheel.server.group.dto.member.GroupMemberListResponse;
+import com.bookwheel.server.group.dto.member.GroupMemberResponse;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;

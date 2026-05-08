@@ -1,4 +1,4 @@
-package com.bookwheel.server.group.dto;
+package com.bookwheel.server.group.dto.setting;
 
 import com.bookwheel.server.member.enums.MemberRole;
 import jakarta.validation.constraints.NotNull;

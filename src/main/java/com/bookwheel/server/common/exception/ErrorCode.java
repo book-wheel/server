@@ -45,7 +45,7 @@ public enum ErrorCode {
     GROUP_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_004", "존재하지 않는 그룹입니다."),
     INVALID_GROUP_PASSWORD(HttpStatus.BAD_REQUEST, "GROUP_005", "비밀번호가 틀렸습니다."),
     GROUP_FULL(HttpStatus.BAD_REQUEST, "GROUP_006", "그룹 정원이 초과되었습니다."),
-    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 가입 요청을 처리할 수 있습니다."),
+    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 수행할 수 있는 작업입니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_008", "해당 멤버를 찾을 수 없습니다."),
     MEMBER_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "GROUP_009", "대기 중인 가입 요청만 처리할 수 있습니다."),
     DUPLICATE_GROUP_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_010", "이미 가입했거나 가입 요청을 보낸 모임입니다."),
@@ -62,6 +62,9 @@ public enum ErrorCode {
     WHEEL_ALREADY_CERTIFIED(HttpStatus.BAD_REQUEST, "GROUP_021", "이미 독서 완료 인증 정보가 존재합니다."),
     IMAGES_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_022", "도서 정보를 꼭 등록해야합니다."),
     WITHDRAW_BLOCKED_BY_GROUP_MEMBERSHIP(HttpStatus.BAD_REQUEST, "GROUP_023", "가입된 모임이 있어 탈퇴할 수 없습니다. 모든 모임을 탈퇴한 후 다시 시도해주세요."),
+    GROUP_MEMBER_ONLY(HttpStatus.BAD_REQUEST, "GROUP_024", "일반 유저만 해당 작업을 수행할 수 있습니다."),
+    CANNOT_KICK_YOURSELF(HttpStatus.BAD_REQUEST, "GROUP_025", "자기 자신을 강퇴할 수 없습니다."),
+    INVALID_TARGET_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_026", "해당 작업을 수행할 수 없는 멤버입니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),

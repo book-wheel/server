@@ -49,13 +49,9 @@ public class GroupMemberOrderService {
                 ? resolveRandomOrder(activeMembers)
                 : resolveManualOrder(activeMembers, request.memberIds());
 
-        for (Member member : activeMembers) {
-            member.setReadOrder(null);
-        }
-
         int order = 1;
         for (Member member : orderedMembers) {
-            member.setReadOrder(order++);
+            member.updateReadOrder(order++);
         }
 
         memberRepository.saveAll(activeMembers);
