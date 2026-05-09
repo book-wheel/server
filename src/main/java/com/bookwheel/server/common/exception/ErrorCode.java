@@ -65,6 +65,11 @@ public enum ErrorCode {
     GROUP_MEMBER_ONLY(HttpStatus.BAD_REQUEST, "GROUP_024", "일반 유저만 해당 작업을 수행할 수 있습니다."),
     CANNOT_KICK_YOURSELF(HttpStatus.BAD_REQUEST, "GROUP_025", "자기 자신을 강퇴할 수 없습니다."),
     INVALID_TARGET_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_026", "해당 작업을 수행할 수 없는 멤버입니다."),
+    INVALID_ROLE_CHANGE(HttpStatus.BAD_REQUEST, "GROUP_027", "변경 불가능한 권한을 가진 사용자입니다."),
+    CANNOT_CHANGE_OWN_ROLE(HttpStatus.BAD_REQUEST, "GROUP_028", "자기 자신의 권한은 변경할 수 없습니다."),
+    ROLE_ALREADY_ASSIGNED(HttpStatus.BAD_REQUEST, "GROUP_029", "이미 해당 권한을 가지고 있는 멤버입니다."),
+    INVALID_ROLE_TRANSITION(HttpStatus.BAD_REQUEST, "GROUP_030", "허용되지 않는 권한 변경 요청입니다."),
+    CANNOT_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "GROUP_031", "자기 자신에게 리더를 위임할 수 없습니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
