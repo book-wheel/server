@@ -18,8 +18,8 @@ public class User {
     @Column(name = "id", length = 50)
     private String id;
 
-    @Column(name = "user_id", length = 50, unique = true, nullable = false)
-    private String userId;
+    @Column(name = "login_id", length = 50, unique = true, nullable = false)
+    private String loginId;
 
     @Column(name = "password")
     private String password;
@@ -31,7 +31,7 @@ public class User {
     private String mail;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "social_type", length = 20)
+    @Column(name = "social_type", columnDefinition = "VARCHAR(20) DEFAULT 'NONE'")
     private SocialType socialType = SocialType.NONE;
 
     @Column(name = "social_id", length = 100)
@@ -46,32 +46,27 @@ public class User {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private Role role;
-
-
     @Column(name = "ban_expired_at")
     private LocalDateTime banExpiredAt;
 
+    @Column(name = "is_profile_set")
+    private Boolean isProfileSet = false;
+
     @Builder
-    public User(String userId, String password, String nickname, String mail,
-                SocialType socialType, String socialId, String comment, String profileImage,
-                Role role, Boolean isActive) {
+    public User(String loginId, String password, String nickname, String mail,
+                SocialType socialType, String socialId, String comment, String profileImageKey,
+                Boolean isActive) {
         this.id = UUID.randomUUID().toString();
-        this.userId = userId;
+        this.loginId = loginId;
         this.password = password;
         this.nickname = nickname;
         this.mail = mail;
         this.socialType = socialType != null ? socialType : SocialType.NONE;
         this.socialId = socialId;
         this.comment = comment;
-        this.profileImageKey = profileImage;
+        this.profileImageKey = profileImageKey;
         this.isActive = isActive != null ? isActive : true;
-        this.role = role != null ? role : Role.USER;
     }
-
-    private boolean isProfileSet = false;
 
     public void completeProfile() {
         this.isProfileSet = true;
@@ -81,10 +76,10 @@ public class User {
         this.password = password;
     }
 
-    public void updateProfile(String nickname, String comment, String profileImage) {
+    public void updateProfile(String nickname, String comment, String profileImageKey) {
         this.nickname = nickname;
         this.comment = comment;
-        this.profileImageKey = profileImage;
+        this.profileImageKey = profileImageKey;
     }
 
     public void deactivate() {

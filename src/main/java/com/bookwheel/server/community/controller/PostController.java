@@ -22,21 +22,21 @@ public class PostController {
     private final PostService postService;
 
     @Operation(summary = "게시물 사진 업로드용 Presigned URL 다중 발급")
-    @PostMapping("/{bookId}/images/presigned-urls")
+    @PostMapping("/{isbn}/images/presigned-urls")
     public ApiResponse<PostImagePresignedResponse> getPresignedUrls(
-        @PathVariable("bookId") String bookId,
+        @PathVariable("isbn") String isbn,
         @RequestBody PostImagePresignedRequest request) {
-        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(bookId, request.fileExtensions());
+        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, request.fileExtensions());
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "게시물 업로드(사진 + 글)")
-    @PostMapping("/{bookId}/save")
-    public ApiResponse<PostCreateResponse> save(@PathVariable("bookId") String bookId,
-                                                @RequestBody PostCreateRequest request, @AuthenticationPrincipal Object principal) {
+    @PostMapping("/{isbn}/save")
+    public ApiResponse<PostCreateResponse> save(@Valid @RequestBody PostCreateRequest request,
+                                                @AuthenticationPrincipal Object principal) {
 
         String userPK = getUserPK(principal);
-        PostCreateResponse response = postService.create(bookId, request,userPK);
+        PostCreateResponse response = postService.create(request,userPK);
         return ApiResponse.success(response);
     }
 
@@ -64,10 +64,13 @@ public class PostController {
     }
 
 
-    @Operation(summary = "사진첩 신고")
+    @Operation(summary = "게시물 신고")
     @PostMapping("/{postId}/reports")
-    public ApiResponse<String> reportPhoto(@PathVariable("postId") Long photoId,@RequestBody PhotoReportRequest request) {
-        // TODO: 신고 사유(DTO) 받아서 Service로 넘기기
-        return ApiResponse.success(photoId +"신고처리 api 연결 성공");
+    public ApiResponse<String> reportPost(
+        @PathVariable("postId") Long postId,
+        @Valid @RequestBody PostReportRequest request,
+        @AuthenticationPrincipal Object principal) {
+        postService.reportPost(postId, request, getUserPK(principal));
+        return ApiResponse.success("게시물이 성공적으로 신고 접수되었습니다.");
     }
 }

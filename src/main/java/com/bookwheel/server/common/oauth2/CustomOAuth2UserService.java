@@ -1,9 +1,9 @@
 package com.bookwheel.server.common.oauth2;
 
+import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.oauth2.userinfo.GoogleOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.KakaoOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.OAuth2UserInfo;
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -53,11 +53,11 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
         // 커스텀 유저 객체 반환
         return new CustomOAuth2User(
-                Collections.singleton(new SimpleGrantedAuthority(user.getRole().getKey())),
+                Collections.singleton(new SimpleGrantedAuthority(AuthRole.USER.getKey())),
                 attributes,
                 userNameAttributeName,
                 user.getId(),
-                user.getRole(),
+                AuthRole.USER,
                 user.getNickname()
         );
     }
@@ -84,7 +84,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
         // 탈퇴했었던 유저 처리
         if (!findUser.getIsActive()) {
-            log.info("탈퇴했던 소셜 유저의 재접속: 기존 데이터를 삭제하고 신규 가입 처리합니다. userId={}", findUser.getUserId());
+            log.info("탈퇴했던 소셜 유저의 재접속: 기존 데이터를 삭제하고 신규 가입 처리합니다. loginId={}", findUser.getLoginId());
 
             // 기존 데이터 삭제 (Hard Delete)
             userRepository.delete(findUser);
@@ -101,20 +101,19 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     }
 
     private User saveUser(OAuth2UserInfo userInfo, SocialType socialType) {
-        // 이메일이 있으면 이메일, 없으면 소셜 고유 ID를 userId로 사용
+        // 소셜 타입 + 소셜 고유 ID로 loginId 생성
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
-        String uniqueUserId = socialType.name() + "_" + userInfo.getSocialId();
+        String uniqueLoginId = socialType.name() + "_" + userInfo.getSocialId();
 
         User user = User.builder()
-                .userId(uniqueUserId)
+                .loginId(uniqueLoginId)
                 .password(UUID.randomUUID().toString())
                 .socialType(socialType)
                 .socialId(userInfo.getSocialId())
                 .mail(userInfo.getEmail())
                 .nickname(tempNickname)
-                .profileImage(userInfo.getProfileImage())
-                .role(Role.USER)
+                .profileImageKey(userInfo.getProfileImage())
                 .build();
 
         return userRepository.save(user);

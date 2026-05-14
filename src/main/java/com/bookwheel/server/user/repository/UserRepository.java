@@ -8,7 +8,7 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, String> {
-    Optional<User> findByUserId(String userId);
+    Optional<User> findByLoginId(String loginId);
     boolean existsByNickname(String nickname);
 
     Optional<User> findBySocialTypeAndSocialId(SocialType socialType, String socialId);
@@ -16,5 +16,8 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     // 이메일 + 가입경로(SocialType) + 활성상태(isActive) 모두 만족하는 단 한 명의 유저 조회
     Optional<User> findByMailAndSocialTypeAndIsActiveTrue(String mail, SocialType socialType);
+
+    // 이메일 + 가입경로(SocialType) + 활성상태(isActive) 만족하는 유저의 존재 여부만 확인
+    boolean existsByMailAndSocialTypeAndIsActiveTrue(String mail, SocialType socialType);
 }
 

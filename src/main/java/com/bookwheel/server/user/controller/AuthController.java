@@ -40,6 +40,7 @@ public class AuthController {
     @Operation(summary = "이메일 인증번호 전송", description = "회원가입을 위해 이메일로 6자리 인증번호를 보냅니다.")
     @PostMapping("/emails/send")
     public ApiResponse<?> sendEmailVerification(@Valid @RequestBody EmailVerificationRequest request) {
+        userService.checkEmailDuplication(request.email());
         emailService.sendVerificationCode(request.email());
         return ApiResponse.success("인증번호가 발송되었습니다.");
     }

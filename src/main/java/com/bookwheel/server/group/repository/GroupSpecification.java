@@ -1,6 +1,6 @@
 package com.bookwheel.server.group.repository;
 
-import com.bookwheel.server.group.dto.GroupSearchCondition;
+import com.bookwheel.server.group.dto.search.GroupSearchCondition;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import org.springframework.data.jpa.domain.Specification;

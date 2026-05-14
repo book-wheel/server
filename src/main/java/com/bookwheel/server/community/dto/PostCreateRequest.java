@@ -1,16 +1,21 @@
 package com.bookwheel.server.community.dto;
 
-import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.user.entity.User;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
 @Schema(description = "도서 게시물(감상평+사진) 최종 등록 요청")
 public record PostCreateRequest(
+
+    @Schema(description = "알라딘 도서 고유 식별자(ISBN)", example = "9788966263158")
+    @NotBlank(message = "ISBN은 필수입니다.")
+    String isbn,
+
     @Schema(description = "감상평 내용", example = "이 페이지 진짜 너무 웃김 ㅋㅋㅋ")
     String content,
 

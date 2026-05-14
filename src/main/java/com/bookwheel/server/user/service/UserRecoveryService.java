@@ -107,7 +107,7 @@ public class UserRecoveryService {
         // 인증 성공 후 보안을 위해 Redis의 인증번호 삭제
         redisTemplate.delete(CODE_PREFIX + mail);
 
-        return IdRecoveryResponse.from(user.getUserId());
+        return IdRecoveryResponse.from(user.getLoginId());
     }
 
      // 비밀번호 재설정을 위한 인증번호 검증

@@ -45,7 +45,7 @@ public enum ErrorCode {
     GROUP_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_004", "존재하지 않는 그룹입니다."),
     INVALID_GROUP_PASSWORD(HttpStatus.BAD_REQUEST, "GROUP_005", "비밀번호가 틀렸습니다."),
     GROUP_FULL(HttpStatus.BAD_REQUEST, "GROUP_006", "그룹 정원이 초과되었습니다."),
-    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 가입 요청을 처리할 수 있습니다."),
+    GROUP_LEADER_ONLY(HttpStatus.FORBIDDEN, "GROUP_007", "모임장만 수행할 수 있는 작업입니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_008", "해당 멤버를 찾을 수 없습니다."),
     MEMBER_REQUEST_NOT_PENDING(HttpStatus.BAD_REQUEST, "GROUP_009", "대기 중인 가입 요청만 처리할 수 있습니다."),
     DUPLICATE_GROUP_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_010", "이미 가입했거나 가입 요청을 보낸 모임입니다."),
@@ -61,6 +61,15 @@ public enum ErrorCode {
     WHEEL_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_020", "해당 도서의 진행 정보를 찾을 수 없습니다."),
     WHEEL_ALREADY_CERTIFIED(HttpStatus.BAD_REQUEST, "GROUP_021", "이미 독서 완료 인증 정보가 존재합니다."),
     IMAGES_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP_022", "도서 정보를 꼭 등록해야합니다."),
+    WITHDRAW_BLOCKED_BY_GROUP_MEMBERSHIP(HttpStatus.BAD_REQUEST, "GROUP_023", "가입된 모임이 있어 탈퇴할 수 없습니다. 모든 모임을 탈퇴한 후 다시 시도해주세요."),
+    GROUP_MEMBER_ONLY(HttpStatus.BAD_REQUEST, "GROUP_024", "일반 유저만 해당 작업을 수행할 수 있습니다."),
+    CANNOT_KICK_YOURSELF(HttpStatus.BAD_REQUEST, "GROUP_025", "자기 자신을 강퇴할 수 없습니다."),
+    INVALID_TARGET_MEMBER(HttpStatus.BAD_REQUEST, "GROUP_026", "해당 작업을 수행할 수 없는 멤버입니다."),
+    INVALID_ROLE_CHANGE(HttpStatus.BAD_REQUEST, "GROUP_027", "변경 불가능한 권한을 가진 사용자입니다."),
+    CANNOT_CHANGE_OWN_ROLE(HttpStatus.BAD_REQUEST, "GROUP_028", "자기 자신의 권한은 변경할 수 없습니다."),
+    ROLE_ALREADY_ASSIGNED(HttpStatus.BAD_REQUEST, "GROUP_029", "이미 해당 권한을 가지고 있는 멤버입니다."),
+    INVALID_ROLE_TRANSITION(HttpStatus.BAD_REQUEST, "GROUP_030", "허용되지 않는 권한 변경 요청입니다."),
+    CANNOT_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "GROUP_031", "자기 자신에게 리더를 위임할 수 없습니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
@@ -76,6 +85,8 @@ public enum ErrorCode {
     ALREADY_PROCESSED_REPORT(HttpStatus.BAD_REQUEST, "REPORT_002", "이미 처리 완료된 신고입니다."),
     CANNOT_BAN_ADMIN(HttpStatus.BAD_REQUEST, "ADMIN_001", "관리자 계정은 제재할 수 없습니다."),
     ALREADY_BANNED_USER(HttpStatus.BAD_REQUEST, "ADMIN_002", "이미 정지된 사용자입니다."),
+    ADMIN_NOT_FOUND(HttpStatus.NOT_FOUND, "ADMIN_003", "관리자 계정을 찾을 수 없습니다."),
+    INACTIVE_ADMIN(HttpStatus.BAD_REQUEST, "ADMIN_004", "비활성화된 관리자 계정입니다."),
     LREADY_REPORTED(HttpStatus.BAD_REQUEST, "REPORT_003", "이미 신고가 접수된 사진입니다."),
 
     // 파일 관련 에러
@@ -83,7 +94,9 @@ public enum ErrorCode {
     INVALID_FILE_FORMAT(HttpStatus.BAD_REQUEST, "FILE_002", "지원하지 않는 파일 형식입니다."),
 
     //게시물관련 에러
-    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "해당 게시물을 찾을 수 없습니다."),
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_001", "해당 게시물을 찾을 수 없습니다."),
+    ALREADY_REPORTED(HttpStatus.BAD_REQUEST, "POST_002", "이미 신고한 게시물입니다."),
+    CANNOT_REPORT_OWN_POST(HttpStatus.BAD_REQUEST, "POST_003", "자신의 게시물은 신고할 수 없습니다."),
 
     //리뷰 관련 에러
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "해당 리뷰를 찾을 수 없습니다."),

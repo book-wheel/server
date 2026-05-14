@@ -13,12 +13,6 @@ public class KakaoOAuth2UserInfo implements OAuth2UserInfo {
     public String getSocialId() { return String.valueOf(attributes.get("id")); }
 
     @Override
-    public String getNickname() {
-        Map<String, Object> profile = (Map<String, Object>) getKakaoAccount().get("profile");
-        return profile == null ? null : (String) profile.get("nickname");
-    }
-
-    @Override
     public String getEmail() { return (String) getKakaoAccount().get("email"); }
 
     @Override

@@ -1,4 +1,4 @@
-package com.bookwheel.server.group.dto;
+package com.bookwheel.server.group.dto.search;
 
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.Region;
@@ -13,6 +13,7 @@ public record GroupSearchResponse(
         String groupId,
         String groupName,
         String groupComment,
+        boolean groupPublic,
         boolean groupOffline,
         Region groupRegion,
         int currentMembers,
@@ -31,6 +32,7 @@ public record GroupSearchResponse(
                 .groupId(group.getGroupId())
                 .groupName(group.getGroupName())
                 .groupComment(group.getGroupComment())
+                .groupPublic(group.isGroupPublic())
                 .groupRegion(group.getGroupRegion())
                 .groupOffline(group.isGroupOffline())
                 .currentMembers(group.getCurrentMembers())

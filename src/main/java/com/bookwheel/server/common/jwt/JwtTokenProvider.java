@@ -1,6 +1,6 @@
 package com.bookwheel.server.common.jwt;
 
-import com.bookwheel.server.user.entity.Role;
+import com.bookwheel.server.common.auth.AuthRole;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -34,12 +34,12 @@ public class JwtTokenProvider {
     }
 
     // Access Token 생성
-    public String createAccessToken(String userPK, Role role) {
+    public String createAccessToken(String subjectPK, AuthRole role) {
         long now = (new Date()).getTime();
         Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
-                .setSubject(userPK)
+                .setSubject(subjectPK)
                 .claim("auth", role.getKey())
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -47,12 +47,12 @@ public class JwtTokenProvider {
     }
 
     // Refresh Token 생성
-    public String createRefreshToken(String userPK, Role role) {
+    public String createRefreshToken(String subjectPK, AuthRole role) {
         long now = (new Date()).getTime();
         Date refreshTokenExpiresIn = new Date(now + REFRESH_TOKEN_EXPIRE_TIME);
 
         return Jwts.builder()
-                .setSubject(userPK)
+                .setSubject(subjectPK)
                 .claim("auth", role.getKey())
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)

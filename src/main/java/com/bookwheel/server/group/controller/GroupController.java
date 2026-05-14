@@ -2,9 +2,13 @@ package com.bookwheel.server.group.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.group.dto.*;
+import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.search.*;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.service.GroupService;
+import com.bookwheel.server.member.service.MemberService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +33,7 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 @RequestMapping({"/api/v1/groups"})
 public class GroupController {
     private final GroupService groupService;
+    private final MemberService memberService;
 
     @Operation(summary = "그룹 생성", description = "새로운 독서 그룹을 생성합니다.")
     @PostMapping("/making")
@@ -105,5 +110,12 @@ public class GroupController {
                 request.status()
         );
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "그룹 멤버 리스트", description = "특정 그룹에 속한 모든 멤버의 목록과 권한 정보를 조회합니다.")
+    @GetMapping("/{groupId}/members")
+    public ApiResponse<GroupMemberListResponse> getGroupMembers(@PathVariable String groupId) {
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+        return ApiResponse.success(response);
     }
 }

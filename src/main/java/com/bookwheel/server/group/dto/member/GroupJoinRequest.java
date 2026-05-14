@@ -1,4 +1,4 @@
-package com.bookwheel.server.group.dto;
+package com.bookwheel.server.group.dto.member;
 
 import jakarta.validation.constraints.NotBlank;
 

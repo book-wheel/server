@@ -1,7 +1,6 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.service.S3Service;
-import com.bookwheel.server.community.dto.PhotoReportRequest;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
@@ -21,6 +20,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -65,7 +65,7 @@ class PostControllerTest {
     @WithMockUser
     @DisplayName("Community Gallery: get presigned urls success")
     void getPresignedUrls_Success() throws Exception {
-        String bookId = "book-1";
+        String isbn = "9788966263158";
         PostImagePresignedRequest request = new PostImagePresignedRequest(List.of("jpg"));
         PostImagePresignedResponse response = new PostImagePresignedResponse(
                 List.of(new PostImagePresignedResponse.PresignedInfo(
@@ -74,9 +74,9 @@ class PostControllerTest {
                 ))
         );
 
-        given(s3Service.getPostPresignedUrls(eq(bookId), any(List.class))).willReturn(response);
+        given(s3Service.getPostPresignedUrls(eq(isbn), any(List.class))).willReturn(response);
 
-        mockMvc.perform(post("/api/v1/posts/{bookId}/images/presigned-urls", bookId)
+        mockMvc.perform(post("/api/v1/posts/{isbn}/images/presigned-urls", isbn)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -89,29 +89,31 @@ class PostControllerTest {
     @WithMockUser
     @DisplayName("Community Gallery: save post success")
     void savePost_Success() throws Exception {
-        String bookId = "book-1";
+        String isbn = "9788966263158";
         PostCreateRequest request = new PostCreateRequest(
+            isbn,
                 "Nice book",
                 List.of("posts/1/abc.jpg")
         );
         PostCreateResponse response = new PostCreateResponse(
-                10L,
-                "book-1",
-                "Nice book",
-                List.of("posts/1/abc.jpg")
+            10L,
+            isbn,
+            "Nice book",
+            List.of("posts/1/abc.jpg"),
+            LocalDateTime.now()
         );
 
-        given(postService.create(eq(bookId), any(PostCreateRequest.class), any()))
-                .willReturn(response);
+        given(postService.create(any(PostCreateRequest.class), any()))
+            .willReturn(response);
 
-        mockMvc.perform(post("/api/v1/posts/{bookId}/save", bookId)
+        mockMvc.perform(post("/api/v1/posts")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.postId").value(10L))
-                .andExpect(jsonPath("$.data.bookId").value("book-1"));
+                .andExpect(jsonPath("$.data.isbn").value(isbn));
     }
 
     @Test
@@ -161,11 +163,11 @@ class PostControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("Community Gallery: report photo success")
-    void reportPhoto_Success() throws Exception {
-        Long photoId = 99L;
+    @DisplayName("Community Gallery: report post success")
+    void reportPost_Success() throws Exception {
+        Long postId = 99L;
 
-        mockMvc.perform(post("/api/v1/posts/{postId}/reports", photoId)
+        mockMvc.perform(post("/api/v1/posts/{postId}/reports", postId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))

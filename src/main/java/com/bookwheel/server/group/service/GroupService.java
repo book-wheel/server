@@ -3,6 +3,9 @@ package com.bookwheel.server.group.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
+import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.search.*;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.*;
 import com.bookwheel.server.group.repository.*;
 import com.bookwheel.server.member.entity.*;
@@ -29,6 +32,7 @@ public class GroupService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final GroupMemberPermissionValidator memberPermissionValidator;
 
     @Transactional
     public GroupCreateResponse createGroup(GroupCreateRequest request, String userPK) {
@@ -90,7 +94,7 @@ public class GroupService {
 
     public List<MemberRequestResponse> getMemberRequests(String groupId, String leaderUserPk) {
         findGroupById(groupId);
-        validateLeaderPermission(groupId, leaderUserPk);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPk);
 
         return memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.PENDING)
                 .stream()
@@ -108,7 +112,7 @@ public class GroupService {
         Group group = (status == MemberRequestStatus.APPROVED)
                 ? findGroupByIdForUpdate(groupId)
                 : findGroupById(groupId);
-        validateLeaderPermission(groupId, leaderUserPk);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPk);
 
         Member targetMember = memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
@@ -121,9 +125,9 @@ public class GroupService {
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
-            targetMember.setMemberStatus(MemberStatus.ACTIVE);
+            targetMember.approve();
         } else {
-            targetMember.setMemberStatus(MemberStatus.REJECTED);
+            targetMember.reject();
         }
 
         return MemberRequestStatusUpdateResponse.of(targetMember.getMemberId(), status);
@@ -153,17 +157,6 @@ public class GroupService {
 
         if (group.getCurrentMembers() >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
-        }
-    }
-
-    private void validateLeaderPermission(String groupId, String leaderUserPk) {
-        Member leaderMember = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, leaderUserPk)
-                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
-
-        boolean isLeader = leaderMember.getMemberRole() == MemberRole.LEADER;
-        boolean isActive = leaderMember.getMemberStatus() == MemberStatus.ACTIVE;
-        if (!isLeader || !isActive) {
-            throw new BusinessException(ErrorCode.GROUP_LEADER_ONLY);
         }
     }
 

@@ -10,11 +10,11 @@ public record ReviewCreateResponse(
     @Schema(description = "작성된 리뷰 ID", example = "42")
     Long reviewId,
 
-    @Schema(description = "도서 ID", example = "book-12345")
-    String bookId,
+    @Schema(description = "도서 ISBN", example = "9788966263158")
+    String isbn,
 
     //@Schema(description = "작성자 프로필 이미지 URL", example = "https://...")
-    //String reviewerProfileImageUrl, 추후 프론트에서 프로필 보일때 추가할게요!
+    //String reviewerProfileImageKey, 추후 프론트에서 프로필 보일때 추가할게요!
 
     @Schema(description = "추천 여부", example = "true")
     boolean isRecommended,
@@ -32,7 +32,7 @@ public record ReviewCreateResponse(
     public static ReviewCreateResponse from(BookReview review) {
         return new ReviewCreateResponse(
             review.getReviewId(),
-            review.getBookInfo().getId(),
+            review.getBookInfo().getIsbn(),
             review.getIsRecommended(),
             review.getContent(),
             review.getIsHidden(),

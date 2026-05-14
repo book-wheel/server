@@ -7,11 +7,9 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
+import com.bookwheel.server.community.dto.PostReportRequest;
 import com.bookwheel.server.community.entity.*;
-import com.bookwheel.server.community.repository.BookInfoRepository;
-import com.bookwheel.server.community.repository.PostCommentRepository;
-import com.bookwheel.server.community.repository.PostLikeRepository;
-import com.bookwheel.server.community.repository.PostRepository;
+import com.bookwheel.server.community.repository.*;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,11 +25,13 @@ public class PostService {
     private final BookInfoRepository bookInfoRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
+    private final PostReportRepository postReportRepository;
 
     @Transactional
-    public PostCreateResponse create(String bookInfoId, PostCreateRequest request, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findById(bookInfoId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    public PostCreateResponse create(PostCreateRequest request, String userPK) {
+        String isbn = request.isbn();
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -87,5 +87,30 @@ public class PostService {
 
         postCommentRepository.save(comment);
     }
+
+    @Transactional
+    public void reportPost(Long postId, PostReportRequest request, String userPK) {
+
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        User user = userRepository.findById(userPK)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (post.getUploader().getId().equals(user.getId())) {
+            throw new BusinessException(ErrorCode.CANNOT_REPORT_OWN_POST);
+        }
+
+
+        if (postReportRepository.existsByPostAndReporter(post, user)) {
+            throw new BusinessException(ErrorCode.ALREADY_REPORTED);
+        }
+
+        // 신고 내역 저장
+        PostReport postReport = new PostReport(post, user, request.reason());
+        postReportRepository.save(postReport);
+    }
+
+
 
 }

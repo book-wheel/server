@@ -2,13 +2,15 @@ package com.bookwheel.server.user.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.user.dto.*;
-import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bookwheel.server.user.dto.ProfileSetupRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -34,7 +37,7 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
     private final S3Service s3Service;
-    private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
+    private final MemberRepository memberRepository;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -53,17 +56,16 @@ public class UserService {
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 
         User user = User.builder()
-                .userId(request.loginId())
+                .loginId(request.loginId())
                 .password(passwordEncoder.encode(request.password()))
                 .nickname(tempNickname)
                 .mail(request.mail())
-                .role(Role.USER)
                 .socialType(SocialType.NONE)
                 .isActive(true)
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("일반 회원가입 1단계 완료: userId={}, tempNickname={}", savedUser.getUserId(), tempNickname);
+        log.info("일반 회원가입 1단계 완료: loginId={}, tempNickname={}", savedUser.getLoginId(), tempNickname);
 
         return UserResponse.from(savedUser, null);
     }
@@ -126,6 +128,12 @@ public class UserService {
         return userRepository.existsByNickname(nickname);
     }
 
+    public void checkEmailDuplication(String mail) {
+        if (userRepository.existsByMailAndSocialTypeAndIsActiveTrue(mail, SocialType.NONE)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
+        }
+    }
+
     @Transactional
     public TokenResponse reissue(TokenReissueRequest request) {
         String refreshToken = request.refreshToken();
@@ -148,7 +156,7 @@ public class UserService {
         User user = findByIdAndValidateActive(userPK);
 
         // 새 Access Token 발급
-        String newAccessToken = jwtTokenProvider.createAccessToken(userPK, user.getRole());
+        String newAccessToken = jwtTokenProvider.createAccessToken(userPK, AuthRole.USER);
 
         log.info("토큰 재발급 성공: userPK={}", userPK);
 
@@ -178,7 +186,6 @@ public class UserService {
     public void withdraw(String userPK, UserWithdrawRequest request) {
         // 유저 조회 및 활성 상태 검증
         User user = findByIdAndValidateActive(userPK);
-        // [TODO] 추후 탈퇴하려는 회원이 가입된 모임이 있는지 확인하는 로직 추가 필요
 
         if (user.getSocialType() == SocialType.NONE) {
             if (request == null || request.password() == null ||
@@ -187,24 +194,21 @@ public class UserService {
             }
         }
 
+        // 가입된 모임이 있으면 탈퇴 차단
+        boolean hasActiveGroup = memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE);
+        if (hasActiveGroup) {
+            throw new BusinessException(ErrorCode.WITHDRAW_BLOCKED_BY_GROUP_MEMBERSHIP);
+        }
+
+        // 가입 대기 중인(PENDING) 모든 요청 건 삭제
+        memberRepository.deleteByUser_IdAndMemberStatus(userPK, MemberStatus.PENDING);
+
         String imageKey = user.getProfileImageKey();
         if (imageKey != null) {
             s3Service.deleteObject(imageKey);
         }
 
-        // 디버깅 - 현재 시큐리티 세션에 기록된 진짜 이름을 확인
-        log.info("회원 탈퇴 처리 시작 - userPK: {}", userPK);
-        log.info("탈퇴 대상 SocialType: {}", user.getSocialType());
-
-        // 구글일 경우 연동 해제용 액세스 토큰 가져오기
-        String socialAccessToken = null;
-        if (user.getSocialType() == SocialType.GOOGLE) {
-            org.springframework.security.oauth2.client.OAuth2AuthorizedClient client =
-                    authorizedClientService.loadAuthorizedClient("google", user.getId());
-            if (client != null && client.getAccessToken() != null) {
-                socialAccessToken = client.getAccessToken().getTokenValue();
-            }
-        }
+        log.info("회원 탈퇴 처리 시작 - userPK: {}, socialType: {}", userPK, user.getSocialType());
 
         // 계정 비활성화 (Soft Delete)
         user.deactivate();
@@ -212,10 +216,9 @@ public class UserService {
         // Redis에 저장된 Refresh Token 삭제
         refreshTokenRepository.deleteById(userPK);
 
-
-        // 소셜 연동 해제
+        // 소셜 연동 해제 (카카오만 서버에서 처리, 구글은 사용자가 직접 처리)
         if (user.getSocialType() != SocialType.NONE) {
-            socialUnlinkService.unlink(user.getSocialType(), user.getSocialId(), socialAccessToken);
+            socialUnlinkService.unlink(user.getSocialType(), user.getSocialId());
         }
 
         log.info("회원 탈퇴 완료: userPK={}, socialType={}", userPK, user.getSocialType());
@@ -223,22 +226,20 @@ public class UserService {
 
     private void handleExistingUser(String loginId, String mail, SocialType socialType) {
         // 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
-        userRepository.findByUserId(loginId).ifPresent(user -> {
+        userRepository.findByLoginId(loginId).ifPresent(user -> {
             if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
             userRepository.delete(user);
         });
 
-        // 이메일 중복 확인: 현재 시도하려는 가입 방식(socialType)에 대해서만 중복 체크
-        userRepository.findByMailAndSocialType(mail, socialType).ifPresent(user -> {
-            if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
-            // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
-            userRepository.delete(user);
-        });
+        // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
+        userRepository.findByMailAndSocialType(mail, socialType)
+                .filter(user -> !user.getIsActive())
+                .ifPresent(userRepository::delete);
     }
 
     private LoginResponse getLoginResponse(User user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getRole());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getRole());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), AuthRole.USER);
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), AuthRole.USER);
 
         refreshTokenRepository.save(new RefreshToken(user.getId(), refreshToken));
 
@@ -265,7 +266,7 @@ public class UserService {
     }
 
     private User findByLoginIdAndValidateActive(String loginId) {
-        User user = userRepository.findByUserId(loginId)
+        User user = userRepository.findByLoginId(loginId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
