@@ -26,6 +26,8 @@ jobs:
         env :
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          KAKAO_API_KEY: ${{ secrets.KAKAO_API_KEY }}
+          ALADIN_API_KEY: ${{ secrets.ALADIN_API_KEY }}
 
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@master
@@ -49,6 +51,8 @@ jobs:
             export AWS_ACCESS_KEY="${{ secrets.AWS_ACCESS_KEY }}"
             export AWS_SECRET_KEY="${{ secrets.AWS_SECRET_KEY }}"
             export AWS_REGION="ap-northeast-2"
+            export KAKAO_API_KEY="${{ secrets.KAKAO_API_KEY }}"
+            export ALADIN_API_KEY="${{ secrets.ALADIN_API_KEY }}"
             nohup java -jar \
               -Dspring.profiles.active=prod \
               -Dspring.datasource.url="${{ secrets.DB_URL }}" \
