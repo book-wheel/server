@@ -1,6 +1,7 @@
 package com.bookwheel.server.member.repository;
 
 import com.bookwheel.server.member.entity.Member;
+import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -48,4 +49,23 @@ public interface MemberRepository extends JpaRepository<Member, String> {
 
     // IN 절을 사용하여 여러 유저가 그룹에 속해있는지 한 번에 확인
     long countByGroup_GroupIdAndUser_UserIdIn(String groupId, List<String> userIds);
+
+    // 그룹의 리더(또는 임의 역할)를 단건 조회 - 알림 수신자 결정용
+    @EntityGraph(attributePaths = "user")
+    Optional<Member> findFirstByGroup_GroupIdAndMemberRoleAndMemberStatus(
+            String groupId, MemberRole memberRole, MemberStatus memberStatus
+    );
+
+    // 특정 그룹의 특정 상태 멤버를 user fetch 와 함께 조회 - 알림 수신자 일괄 결정용
+    @Query("""
+            select m
+            from Member m
+            join fetch m.user
+            where m.group.groupId = :groupId
+              and m.memberStatus = :memberStatus
+            """)
+    List<Member> findAllWithUserByGroupIdAndStatus(
+            @Param("groupId") String groupId,
+            @Param("memberStatus") MemberStatus memberStatus
+    );
 }
