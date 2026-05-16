@@ -11,9 +11,11 @@ import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.Role;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
+import com.bookwheel.server.user.event.UserDeactivatedEvent;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ public class UserService {
     private final SocialUnlinkService socialUnlinkService;
     private final S3Service s3Service;
     private final org.springframework.security.oauth2.client.OAuth2AuthorizedClientService authorizedClientService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -206,6 +209,9 @@ public class UserService {
             }
         }
 
+        // 탈퇴 직전 메일 보존 (deactivate 호출 후에는 nickname/profile 등이 마스킹될 수 있음)
+        String mail = user.getMail();
+
         // 계정 비활성화 (Soft Delete)
         user.deactivate();
 
@@ -216,6 +222,8 @@ public class UserService {
         if (user.getSocialType() != SocialType.NONE) {
             socialUnlinkService.unlink(user.getSocialType(), user.getSocialId(), socialAccessToken);
         }
+
+        eventPublisher.publishEvent(new UserDeactivatedEvent(userId, mail));
 
         log.info("회원 탈퇴 완료: userId={}, socialType={}", userId, user.getSocialType());
     }
