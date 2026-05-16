@@ -8,6 +8,8 @@ import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.entity.*;
+import com.bookwheel.server.community.event.PostCommentedEvent;
+import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
@@ -15,6 +17,7 @@ import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class PostService {
     private final BookInfoRepository bookInfoRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PostCreateResponse create(String bookInfoId, PostCreateRequest request, String userId) {
@@ -70,6 +74,15 @@ public class PostService {
                 () -> {
                     postLikeRepository.save(PostLike.create(post, user));
                     post.increaseLikeCount();
+                    String ownerUserId = post.getUploader().getUserId();
+                    if (!ownerUserId.equals(userId)) {
+                        eventPublisher.publishEvent(new PostLikedEvent(
+                                post.getPostId(),
+                                ownerUserId,
+                                userId,
+                                user.getNickname()
+                        ));
+                    }
                 }
             );
     }
@@ -86,6 +99,21 @@ public class PostService {
         PostComment comment = request.toEntity(post, user);
 
         postCommentRepository.save(comment);
+
+        String ownerUserId = post.getUploader().getUserId();
+        if (!ownerUserId.equals(userId)) {
+            String preview = comment.getContent();
+            if (preview != null && preview.length() > 50) {
+                preview = preview.substring(0, 50) + "...";
+            }
+            eventPublisher.publishEvent(new PostCommentedEvent(
+                    post.getPostId(),
+                    ownerUserId,
+                    userId,
+                    user.getNickname(),
+                    preview
+            ));
+        }
     }
 
 }
