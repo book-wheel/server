@@ -28,4 +28,10 @@ public interface RoundRepository extends JpaRepository<Round, String> {
     List<String> findRoundIdsByEndDateBefore(LocalDate date);
 
     List<Round> findByStartDate(LocalDate startDate);
+
+    // 종료일이 특정 날짜인 라운드 조회 (어제 종료된 라운드 → 미완독 알림)
+    List<Round> findByEndDate(LocalDate endDate);
+
+    // 종료일이 [from, to] 사이인 라운드 조회 (D-1/D-3 리마인더용)
+    List<Round> findByEndDateBetween(LocalDate from, LocalDate to);
 }
