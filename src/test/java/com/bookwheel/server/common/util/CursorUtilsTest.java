@@ -9,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -20,13 +22,13 @@ class CursorUtilsTest {
 
     @BeforeEach
     void setUp() {
-        cursorUtils = new CursorUtils(new ObjectMapper());
+        cursorUtils = new CursorUtils(new ObjectMapper().findAndRegisterModules());
     }
 
     @Test
     @DisplayName("encode and decode gallery cursor")
     void encodeAndDecodeGalleryCursor() {
-        GalleryCursor cursor = new GalleryCursor(10L);
+        GalleryCursor cursor = new GalleryCursor(LocalDateTime.of(2026, 5, 17, 10, 15, 30), 10L);
 
         String encodedCursor = cursorUtils.encode(cursor);
         GalleryCursor decodedCursor = cursorUtils.decode(encodedCursor, GalleryCursor.class);

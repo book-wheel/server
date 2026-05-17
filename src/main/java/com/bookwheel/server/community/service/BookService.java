@@ -1,13 +1,18 @@
 package com.bookwheel.server.community.service;
 
+import com.bookwheel.server.common.cursor.GalleryCursor;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
+import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.ReviewLike;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
+import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -26,8 +31,12 @@ public class BookService {
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final PostRepository postRepository;
+    private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
     private final AladinService aladinService;
+
+    private static final int DEFAULT_GALLERY_SIZE = 18;
 
 
     @Transactional
@@ -126,4 +135,49 @@ public class BookService {
         return aladinService.getBookDetailByIsbn(isbn);
     }
 
+    public CursorPageResponse<GalleryResponseDto> getGallery(String cursor, Integer size) {
+        int pageSize = resolveGalleryPageSize(size);
+        GalleryCursor galleryCursor = cursorUtils.decode(cursor, GalleryCursor.class);
+        validateGalleryCursor(galleryCursor);
+
+        List<Post> posts = postRepository.findGalleryPage(galleryCursor, pageSize + 1);
+        boolean hasNext = posts.size() > pageSize;
+        List<Post> pagePosts = hasNext ? posts.subList(0, pageSize) : posts;
+
+        List<GalleryResponseDto> content = pagePosts.stream()
+            .map(GalleryResponseDto::from)
+            .toList();
+
+        String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
+        long totalElements = postRepository.countGalleryPosts();
+
+        return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
+    }
+
+    private int resolveGalleryPageSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_GALLERY_SIZE;
+        }
+
+        if (size <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        return size;
+    }
+
+    private void validateGalleryCursor(GalleryCursor cursor) {
+        if (cursor == null) {
+            return;
+        }
+
+        if (cursor.createdAt() == null || cursor.galleryId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_CURSOR);
+        }
+    }
+
+    private String createNextGalleryCursor(List<Post> posts) {
+        Post lastPost = posts.get(posts.size() - 1);
+        return cursorUtils.encode(new GalleryCursor(lastPost.getCreatedAt(), lastPost.getPostId()));
+    }
 }
