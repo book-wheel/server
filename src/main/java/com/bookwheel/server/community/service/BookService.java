@@ -7,10 +7,12 @@ import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
+import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.ReviewLike;
 import com.bookwheel.server.community.repository.BookInfoRepository;
+import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
@@ -31,6 +33,7 @@ public class BookService {
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final BookLikeRepository bookLikeRepository;
     private final PostRepository postRepository;
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
@@ -133,6 +136,26 @@ public class BookService {
 
     public BookDetailResponse getBookDetail(String isbn) {
         return aladinService.getBookDetailByIsbn(isbn);
+    }
+
+    @Transactional
+    public BookLikeResponse toggleBookLike(String isbn, String userPK) {
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+
+        if (!userRepository.existsById(userPK)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        return bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)
+            .map(bookLike -> {
+                bookLikeRepository.delete(bookLike);
+                return BookLikeResponse.of(isbn, false);
+            })
+            .orElseGet(() -> {
+                bookLikeRepository.save(BookLike.create(bookInfo, userPK));
+                return BookLikeResponse.of(isbn, true);
+            });
     }
 
     public CursorPageResponse<GalleryResponseDto> getGallery(String cursor, Integer size) {

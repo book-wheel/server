@@ -14,18 +14,22 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
+@Table(
+    name = "book_like",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"book_info_id", "user_pk"})
+)
 public class BookLike {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "book_like_id")
     private Long id;
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_info_id", nullable = false)
     private BookInfo bookInfo;
 
-    @Column(nullable = false)
+    @Column(name = "user_pk", nullable = false, length = 50)
     private String userPK;
 
     @CreatedDate
@@ -36,5 +40,12 @@ public class BookLike {
     public BookLike(BookInfo bookInfo, String userPK) {
         this.bookInfo = bookInfo;
         this.userPK = userPK;
+    }
+
+    public static BookLike create(BookInfo bookInfo, String userPK) {
+        return BookLike.builder()
+            .bookInfo(bookInfo)
+            .userPK(userPK)
+            .build();
     }
 }

@@ -3,6 +3,7 @@ package com.bookwheel.server.community.controller;
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.community.dto.BookDetailResponse;
+import com.bookwheel.server.community.dto.BookLikeResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
@@ -32,44 +33,48 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 @RestController
 @RequestMapping("/api/v1/books")
 @RequiredArgsConstructor
-@Tag(name = "Book Community", description = "Book search, reviews, likes, and gallery APIs")
+@Tag(name = "도서 및 커뮤니티 API", description = "도서 검색, 도서 상세 조회, 관심 도서, 교환독서 갤러리, 리뷰 API")
 public class BookController {
 
     private final BookService bookService;
 
-    @Operation(summary = "Search books", description = "Searches books using the Kakao book API.")
+    @Operation(summary = "도서 검색(목록 조회)", description = "카카오 API를 사용해 도서 목록을 검색합니다.")
     @GetMapping("/search")
     public ApiResponse<BookSearchListResponse> searchBooks(@ModelAttribute BookSearchRequest request) {
         BookSearchListResponse response = bookService.searchBooks(request);
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "Gallery list", description = "Returns gallery posts with thumbnail images using cursor pagination.")
+    @Operation(summary = "교환독서 갤러리 목록 조회", description = "게시물에 업로드된 대표 이미지를 최신순 커서 페이징으로 조회합니다.")
     @GetMapping("/gallery")
     public ApiResponse<CursorPageResponse<GalleryResponseDto>> getGallery(
-        @Parameter(description = "Next page cursor")
+        @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "Page size", example = "18")
+        @Parameter(description = "한 번에 조회할 갤러리 개수", example = "18")
         @RequestParam(required = false, defaultValue = "18") Integer size
     ) {
         CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(cursor, size);
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "Get book detail", description = "Returns book detail by ISBN.")
+    @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서 상세 정보를 조회합니다.")
     @GetMapping("/{isbn}")
     public ApiResponse<BookDetailResponse> getBookDetail(@PathVariable("isbn") String isbn) {
         BookDetailResponse response = bookService.getBookDetail(isbn);
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "Toggle book like")
+    @Operation(summary ="관심 도서 찜/취소")
     @PostMapping("/{isbn}/likes")
-    public ApiResponse<String> addBookLike(@PathVariable("isbn") String isbn) {
-        return ApiResponse.success(isbn + " interest book like API connected");
+    public ApiResponse<BookLikeResponse> addBookLike(
+        @PathVariable("isbn") String isbn,
+        @AuthenticationPrincipal Object principal
+    ) {
+        BookLikeResponse response = bookService.toggleBookLike(isbn, getUserPK(principal));
+        return ApiResponse.success(response);
     }
 
-    @Operation(summary = "Create review", description = "Creates a recommendation review for a book.")
+    @Operation(summary = "리뷰 작성", description = "특정 책에 추천/비추천 여부와 코멘트를 작성합니다.")
     @PostMapping("/{isbn}/reviews")
     public ApiResponse<String> addBookReview(
         @PathVariable("isbn") String isbn,
@@ -77,10 +82,10 @@ public class BookController {
         @AuthenticationPrincipal Object principal
     ) {
         bookService.createReview(request, getUserPK(principal));
-        return ApiResponse.success("Review has been created.");
+        return ApiResponse.success("리뷰 작성이 완료되었습니다.");
     }
 
-    @Operation(summary = "Review list", description = "Returns reviews for a book.")
+    @Operation(summary = "리뷰 목록 조회", description = "특정 책에 달린 모든 코멘트와 하트 개수, 내 공감 여부를 최신순으로 가져옵니다.")
     @GetMapping("/{isbn}/reviews")
     public ApiResponse<List<ReviewDetailResponse>> getReviewList(
         @PathVariable("isbn") String isbn,
@@ -90,20 +95,20 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "Review stats", description = "Returns recommendation stats for a book.")
+    @Operation(summary = "리뷰 추천/비추천 통계 조회", description = "특정 책의 전체 리뷰 중 추천/비추천 비율을 조회합니다.")
     @GetMapping("/{isbn}/reviews/stats")
     public ApiResponse<ReviewStatsResponse> getReviewStats(@PathVariable("isbn") String isbn) {
         ReviewStatsResponse response = bookService.getReviewStats(isbn);
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "Toggle review like")
+    @Operation(summary = "리뷰 추천/비추천 공감 누르기/취소")
     @PostMapping("/reviews/{reviewId}/likes")
     public ApiResponse<String> toggleReviewLike(
         @PathVariable("reviewId") Long reviewId,
         @AuthenticationPrincipal Object principal
     ) {
         bookService.toggleReviewLike(reviewId, getUserPK(principal));
-        return ApiResponse.success("Review like status has been changed.");
+        return ApiResponse.success("공감 상태가 변경되었습니다.");
     }
 }
