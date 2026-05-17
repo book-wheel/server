@@ -7,6 +7,7 @@ import com.bookwheel.server.community.dto.BookLikeResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
+import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.dto.ReviewCreateRequest;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
@@ -54,6 +55,23 @@ public class BookController {
         @RequestParam(required = false, defaultValue = "18") Integer size
     ) {
         CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(cursor, size);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "관심 도서 목록 조회", description = "현재 로그인한 사용자가 관심 등록한 도서를 최근 등록순 커서 페이징으로 조회합니다.")
+    @GetMapping("/likes")
+    public ApiResponse<CursorPageResponse<InterestBookResponseDto>> getInterestBooks(
+        @Parameter(description = "다음 페이지 조회용 커서")
+        @RequestParam(required = false) String cursor,
+        @Parameter(description = "한 번에 조회할 관심 도서 개수", example = "30")
+        @RequestParam(required = false, defaultValue = "30") Integer size,
+        @AuthenticationPrincipal Object principal
+    ) {
+        CursorPageResponse<InterestBookResponseDto> response = bookService.getInterestBooks(
+            cursor,
+            size,
+            getUserPK(principal)
+        );
         return ApiResponse.success(response);
     }
 

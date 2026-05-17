@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.service;
 
 import com.bookwheel.server.common.cursor.GalleryCursor;
+import com.bookwheel.server.common.cursor.InterestCursor;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
@@ -21,6 +22,7 @@ import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
@@ -40,6 +42,7 @@ public class BookService {
     private final AladinService aladinService;
 
     private static final int DEFAULT_GALLERY_SIZE = 18;
+    private static final int DEFAULT_INTEREST_SIZE = 30;
 
 
     @Transactional
@@ -158,6 +161,25 @@ public class BookService {
             });
     }
 
+    public CursorPageResponse<InterestBookResponseDto> getInterestBooks(String cursor, Integer size, String userPK) {
+        if (!userRepository.existsById(userPK)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        int pageSize = resolveInterestPageSize(size);
+        InterestCursor interestCursor = cursorUtils.decode(cursor, InterestCursor.class);
+        validateInterestCursor(interestCursor);
+
+        List<InterestBookResponseDto> books = findInterestBooks(userPK, interestCursor, pageSize + 1);
+        boolean hasNext = books.size() > pageSize;
+        List<InterestBookResponseDto> content = hasNext ? books.subList(0, pageSize) : books;
+
+        String nextCursor = hasNext ? createNextInterestCursor(content) : null;
+        long totalElements = bookLikeRepository.countByUserPK(userPK);
+
+        return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
+    }
+
     public CursorPageResponse<GalleryResponseDto> getGallery(String cursor, Integer size) {
         int pageSize = resolveGalleryPageSize(size);
         GalleryCursor galleryCursor = cursorUtils.decode(cursor, GalleryCursor.class);
@@ -189,6 +211,18 @@ public class BookService {
         return size;
     }
 
+    private int resolveInterestPageSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_INTEREST_SIZE;
+        }
+
+        if (size <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        return size;
+    }
+
     private void validateGalleryCursor(GalleryCursor cursor) {
         if (cursor == null) {
             return;
@@ -199,8 +233,38 @@ public class BookService {
         }
     }
 
+    private void validateInterestCursor(InterestCursor cursor) {
+        if (cursor == null) {
+            return;
+        }
+
+        if (cursor.interestedAt() == null || cursor.bookId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_CURSOR);
+        }
+    }
+
     private String createNextGalleryCursor(List<Post> posts) {
         Post lastPost = posts.get(posts.size() - 1);
         return cursorUtils.encode(new GalleryCursor(lastPost.getCreatedAt(), lastPost.getPostId()));
+    }
+
+    private List<InterestBookResponseDto> findInterestBooks(String userPK, InterestCursor cursor, int limit) {
+        PageRequest pageRequest = PageRequest.of(0, limit);
+
+        if (cursor == null) {
+            return bookLikeRepository.findInterestBooksFirstPage(userPK, pageRequest);
+        }
+
+        return bookLikeRepository.findInterestBooksAfterCursor(
+            userPK,
+            cursor.interestedAt(),
+            cursor.bookId(),
+            pageRequest
+        );
+    }
+
+    private String createNextInterestCursor(List<InterestBookResponseDto> books) {
+        InterestBookResponseDto lastBook = books.get(books.size() - 1);
+        return cursorUtils.encode(new InterestCursor(lastBook.interestedAt(), lastBook.bookId()));
     }
 }
