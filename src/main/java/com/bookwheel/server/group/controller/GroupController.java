@@ -64,6 +64,15 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "내 모임 조회", description = "현재 로그인한 사용자가 ACTIVE 상태로 가입한 모임 목록을 최신 신청일 순으로 반환합니다.")
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<GroupSearchResponse>>> getMyGroups(
+            @AuthenticationPrincipal Object principal
+    ) {
+        List<GroupSearchResponse> response = groupService.getMyGroups(getUserPK(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @Operation(summary = "그룹 상세 조회", description = "특정 그룹의 상세 정보를 조회합니다.")
     @GetMapping("/{groupId}")
     public ResponseEntity<ApiResponse<GroupDetailResponse>> getGroup(
