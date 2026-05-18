@@ -38,4 +38,7 @@ out/
 
 **/application-dev.properties
 
+.DS_Store
+
 .omc/
+.claude/

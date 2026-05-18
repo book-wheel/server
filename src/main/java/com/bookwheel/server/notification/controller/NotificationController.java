@@ -19,7 +19,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequiredArgsConstructor
@@ -37,13 +37,13 @@ public class NotificationController {
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal Object principal
     ) {
-        return ApiResponse.success(notificationService.list(getUserId(principal), pageable));
+        return ApiResponse.success(notificationService.list(getUserPK(principal), pageable));
     }
 
     @Operation(summary = "안읽음 알림 개수")
     @GetMapping("/unread-count")
     public ApiResponse<UnreadCountResponse> unreadCount(@AuthenticationPrincipal Object principal) {
-        return ApiResponse.success(notificationService.unreadCount(getUserId(principal)));
+        return ApiResponse.success(notificationService.unreadCount(getUserPK(principal)));
     }
 
     @Operation(summary = "알림 읽음 처리")
@@ -52,20 +52,20 @@ public class NotificationController {
             @PathVariable Long notificationId,
             @AuthenticationPrincipal Object principal
     ) {
-        notificationService.markRead(getUserId(principal), notificationId);
+        notificationService.markRead(getUserPK(principal), notificationId);
         return ApiResponse.success(null);
     }
 
     @Operation(summary = "모든 알림 읽음 처리")
     @PatchMapping("/read-all")
     public ApiResponse<Integer> markAllRead(@AuthenticationPrincipal Object principal) {
-        return ApiResponse.success(notificationService.markAllRead(getUserId(principal)));
+        return ApiResponse.success(notificationService.markAllRead(getUserPK(principal)));
     }
 
     @Operation(summary = "내 알림 설정 조회")
     @GetMapping("/preferences")
     public ApiResponse<NotificationPreferenceResponse> getPreferences(@AuthenticationPrincipal Object principal) {
-        return ApiResponse.success(preferenceService.get(getUserId(principal)));
+        return ApiResponse.success(preferenceService.get(getUserPK(principal)));
     }
 
     @Operation(summary = "내 알림 설정 변경 (카테고리 on/off, FCM 토큰 등록)")
@@ -75,8 +75,8 @@ public class NotificationController {
             @AuthenticationPrincipal Object principal
     ) {
         if (request == null) {
-            return ApiResponse.success(preferenceService.get(getUserId(principal)));
+            return ApiResponse.success(preferenceService.get(getUserPK(principal)));
         }
-        return ApiResponse.success(preferenceService.update(getUserId(principal), request));
+        return ApiResponse.success(preferenceService.update(getUserPK(principal), request));
     }
 }

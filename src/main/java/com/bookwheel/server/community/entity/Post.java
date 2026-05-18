@@ -4,7 +4,10 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,6 +16,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "post")
 public class Post {
     @Id
@@ -36,8 +40,16 @@ public class Post {
     private List<PostImage> images = new ArrayList<>();
 
     @Builder.Default
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PostReport> reports = new ArrayList<>();
+
+    @Builder.Default
     @Column(name = "like_count", nullable = false)
     private int likeCount = 0;
+
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 
     public void addImage(PostImage image) {
         images.add(image);

@@ -1,13 +1,8 @@
 package com.bookwheel.server.community.service;
 
-import com.bookwheel.server.book.entity.Book;
-import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.community.dto.ReviewCreateRequest;
-import com.bookwheel.server.community.dto.ReviewCreateResponse;
-import com.bookwheel.server.community.dto.ReviewDetailResponse;
-import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.ReviewLike;
@@ -23,10 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+
 @Transactional(readOnly = true)
 public class BookService {
    private final BookInfoRepository bookInfoRepository;
@@ -34,20 +29,23 @@ public class BookService {
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final KaKaoService kaKaoService;
+    private final AladinService aladinService;
 
 
     @Transactional
-    public ReviewCreateResponse createReview(String bookId, ReviewCreateRequest request, String userId) {
+    public ReviewCreateResponse createReview(ReviewCreateRequest request, String userPK) {
+        String isbn = request.isbn();
 
-        BookInfo bookInfo = bookInfoRepository.findById(bookId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
-        if (bookReviewRepository.existsByBookInfoAndReviewer_UserId(bookInfo, userId)) {
+        if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userPK)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
         }
 
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
@@ -59,11 +57,11 @@ public class BookService {
     }
 
     @Transactional
-    public void toggleReviewLike(Long reviewId, String userId) {
+    public void toggleReviewLike(Long reviewId, String userPK) {
         BookReview review = bookReviewRepository.findById(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         reviewLikeRepository.findByReviewAndUser(review, user)
@@ -77,12 +75,12 @@ public class BookService {
                 () -> {
                     reviewLikeRepository.save(ReviewLike.create(review, user));
                     review.increaseLikeCount();
-                    String reviewerUserId = review.getReviewer().getUserId();
-                    if (!reviewerUserId.equals(userId)) {
+                    String reviewerUserPK = review.getReviewer().getId();
+                    if (!reviewerUserPK.equals(userPK)) {
                         eventPublisher.publishEvent(new ReviewLikedEvent(
                                 review.getReviewId(),
-                                reviewerUserId,
-                                userId,
+                                reviewerUserPK,
+                                userPK,
                                 user.getNickname()
                         ));
                     }
@@ -90,9 +88,13 @@ public class BookService {
             );
     }
 
-    public ReviewStatsResponse getReviewStats(String bookId) {
-        BookInfo bookInfo = bookInfoRepository.findById(bookId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    public ReviewStatsResponse getReviewStats(String isbn) {
+
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+
+        if (bookInfo == null) {
+            return new ReviewStatsResponse(0, 0);
+        }
 
         long recommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, true);
         long notRecommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, false);
@@ -108,11 +110,10 @@ public class BookService {
         return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio);
     }
 
-    public List<ReviewDetailResponse> getReviewList(String bookId, String userId) {
-        BookInfo bookInfo = bookInfoRepository.findById(bookId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    public List<ReviewDetailResponse> getReviewList(String isbn, String userPK) {
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
-        User user = userRepository.findByUserId(userId)
+        User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 
@@ -124,8 +125,17 @@ public class BookService {
             boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
 
             return ReviewDetailResponse.of(review, isLikedByMe);
-        }).collect(Collectors.toList());
+        }).toList();
     }
 
+
+    public BookSearchListResponse searchBooks(BookSearchRequest request) {
+        return kaKaoService.searchBooks(request);
+    }
+
+
+    public BookDetailResponse getBookDetail(String isbn) {
+        return aladinService.getBookDetailByIsbn(isbn);
+    }
 
 }

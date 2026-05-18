@@ -94,13 +94,13 @@ public class S3Service {
             String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + normalizedExt;
 
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(objectKey)
-                .build();
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .build();
 
             PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(5))
-                .putObjectRequest(putObjectRequest).build();
+                    .signatureDuration(Duration.ofMinutes(5))
+                    .putObjectRequest(putObjectRequest).build();
 
             String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
 

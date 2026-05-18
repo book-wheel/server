@@ -1,6 +1,6 @@
 package com.bookwheel.server.group.event;
 
-import com.bookwheel.server.group.dto.MemberRequestStatus;
+import com.bookwheel.server.group.dto.setting.MemberRequestStatus;
 
 public record GroupJoinDecidedEvent(
         String groupId,

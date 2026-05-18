@@ -12,11 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import lombok.extern.slf4j.Slf4j;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
-
-@Slf4j
 @Tag(name = "Users", description = "회원 정보 관리 API")
 @RestController
 @RequestMapping("/api/v1/users")
@@ -31,24 +28,24 @@ public class UserController {
             @AuthenticationPrincipal Object principal,
             @Valid @RequestBody ProfileSetupRequest request) {
 
-        String userId = getUserId(principal);
-        LoginResponse response = userService.setupProfile(userId, request);
+        String userPK = getUserPK(principal);
+        LoginResponse response = userService.setupProfile(userPK, request);
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "내 정보 조회", description = "로그인한 사용자의 정보를 조회합니다. (소셜 유저도 가능!)")
     @GetMapping("/me")
     public ApiResponse<UserResponse> getMyInfo(@AuthenticationPrincipal Object principal) {
-        String userId = getUserId(principal);
-        UserResponse response = userService.getMyInfo(userId);
+        String userPK = getUserPK(principal);
+        UserResponse response = userService.getMyInfo(userPK);
         return ApiResponse.success(response);
     }
 
     @Operation(summary = "로그아웃", description = "사용자를 로그아웃 처리하고 Redis의 Refresh Token을 삭제합니다.")
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal Object principal) {
-        String userId = getUserId(principal);
-        userService.logout(userId);
+        String userPK = getUserPK(principal);
+        userService.logout(userPK);
         return ApiResponse.success(null);
     }
 
@@ -57,8 +54,8 @@ public class UserController {
     public ApiResponse<Void> withdraw(
             @AuthenticationPrincipal Object principal,
             @Valid @RequestBody(required = false) UserWithdrawRequest request) {
-        String userId = getUserId(principal);
-        userService.withdraw(userId, request);
+        String userPK = getUserPK(principal);
+        userService.withdraw(userPK, request);
         return ApiResponse.success(null);
     }
 
@@ -71,26 +68,14 @@ public class UserController {
         return ApiResponse.success(true);
     }
 
-     // 소셜 유저 검증
-    private void validateNonSocialUser(String userId) {
-        if (userId.startsWith("GOOGLE_") || userId.startsWith("KAKAO_")) {
-            log.warn("=> [경고] 소셜 유저가 금지된 기능(비밀번호 변경 등)에 접근함. ID: {}", userId);
-            throw new BusinessException(ErrorCode.SOCIAL_ACCOUNT_CANNOT_USE_RECOVERY);
-        }
-    }
-
     @Operation(summary = "비밀번호 직접 변경", description = "로그인한 사용자가 현재 비밀번호를 확인한 후 새로운 비밀번호로 변경합니다.")
     @PatchMapping("/change-password")
     public ApiResponse<Void> changePassword(
             @AuthenticationPrincipal Object principal,
             @Valid @RequestBody PasswordChangeRequest request) {
 
-        String userId = getUserId(principal);
-
-        // 소셜 유저 검증
-        validateNonSocialUser(userId);
-
-        userService.changePassword(userId, request);
+        String userPK = getUserPK(principal);
+        userService.changePassword(userPK, request);
         return ApiResponse.success(null);
     }
 }

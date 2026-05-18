@@ -1,6 +1,6 @@
 package com.bookwheel.server.common.oauth2;
 
-import com.bookwheel.server.user.entity.Role;
+import com.bookwheel.server.common.auth.AuthRole;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
@@ -11,15 +11,15 @@ import java.util.Map;
 @Getter
 public class CustomOAuth2User extends DefaultOAuth2User {
 
-    private String userId;
-    private Role role;
+    private String userPK;
+    private AuthRole role;
     private String nickname;
 
     public CustomOAuth2User(Collection<? extends GrantedAuthority> authorities,
                             Map<String, Object> attributes, String nameAttributeKey,
-                            String userId, Role role, String nickname) {
+                            String userPK, AuthRole role, String nickname) {
         super(authorities, attributes, nameAttributeKey);
-        this.userId = userId;
+        this.userPK = userPK;
         this.role = role;
         this.nickname = nickname;
         }

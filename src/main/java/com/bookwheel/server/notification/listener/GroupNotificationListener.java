@@ -1,6 +1,6 @@
 package com.bookwheel.server.notification.listener;
 
-import com.bookwheel.server.group.dto.MemberRequestStatus;
+import com.bookwheel.server.group.dto.setting.MemberRequestStatus;
 import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
 import com.bookwheel.server.group.event.GroupJoinRequestedEvent;
 import com.bookwheel.server.member.enums.MemberRole;
@@ -34,7 +34,7 @@ public class GroupNotificationListener {
         memberRepository.findFirstByGroup_GroupIdAndMemberRoleAndMemberStatus(
                 event.groupId(), MemberRole.LEADER, MemberStatus.ACTIVE
         ).ifPresent(leader -> eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(leader.getUser().getUserId())
+                .recipientUserId(leader.getUser().getId())
                 .type(NotificationType.GROUP_JOIN_REQUESTED)
                 .title("새 가입 요청")
                 .body(nick + "님이 '" + group + "' 그룹에 가입을 신청했어요.")

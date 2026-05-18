@@ -2,9 +2,13 @@ package com.bookwheel.server.group.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.group.dto.*;
+import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.search.*;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.service.GroupService;
+import com.bookwheel.server.member.service.MemberService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
 @RequiredArgsConstructor
@@ -29,6 +33,7 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserId;
 @RequestMapping({"/api/v1/groups"})
 public class GroupController {
     private final GroupService groupService;
+    private final MemberService memberService;
 
     @Operation(summary = "그룹 생성", description = "새로운 독서 그룹을 생성합니다.")
     @PostMapping("/making")
@@ -36,7 +41,7 @@ public class GroupController {
             @RequestBody @Valid GroupCreateRequest groupCreateRequest,
             @AuthenticationPrincipal Object principal
     ) {
-        GroupCreateResponse response = groupService.createGroup(groupCreateRequest, getUserId(principal));
+        GroupCreateResponse response = groupService.createGroup(groupCreateRequest, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -65,7 +70,7 @@ public class GroupController {
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        GroupDetailResponse response = groupService.getGroup(groupId, getUserId(principal));
+        GroupDetailResponse response = groupService.getGroup(groupId, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -76,7 +81,7 @@ public class GroupController {
             @RequestBody @Valid GroupJoinRequest groupJoinRequest,
             @AuthenticationPrincipal Object principal
     ) {
-        GroupJoinResponse response = groupService.joinGroup(groupId, groupJoinRequest, getUserId(principal));
+        GroupJoinResponse response = groupService.joinGroup(groupId, groupJoinRequest, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -86,7 +91,7 @@ public class GroupController {
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        List<MemberRequestResponse> response = groupService.getMemberRequests(groupId, getUserId(principal));
+        List<MemberRequestResponse> response = groupService.getMemberRequests(groupId, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -101,9 +106,16 @@ public class GroupController {
         MemberRequestStatusUpdateResponse response = groupService.updateMemberRequestStatus(
                 groupId,
                 memberId,
-                getUserId(principal),
+                getUserPK(principal),
                 request.status()
         );
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "그룹 멤버 리스트", description = "특정 그룹에 속한 모든 멤버의 목록과 권한 정보를 조회합니다.")
+    @GetMapping("/{groupId}/members")
+    public ApiResponse<GroupMemberListResponse> getGroupMembers(@PathVariable String groupId) {
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+        return ApiResponse.success(response);
     }
 }

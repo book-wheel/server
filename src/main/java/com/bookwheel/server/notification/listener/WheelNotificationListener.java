@@ -39,11 +39,11 @@ public class WheelNotificationListener {
 
         for (Member member : members) {
             // 본인 알림 제외
-            if (member.getUser().getUserId().equals(event.completedUserId())) {
+            if (member.getUser().getId().equals(event.completedUserId())) {
                 continue;
             }
             eventPublisher.publishEvent(NotificationEvent.builder()
-                    .recipientUserId(member.getUser().getUserId())
+                    .recipientUserId(member.getUser().getId())
                     .type(NotificationType.WHEEL_COMPLETED_BY_PEER)
                     .title("완독 인증")
                     .body(body)

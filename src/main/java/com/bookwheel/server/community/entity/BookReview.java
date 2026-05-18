@@ -43,13 +43,14 @@ public class BookReview {
     @Column(name = "is_hidden", nullable = false)
     private Boolean isHidden;
 
-    @CreatedDate
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
 
     @Column(name = "like_count", nullable = false)
     @Builder.Default
     private int likeCount = 0;
+
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 
     public void increaseLikeCount() {
         this.likeCount++;

@@ -3,6 +3,9 @@ package com.bookwheel.server.group.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
+import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.search.*;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.*;
 import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
 import com.bookwheel.server.group.event.GroupJoinRequestedEvent;
@@ -33,12 +36,13 @@ public class GroupService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final GroupMemberPermissionValidator memberPermissionValidator;
 
     @Transactional
-    public GroupCreateResponse createGroup(GroupCreateRequest request, String userId) {
+    public GroupCreateResponse createGroup(GroupCreateRequest request, String userPK) {
         validateGroupCreateRequest(request);
 
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userPK);
         Group group = request.toEntity();
         if (!request.groupPublic() && StringUtils.hasText(group.getGroupPassword())) {
             group.updateGroupPassword(passwordEncoder.encode(group.getGroupPassword()));
@@ -58,13 +62,13 @@ public class GroupService {
     }
 
     @Transactional
-    public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userId) {
+    public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userPK) {
         Group group = findGroupById(groupId);
-        User user = findActiveUserByUserId(userId);
+        User user = findActiveUserById(userPK);
 
         validateJoinRequest(group, request);
 
-        if (memberRepository.existsByGroup_GroupIdAndUser_UserId(groupId, userId)) {
+        if (memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userPK)) {
             throw new BusinessException(ErrorCode.DUPLICATE_GROUP_MEMBER);
         }
 
@@ -82,7 +86,7 @@ public class GroupService {
         eventPublisher.publishEvent(new GroupJoinRequestedEvent(
                 group.getGroupId(),
                 group.getGroupName(),
-                user.getUserId(),
+                user.getId(),
                 user.getNickname()
         ));
 
@@ -94,15 +98,15 @@ public class GroupService {
         return groupPage.map(GroupSearchResponse::from);
     }
 
-    public GroupDetailResponse getGroup(String groupId, String userId) {
+    public GroupDetailResponse getGroup(String groupId, String userPK) {
         Group group = findGroupById(groupId);
-        GroupDetailButtonType bottomButtonType = resolveBottomButtonType(groupId, userId);
+        GroupDetailButtonType bottomButtonType = resolveBottomButtonType(groupId, userPK);
         return GroupDetailResponse.from(group, bottomButtonType);
     }
 
-    public List<MemberRequestResponse> getMemberRequests(String groupId, String leaderUserId) {
+    public List<MemberRequestResponse> getMemberRequests(String groupId, String leaderUserPk) {
         findGroupById(groupId);
-        validateLeaderPermission(groupId, leaderUserId);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPk);
 
         return memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.PENDING)
                 .stream()
@@ -114,13 +118,13 @@ public class GroupService {
     public MemberRequestStatusUpdateResponse updateMemberRequestStatus(
             String groupId,
             String memberId,
-            String leaderUserId,
+            String leaderUserPk,
             MemberRequestStatus status
     ) {
         Group group = (status == MemberRequestStatus.APPROVED)
                 ? findGroupByIdForUpdate(groupId)
                 : findGroupById(groupId);
-        validateLeaderPermission(groupId, leaderUserId);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPk);
 
         Member targetMember = memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
@@ -133,15 +137,15 @@ public class GroupService {
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
-            targetMember.setMemberStatus(MemberStatus.ACTIVE);
+            targetMember.approve();
         } else {
-            targetMember.setMemberStatus(MemberStatus.REJECTED);
+            targetMember.reject();
         }
 
         eventPublisher.publishEvent(new GroupJoinDecidedEvent(
                 group.getGroupId(),
                 group.getGroupName(),
-                targetMember.getUser().getUserId(),
+                targetMember.getUser().getId(),
                 status
         ));
 
@@ -175,19 +179,8 @@ public class GroupService {
         }
     }
 
-    private void validateLeaderPermission(String groupId, String leaderUserId) {
-        Member leaderMember = memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, leaderUserId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
-
-        boolean isLeader = leaderMember.getMemberRole() == MemberRole.LEADER;
-        boolean isActive = leaderMember.getMemberStatus() == MemberStatus.ACTIVE;
-        if (!isLeader || !isActive) {
-            throw new BusinessException(ErrorCode.GROUP_LEADER_ONLY);
-        }
-    }
-
-    private GroupDetailButtonType resolveBottomButtonType(String groupId, String userId) {
-        return memberRepository.findByGroup_GroupIdAndUser_UserId(groupId, userId)
+    private GroupDetailButtonType resolveBottomButtonType(String groupId, String userPK) {
+        return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .map(member -> {
                     if (member.getMemberRole() == MemberRole.LEADER
                             && member.getMemberStatus() == MemberStatus.ACTIVE) {
@@ -214,8 +207,8 @@ public class GroupService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    private User findActiveUserByUserId(String userId) {
-        User user = userRepository.findByUserId(userId)
+    private User findActiveUserById(String userPK) {
+        User user = userRepository.findById(userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
