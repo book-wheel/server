@@ -36,14 +36,6 @@ public class NotificationPreference {
     private Boolean communityEnabled = true;
 
     @Builder.Default
-    @Column(name = "report_enabled", nullable = false)
-    private Boolean reportEnabled = true;
-
-    @Builder.Default
-    @Column(name = "account_enabled", nullable = false)
-    private Boolean accountEnabled = true;
-
-    @Builder.Default
     @Column(name = "push_enabled", nullable = false)
     private Boolean pushEnabled = true;
 
@@ -81,13 +73,11 @@ public class NotificationPreference {
             Boolean groupEnabled,
             Boolean roundEnabled,
             Boolean communityEnabled,
-            Boolean reportEnabled,
             Boolean pushEnabled
     ) {
         if (groupEnabled != null) this.groupEnabled = groupEnabled;
         if (roundEnabled != null) this.roundEnabled = roundEnabled;
         if (communityEnabled != null) this.communityEnabled = communityEnabled;
-        if (reportEnabled != null) this.reportEnabled = reportEnabled;
         if (pushEnabled != null) this.pushEnabled = pushEnabled;
     }
 

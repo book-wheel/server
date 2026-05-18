@@ -45,7 +45,6 @@ public class NotificationPreferenceService {
                 request.groupEnabled(),
                 request.roundEnabled(),
                 request.communityEnabled(),
-                request.reportEnabled(),
                 request.pushEnabled()
         );
         if (request.fcmToken() != null) {
