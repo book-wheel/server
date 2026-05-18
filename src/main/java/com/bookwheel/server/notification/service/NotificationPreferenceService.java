@@ -31,6 +31,7 @@ public class NotificationPreferenceService {
                 });
     }
 
+    @Transactional
     public NotificationPreferenceResponse get(String userId) {
         return NotificationPreferenceResponse.from(getOrInit(userId));
     }
