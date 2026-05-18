@@ -86,6 +86,13 @@ public class GroupService {
         return groupPage.map(GroupSearchResponse::from);
     }
 
+    public List<GroupSearchResponse> getMyGroups(String userPK) {
+        return memberRepository.findGroupsByUserIdAndMemberStatus(userPK, MemberStatus.ACTIVE)
+                .stream()
+                .map(GroupSearchResponse::from)
+                .toList();
+    }
+
     public GroupDetailResponse getGroup(String groupId, String userPK) {
         Group group = findGroupById(groupId);
         GroupDetailButtonType bottomButtonType = resolveBottomButtonType(groupId, userPK);

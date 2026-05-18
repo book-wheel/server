@@ -1,5 +1,6 @@
 package com.bookwheel.server.member.repository;
 
+import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import jakarta.persistence.LockModeType;
@@ -55,4 +56,17 @@ public interface MemberRepository extends JpaRepository<Member, String> {
 
     // IN 절을 사용하여 여러 유저가 그룹에 속해있는지 한 번에 확인
     long countByGroup_GroupIdAndUser_IdIn(String groupId, List<String> userPK);
+
+    // 내가 특정 상태(ACTIVE 등)로 가입되어 있는 그룹 목록 조회 — '내 모임 조회' 용도
+    @Query("""
+            select m.group
+            from Member m
+            where m.user.id = :userPK
+              and m.memberStatus = :status
+            order by m.requestDate desc
+            """)
+    List<Group> findGroupsByUserIdAndMemberStatus(
+            @Param("userPK") String userPK,
+            @Param("status") MemberStatus status
+    );
 }
