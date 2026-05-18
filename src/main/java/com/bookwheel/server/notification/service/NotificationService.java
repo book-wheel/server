@@ -60,8 +60,9 @@ public class NotificationService {
 
         Notification saved = notificationRepository.save(notification);
 
-        // FCM 푸시 - 푸시 끄지 않았고 토큰이 있을 때만
-        if (Boolean.TRUE.equals(preference.getPushEnabled()) && preference.getFcmToken() != null
+        // FCM 푸시 - 카테고리별 푸시 허용 여부 + FCM 토큰 보유 시 발송
+        // (REPORT/ACCOUNT 는 pushEnabled 설정 무시하고 강제 발송)
+        if (preference.allowsPush(category) && preference.getFcmToken() != null
                 && !preference.getFcmToken().isBlank()) {
             try {
                 fcmSender.send(preference.getFcmToken(), saved);

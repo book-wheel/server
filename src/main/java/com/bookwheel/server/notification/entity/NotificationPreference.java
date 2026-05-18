@@ -61,10 +61,20 @@ public class NotificationPreference {
             case GROUP -> Boolean.TRUE.equals(groupEnabled);
             case ROUND -> Boolean.TRUE.equals(roundEnabled);
             case COMMUNITY -> Boolean.TRUE.equals(communityEnabled);
-            case REPORT -> Boolean.TRUE.equals(reportEnabled);
-            // 계정 카테고리는 보안성 알림이라 사용자가 끄더라도 강제 발송
-            case ACCOUNT -> true;
+            // 제재/계정 카테고리는 본인 상태와 직결되는 보안성 알림이라 사용자가 끄더라도 강제 발송
+            case REPORT, ACCOUNT -> true;
         };
+    }
+
+    /**
+     * 푸시 발송 허용 여부. REPORT/ACCOUNT 는 pushEnabled 설정과 무관하게 강제 발송.
+     * 그 외 카테고리는 사용자가 푸시 전체 toggle 을 끄면 인앱만 표시되고 푸시는 안 감.
+     */
+    public boolean allowsPush(NotificationCategory category) {
+        if (category == NotificationCategory.REPORT || category == NotificationCategory.ACCOUNT) {
+            return true;
+        }
+        return Boolean.TRUE.equals(pushEnabled);
     }
 
     public void updateCategoryFlags(
