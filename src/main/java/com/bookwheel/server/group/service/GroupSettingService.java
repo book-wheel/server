@@ -143,9 +143,9 @@ public class GroupSettingService {
         if (currentRound != null) {
             WheelState myWheelState = wheelStateRepository
                     .findFirstByRoundIdAndMember_MemberId(currentRound.getRoundId(), member.getMemberId())
-                    .orElse(null);
+                    .orElseThrow(() -> new BusinessException(ErrorCode.READING_NOT_COMPLETED));
 
-            if (myWheelState != null && !Boolean.TRUE.equals(myWheelState.getIsCompleted())) {
+            if (!Boolean.TRUE.equals(myWheelState.getIsCompleted())) {
                 throw new BusinessException(ErrorCode.READING_NOT_COMPLETED);
             }
         }
