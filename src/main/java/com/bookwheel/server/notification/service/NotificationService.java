@@ -38,18 +38,18 @@ public class NotificationService {
      */
     @Transactional
     public Notification create(NotificationEvent event) {
-        if (event.recipientUserId() == null || event.recipientUserId().isBlank()) {
+        if (event.recipientUserPK() == null || event.recipientUserPK().isBlank()) {
             return null;
         }
 
         NotificationCategory category = event.type().getCategory();
-        NotificationPreference preference = preferenceService.getOrInit(event.recipientUserId());
+        NotificationPreference preference = preferenceService.getOrInit(event.recipientUserPK());
         if (!preference.allows(category)) {
             return null;
         }
 
         Notification notification = Notification.builder()
-                .recipientUserId(event.recipientUserId())
+                .recipientUserPK(event.recipientUserPK())
                 .type(event.type())
                 .category(category)
                 .title(event.title())
@@ -73,30 +73,30 @@ public class NotificationService {
         return saved;
     }
 
-    public Page<NotificationResponse> list(String userId, Pageable pageable) {
-        return notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(userId, pageable)
+    public Page<NotificationResponse> list(String userPK, Pageable pageable) {
+        return notificationRepository.findByRecipientUserPKOrderByCreatedAtDesc(userPK, pageable)
                 .map(NotificationResponse::from);
     }
 
-    public UnreadCountResponse unreadCount(String userId) {
+    public UnreadCountResponse unreadCount(String userPK) {
         return new UnreadCountResponse(
-                notificationRepository.countByRecipientUserIdAndIsReadFalse(userId)
+                notificationRepository.countByRecipientUserPKAndIsReadFalse(userPK)
         );
     }
 
     @Transactional
-    public void markRead(String userId, Long notificationId) {
+    public void markRead(String userPK, Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
-        if (!notification.getRecipientUserId().equals(userId)) {
+        if (!notification.getRecipientUserPK().equals(userPK)) {
             throw new BusinessException(ErrorCode.NOTIFICATION_FORBIDDEN);
         }
         notification.markRead();
     }
 
     @Transactional
-    public int markAllRead(String userId) {
-        return notificationRepository.markAllRead(userId);
+    public int markAllRead(String userPK) {
+        return notificationRepository.markAllRead(userPK);
     }
 
     private String serializePayload(Map<String, Object> payload) {

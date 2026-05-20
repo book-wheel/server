@@ -34,14 +34,14 @@ public class GroupNotificationListener {
         memberRepository.findFirstByGroup_GroupIdAndMemberRoleAndMemberStatus(
                 event.groupId(), MemberRole.LEADER, MemberStatus.ACTIVE
         ).ifPresent(leader -> eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(leader.getUser().getId())
+                .recipientUserPK(leader.getUser().getId())
                 .type(NotificationType.GROUP_JOIN_REQUESTED)
                 .title("새 가입 요청")
                 .body(nick + "님이 '" + group + "' 그룹에 가입을 신청했어요.")
                 .deepLink("/groups/" + event.groupId() + "/members/requests")
                 .payload(Map.of(
                         "groupId", event.groupId(),
-                        "applicantUserId", event.applicantUserId()
+                        "applicantUserPK", event.applicantUserPK()
                 ))
                 .build()));
     }
@@ -51,7 +51,7 @@ public class GroupNotificationListener {
         boolean approved = event.status() == MemberRequestStatus.APPROVED;
         String group = NotificationText.safe(event.groupName(), 30);
         eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(event.applicantUserId())
+                .recipientUserPK(event.applicantUserPK())
                 .type(approved ? NotificationType.GROUP_JOIN_APPROVED : NotificationType.GROUP_JOIN_REJECTED)
                 .title(approved ? "가입 승인" : "가입 거절")
                 .body(approved

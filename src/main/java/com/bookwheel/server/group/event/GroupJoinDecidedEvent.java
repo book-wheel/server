@@ -5,7 +5,7 @@ import com.bookwheel.server.group.dto.setting.MemberRequestStatus;
 public record GroupJoinDecidedEvent(
         String groupId,
         String groupName,
-        String applicantUserId,
+        String applicantUserPK,
         MemberRequestStatus status
 ) {
 }

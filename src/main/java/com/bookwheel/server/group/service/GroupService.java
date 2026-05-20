@@ -99,7 +99,7 @@ public class GroupService {
     }
 
     public List<GroupSearchResponse> getMyGroups(String userPK) {
-        return memberRepository.findGroupsByUserIdAndMemberStatus(userPK, MemberStatus.ACTIVE)
+        return memberRepository.findGroupsByUserPKAndMemberStatus(userPK, MemberStatus.ACTIVE)
                 .stream()
                 .map(GroupSearchResponse::from)
                 .toList();

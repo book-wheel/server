@@ -4,7 +4,7 @@ public record WheelCompletedEvent(
         String wheelStateId,
         String groupId,
         String groupName,
-        String completedUserId,
+        String completedUserPK,
         String completedNickname,
         String bookTitle
 ) {

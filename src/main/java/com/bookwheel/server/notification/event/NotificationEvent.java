@@ -11,7 +11,7 @@ import java.util.Map;
  */
 @Builder
 public record NotificationEvent(
-        String recipientUserId,
+        String recipientUserPK,
         NotificationType type,
         String title,
         String body,

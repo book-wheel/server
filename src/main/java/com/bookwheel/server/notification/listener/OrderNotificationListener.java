@@ -21,9 +21,9 @@ public class OrderNotificationListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReadOrderAssigned(ReadOrderAssignedEvent event) {
         String group = NotificationText.safe(event.groupName(), 30);
-        for (String userId : event.orderedUserIds()) {
+        for (String userPK : event.orderedUserPKs()) {
             eventPublisher.publishEvent(NotificationEvent.builder()
-                    .recipientUserId(userId)
+                    .recipientUserPK(userPK)
                     .type(NotificationType.READ_ORDER_ASSIGNED)
                     .title("독서 순서 확정")
                     .body("'" + group + "' 그룹의 독서 순서가 정해졌어요.")

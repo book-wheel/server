@@ -9,7 +9,7 @@ import lombok.*;
 @Builder
 @Table(
         name = "notification_preference",
-        uniqueConstraints = @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_id")
+        uniqueConstraints = @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_pk")
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
@@ -20,8 +20,8 @@ public class NotificationPreference {
     @Column(name = "preference_id")
     private Long id;
 
-    @Column(name = "user_id", length = 50, nullable = false)
-    private String userId;
+    @Column(name = "user_pk", length = 50, nullable = false)
+    private String userPK;
 
     @Builder.Default
     @Column(name = "group_enabled", nullable = false)
@@ -42,9 +42,9 @@ public class NotificationPreference {
     @Column(name = "fcm_token", length = 255)
     private String fcmToken;
 
-    public static NotificationPreference defaultsFor(String userId) {
+    public static NotificationPreference defaultsFor(String userPK) {
         return NotificationPreference.builder()
-                .userId(userId)
+                .userPK(userPK)
                 .build();
     }
 

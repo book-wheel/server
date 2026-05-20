@@ -41,7 +41,7 @@ public class AdminNotificationListener {
 
         String safeReason = NotificationText.safe(event.reasonMessage(), 200);
         eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(event.userId())
+                .recipientUserPK(event.userPK())
                 .type(NotificationType.USER_BANNED)
                 .title("계정 제재 안내")
                 .body("사유: " + safeReason + " · 제재 기간: " + dateText)

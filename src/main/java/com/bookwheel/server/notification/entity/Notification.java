@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "notification",
         indexes = {
-                @Index(name = "idx_notification_recipient", columnList = "recipient_user_id, created_at"),
-                @Index(name = "idx_notification_recipient_unread", columnList = "recipient_user_id, is_read")
+                @Index(name = "idx_notification_recipient", columnList = "recipient_user_pk, created_at"),
+                @Index(name = "idx_notification_recipient_unread", columnList = "recipient_user_pk, is_read")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -27,8 +27,8 @@ public class Notification {
     @Column(name = "notification_id")
     private Long id;
 
-    @Column(name = "recipient_user_id", length = 50, nullable = false)
-    private String recipientUserId;
+    @Column(name = "recipient_user_pk", length = 50, nullable = false)
+    private String recipientUserPK;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", length = 50, nullable = false)

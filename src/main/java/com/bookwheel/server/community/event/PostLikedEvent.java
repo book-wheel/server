@@ -2,8 +2,8 @@ package com.bookwheel.server.community.event;
 
 public record PostLikedEvent(
         Long postId,
-        String postOwnerUserId,
-        String likerUserId,
+        String postOwnerUserPK,
+        String likerUserPK,
         String likerNickname
 ) {
 }

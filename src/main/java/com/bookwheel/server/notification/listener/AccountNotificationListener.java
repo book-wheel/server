@@ -20,7 +20,7 @@ public class AccountNotificationListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserDeactivated(UserDeactivatedEvent event) {
         eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(event.userId())
+                .recipientUserPK(event.userPK())
                 .type(NotificationType.ACCOUNT_DEACTIVATED)
                 .title("계정 탈퇴 처리")
                 .body("회원 탈퇴가 정상적으로 처리되었습니다. 일정 기간 내 동일 계정으로 복구가 가능해요.")

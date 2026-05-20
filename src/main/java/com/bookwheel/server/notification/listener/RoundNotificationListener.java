@@ -103,7 +103,7 @@ public class RoundNotificationListener {
         List<Member> members = memberRepository.findAllWithUserByGroupIdAndStatus(groupId, MemberStatus.ACTIVE);
         for (Member member : members) {
             eventPublisher.publishEvent(NotificationEvent.builder()
-                    .recipientUserId(member.getUser().getId())
+                    .recipientUserPK(member.getUser().getId())
                     .type(type)
                     .title(title)
                     .body(body)

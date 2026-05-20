@@ -75,6 +75,8 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     List<Member> findAllWithUserByGroupIdAndStatus(
             @Param("groupId") String groupId,
             @Param("memberStatus") MemberStatus memberStatus
+    );
+
     // 내가 특정 상태(ACTIVE 등)로 가입되어 있는 그룹 목록 조회 — '내 모임 조회' 용도
     @Query("""
             select m.group
@@ -83,7 +85,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
               and m.memberStatus = :status
             order by m.requestDate desc
             """)
-    List<Group> findGroupsByUserIdAndMemberStatus(
+    List<Group> findGroupsByUserPKAndMemberStatus(
             @Param("userPK") String userPK,
             @Param("status") MemberStatus status
     );

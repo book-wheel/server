@@ -27,7 +27,7 @@ public class NotificationDispatcher {
             notificationService.create(event);
         } catch (Exception e) {
             log.warn("알림 처리 실패: type={}, recipient={}, reason={}",
-                    event.type(), event.recipientUserId(), e.getMessage());
+                    event.type(), event.recipientUserPK(), e.getMessage());
         }
     }
 }

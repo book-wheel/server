@@ -20,26 +20,26 @@ public class NotificationPreferenceService {
      * 새 row 가 필요한 첫 사용자에 한해 안전하게 INSERT 한다. unique 제약 동시성은 catch+재조회로 보강.
      */
     @Transactional
-    public NotificationPreference getOrInit(String userId) {
-        return preferenceRepository.findByUserId(userId)
+    public NotificationPreference getOrInit(String userPK) {
+        return preferenceRepository.findByUserPK(userPK)
                 .orElseGet(() -> {
                     try {
-                        return preferenceRepository.save(NotificationPreference.defaultsFor(userId));
+                        return preferenceRepository.save(NotificationPreference.defaultsFor(userPK));
                     } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                        return preferenceRepository.findByUserId(userId).orElseThrow(() -> e);
+                        return preferenceRepository.findByUserPK(userPK).orElseThrow(() -> e);
                     }
                 });
     }
 
     @Transactional
-    public NotificationPreferenceResponse get(String userId) {
-        return NotificationPreferenceResponse.from(getOrInit(userId));
+    public NotificationPreferenceResponse get(String userPK) {
+        return NotificationPreferenceResponse.from(getOrInit(userPK));
     }
 
     @Transactional
-    public NotificationPreferenceResponse update(String userId, NotificationPreferenceUpdateRequest request) {
-        NotificationPreference preference = preferenceRepository.findByUserId(userId)
-                .orElseGet(() -> preferenceRepository.save(NotificationPreference.defaultsFor(userId)));
+    public NotificationPreferenceResponse update(String userPK, NotificationPreferenceUpdateRequest request) {
+        NotificationPreference preference = preferenceRepository.findByUserPK(userPK)
+                .orElseGet(() -> preferenceRepository.save(NotificationPreference.defaultsFor(userPK)));
 
         preference.updateCategoryFlags(
                 request.groupEnabled(),

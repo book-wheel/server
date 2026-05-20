@@ -25,12 +25,12 @@ public class CommunityNotificationListener {
     public void onPostLiked(PostLikedEvent event) {
         String nick = NotificationText.safe(event.likerNickname(), 30);
         eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(event.postOwnerUserId())
+                .recipientUserPK(event.postOwnerUserPK())
                 .type(NotificationType.POST_LIKED)
                 .title("게시물 좋아요")
                 .body(nick + "님이 회원님의 게시물에 좋아요를 눌렀어요.")
                 .deepLink("/posts/" + event.postId())
-                .payload(Map.of("postId", event.postId(), "likerUserId", event.likerUserId()))
+                .payload(Map.of("postId", event.postId(), "likerUserPK", event.likerUserPK()))
                 .build());
     }
 
@@ -40,12 +40,12 @@ public class CommunityNotificationListener {
         String preview = event.commentPreview() == null ? null : NotificationText.safe(event.commentPreview(), 80);
         Map<String, Object> payload = new HashMap<>();
         payload.put("postId", event.postId());
-        payload.put("commenterUserId", event.commenterUserId());
+        payload.put("commenterUserPK", event.commenterUserPK());
         if (preview != null && !preview.isEmpty()) {
             payload.put("commentPreview", preview);
         }
         eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(event.postOwnerUserId())
+                .recipientUserPK(event.postOwnerUserPK())
                 .type(NotificationType.POST_COMMENTED)
                 .title("게시물 댓글")
                 .body(nick + "님이 댓글을 남겼어요"
@@ -59,12 +59,12 @@ public class CommunityNotificationListener {
     public void onReviewLiked(ReviewLikedEvent event) {
         String nick = NotificationText.safe(event.likerNickname(), 30);
         eventPublisher.publishEvent(NotificationEvent.builder()
-                .recipientUserId(event.reviewerUserId())
+                .recipientUserPK(event.reviewerUserPK())
                 .type(NotificationType.REVIEW_LIKED)
                 .title("리뷰 공감")
                 .body(nick + "님이 회원님의 리뷰에 공감했어요.")
                 .deepLink("/reviews/" + event.reviewId())
-                .payload(Map.of("reviewId", event.reviewId(), "likerUserId", event.likerUserId()))
+                .payload(Map.of("reviewId", event.reviewId(), "likerUserPK", event.likerUserPK()))
                 .build());
     }
 }

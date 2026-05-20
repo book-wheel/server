@@ -10,12 +10,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    Page<Notification> findByRecipientUserIdOrderByCreatedAtDesc(String recipientUserId, Pageable pageable);
+    Page<Notification> findByRecipientUserPKOrderByCreatedAtDesc(String recipientUserPK, Pageable pageable);
 
-    long countByRecipientUserIdAndIsReadFalse(String recipientUserId);
+    long countByRecipientUserPKAndIsReadFalse(String recipientUserPK);
 
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP " +
-            "WHERE n.recipientUserId = :recipientUserId AND n.isRead = false")
-    int markAllRead(@Param("recipientUserId") String recipientUserId);
+            "WHERE n.recipientUserPK = :recipientUserPK AND n.isRead = false")
+    int markAllRead(@Param("recipientUserPK") String recipientUserPK);
 }
