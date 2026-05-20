@@ -7,6 +7,7 @@ import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -53,6 +54,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        // 탐색 목록은 비로그인 사용자도 볼 수 있도록 GET만 공개한다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/groups", "/api/v1/groups/").permitAll()
 
                         .requestMatchers(
                                 "/api/v1/auth/**",

@@ -1,5 +1,6 @@
 package com.bookwheel.server.group.dto.search;
 
+import com.bookwheel.server.group.dto.GroupDetailButtonType;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.Region;
 import com.bookwheel.server.group.enums.State;
@@ -23,9 +24,15 @@ public record GroupSearchResponse(
         String groupStateLabel,
         LocalDate startDate,
         String status,
+        GroupDetailButtonType bottomButtonType,
         int dday
 ) {
     public static GroupSearchResponse from(Group group) {
+        // 개인화 정보가 없을 때는 기본 버튼 상태를 JOIN으로 내려준다.
+        return from(group, GroupDetailButtonType.JOIN);
+    }
+
+    public static GroupSearchResponse from(Group group, GroupDetailButtonType bottomButtonType) {
         State normalizedState = normalizeState(group.getGroupState());
 
         return GroupSearchResponse.builder()
@@ -42,6 +49,7 @@ public record GroupSearchResponse(
                 .groupStateLabel(mapStateLabel(normalizedState))
                 .startDate(group.getStartDate())
                 .status(mapStatus(normalizedState))
+                .bottomButtonType(bottomButtonType)
                 .dday(calculateDday(group.getStartDate()))
                 .build();
     }

@@ -22,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -81,15 +83,26 @@ public class GroupService {
         return GroupJoinResponse.of(savedMember.getMemberId(), savedMember.getMemberStatus());
     }
 
-    public Page<GroupSearchResponse> getGroups(GroupSearchCondition condition, Pageable pageable) {
+    public Page<GroupSearchResponse> getGroups(GroupSearchCondition condition, Pageable pageable, String userPK) {
         Page<Group> groupPage = groupRepository.findAll(GroupSpecification.searchWith(condition), pageable);
-        return groupPage.map(GroupSearchResponse::from);
+        // 페이지 내 그룹들의 버튼 상태를 한 번에 계산해 응답에 채운다.
+        Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groupPage.getContent(), userPK);
+        return groupPage.map(group -> GroupSearchResponse.from(
+                group,
+                bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOIN)
+        ));
     }
 
     public List<GroupSearchResponse> getMyGroups(String userPK) {
-        return memberRepository.findGroupsByUserIdAndMemberStatus(userPK, MemberStatus.ACTIVE)
-                .stream()
-                .map(GroupSearchResponse::from)
+        List<Group> groups = memberRepository.findGroupsByUserIdAndMemberStatus(userPK, MemberStatus.ACTIVE);
+        // 내 모임 목록도 상세/탐색과 같은 버튼 상태 규칙을 재사용한다.
+        Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groups, userPK);
+
+        return groups.stream()
+                .map(group -> GroupSearchResponse.from(
+                        group,
+                        bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOINED)
+                ))
                 .toList();
     }
 
@@ -169,20 +182,50 @@ public class GroupService {
 
     private GroupDetailButtonType resolveBottomButtonType(String groupId, String userPK) {
         return memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
-                .map(member -> {
-                    if (member.getMemberRole() == MemberRole.LEADER
-                            && member.getMemberStatus() == MemberStatus.ACTIVE) {
-                        return GroupDetailButtonType.LEADER_SETTING;
-                    }
-
-                    if (member.getMemberStatus() == MemberStatus.ACTIVE
-                            || member.getMemberStatus() == MemberStatus.PENDING) {
-                        return GroupDetailButtonType.JOINED;
-                    }
-
-                    return GroupDetailButtonType.JOIN;
-                })
+                .map(this::resolveBottomButtonType)
                 .orElse(GroupDetailButtonType.JOIN);
+    }
+
+    private Map<String, GroupDetailButtonType> resolveBottomButtonTypes(List<Group> groups, String userPK) {
+        List<String> groupIds = groups.stream()
+                .map(Group::getGroupId)
+                .toList();
+
+        if (groupIds.isEmpty() || !StringUtils.hasText(userPK)) {
+            // 비로그인 목록 조회에서는 멤버십 조회 없이 기본 JOIN 상태를 사용한다.
+            return Map.of();
+        }
+
+        return memberRepository.findMembershipSummariesByUserIdAndGroupIds(userPK, groupIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        MemberRepository.GroupMembershipSummary::getGroupId,
+                        this::resolveBottomButtonType,
+                        (left, right) -> left
+                ));
+    }
+
+    private GroupDetailButtonType resolveBottomButtonType(Member member) {
+        return resolveBottomButtonType(member.getMemberRole(), member.getMemberStatus());
+    }
+
+    private GroupDetailButtonType resolveBottomButtonType(MemberRepository.GroupMembershipSummary membership) {
+        return resolveBottomButtonType(membership.getMemberRole(), membership.getMemberStatus());
+    }
+
+    private GroupDetailButtonType resolveBottomButtonType(MemberRole memberRole, MemberStatus memberStatus) {
+        if (memberStatus == MemberStatus.PENDING) {
+            return GroupDetailButtonType.PENDING;
+        }
+
+        if (memberStatus == MemberStatus.ACTIVE) {
+            if (memberRole == MemberRole.LEADER) {
+                return GroupDetailButtonType.OWNER;
+            }
+            return GroupDetailButtonType.JOINED;
+        }
+
+        return GroupDetailButtonType.JOIN;
     }
 
     private Group findGroupById(String groupId) {

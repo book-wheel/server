@@ -1,12 +1,18 @@
 package com.bookwheel.server.group.controller;
 
 import java.time.LocalDate;
+import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
+import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.common.oauth2.CustomOAuth2UserService;
+import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
+import com.bookwheel.server.config.SecurityConfig;
 import com.bookwheel.server.group.dto.*;
 import com.bookwheel.server.group.dto.member.*;
 import com.bookwheel.server.group.dto.search.*;
 import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.service.GroupService;
 import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.member.service.MemberService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +21,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestWatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -27,6 +34,7 @@ import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -34,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(GroupController.class)
+@Import(SecurityConfig.class)
 class GroupControllerTest {
 
     @Autowired
@@ -44,6 +53,21 @@ class GroupControllerTest {
 
     @MockitoBean
     private GroupService groupService;
+
+    @MockitoBean
+    private MemberService memberService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    @MockitoBean
+    private CustomOAuth2UserService customOAuth2UserService;
+
+    @MockitoBean
+    private OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -118,13 +142,29 @@ class GroupControllerTest {
     void getGroups_Success() throws Exception {
         // given
         Page<GroupSearchResponse> mockPage = new PageImpl<>(Collections.emptyList());
-        given(groupService.getGroups(any(GroupSearchCondition.class), any(Pageable.class))).willReturn(mockPage);
+        given(groupService.getGroups(any(GroupSearchCondition.class), any(Pageable.class), eq("user"))).willReturn(mockPage);
 
         // when & then
         mockMvc.perform(get("/api/v1/groups")
                         .param("state", "RECRUITING")
                         .param("type", "OFFLINE")
                         .param("region", "SEOUL")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isArray());
+    }
+
+    @Test
+    @DisplayName("조건에 맞는 그룹 목록 조회 API 성공 - 비로그인")
+    void getGroups_Guest_Success() throws Exception {
+        // given
+        Page<GroupSearchResponse> mockPage = new PageImpl<>(Collections.emptyList());
+        given(groupService.getGroups(any(GroupSearchCondition.class), any(Pageable.class), isNull())).willReturn(mockPage);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/groups")
                         .param("page", "0")
                         .param("size", "10"))
                 .andDo(print())
