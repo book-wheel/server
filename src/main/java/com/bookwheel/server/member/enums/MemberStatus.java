@@ -4,6 +4,6 @@ public enum MemberStatus {
     PENDING,
     ACTIVE,
     REJECTED,
-    WITHDRAWN,
+    EXITED,
     BANNED
 }
