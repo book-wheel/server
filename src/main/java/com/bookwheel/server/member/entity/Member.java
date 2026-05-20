@@ -64,9 +64,9 @@ public class Member {
     }
 
     // 중도하차
-    public void withdraw() {
+    public void exit() {
         validateActiveMember();
-        changeStatusAndRole(MemberStatus.WITHDRAWN, MemberRole.OUT);
+        changeStatusAndRole(MemberStatus.EXITED, MemberRole.OUT);
     }
 
     // 부리더 승격

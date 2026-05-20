@@ -4,6 +4,7 @@ import com.bookwheel.server.schedule.entity.Round;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -34,4 +35,10 @@ public interface RoundRepository extends JpaRepository<Round, String> {
 
     // 종료일이 [from, to] 사이인 라운드 조회 (D-1/D-3 리마인더용)
     List<Round> findByEndDateBetween(LocalDate from, LocalDate to);
+
+    // 그룹의 현재 진행 중인 라운드 (오늘 날짜가 시작/종료일 사이) 조회
+    @Query("SELECT r FROM Round r " +
+            "WHERE r.group.groupId = :groupId " +
+            "AND r.startDate <= :today AND r.endDate >= :today")
+    Optional<Round> findCurrentRound(@Param("groupId") String groupId, @Param("today") LocalDate today);
 }

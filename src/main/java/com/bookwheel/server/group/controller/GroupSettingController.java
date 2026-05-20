@@ -1,10 +1,7 @@
 package com.bookwheel.server.group.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
-import com.bookwheel.server.group.dto.setting.LeadershipTransferResponse;
-import com.bookwheel.server.group.dto.setting.MemberKickResponse;
-import com.bookwheel.server.group.dto.setting.MemberRoleChangeRequest;
-import com.bookwheel.server.group.dto.setting.MemberRoleChangeResponse;
+import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.service.GroupSettingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -54,6 +51,16 @@ public class GroupSettingController {
             @AuthenticationPrincipal Object principal
     ) {
         LeadershipTransferResponse response = groupSettingService.transferLeadership(groupId, targetUserPK, getUserPK(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "중도 하차", description = "멤버가 그룹에서 하차합니다.")
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<MemberExitResponse>> exitGroup(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal Object principal
+    ) {
+        MemberExitResponse response = groupSettingService.exitMember(groupId, getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
