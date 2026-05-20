@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestWatcher;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -38,6 +39,9 @@ class AdminServiceTest {
 
     @Mock
     private PenaltyRepository penaltyRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {

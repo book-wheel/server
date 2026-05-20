@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.TestWatcher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -46,6 +47,9 @@ class GroupServiceTest {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
