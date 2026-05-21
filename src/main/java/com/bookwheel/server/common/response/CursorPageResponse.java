@@ -5,7 +5,7 @@ import java.util.List;
 public record CursorPageResponse<T>(
     List<T> content,
     int size,
-    long totalElements,
+    Long totalElements,
     boolean hasNext,
     String nextCursor
 ) {
@@ -17,7 +17,7 @@ public record CursorPageResponse<T>(
     public static <T> CursorPageResponse<T> of(
         List<T> content,
         int size,
-        long totalElements,
+        Long totalElements,
         boolean hasNext,
         String nextCursor
     ) {

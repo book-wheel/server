@@ -175,7 +175,7 @@ public class BookService {
         List<InterestBookResponseDto> content = hasNext ? books.subList(0, pageSize) : books;
 
         String nextCursor = hasNext ? createNextInterestCursor(content) : null;
-        long totalElements = bookLikeRepository.countByUserPK(userPK);
+        Long totalElements = interestCursor == null ? bookLikeRepository.countByUserPK(userPK) : null;
 
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }
@@ -194,7 +194,7 @@ public class BookService {
             .toList();
 
         String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
-        long totalElements = postRepository.countGalleryPosts();
+        Long totalElements = galleryCursor == null ? postRepository.countGalleryPosts() : null;
 
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }
