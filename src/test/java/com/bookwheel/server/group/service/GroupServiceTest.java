@@ -46,6 +46,8 @@ class GroupServiceTest {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private GroupMemberPermissionValidator memberPermissionValidator;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -190,11 +192,7 @@ class GroupServiceTest {
         when(mockGroup.getMaxMembers()).thenReturn(10);
         when(groupRepository.findByGroupIdForUpdate(groupId)).thenReturn(Optional.of(mockGroup)); // APPROVED인 경우 Lock 적용 메서드 호출
 
-        // 리더 권한 검증 모킹
-        Member mockLeader = mock(Member.class);
-        when(mockLeader.getMemberRole()).thenReturn(MemberRole.LEADER);
-        when(mockLeader.getMemberStatus()).thenReturn(MemberStatus.ACTIVE);
-        when(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, leaderId)).thenReturn(Optional.of(mockLeader));
+        doNothing().when(memberPermissionValidator).validateLeader(groupId, leaderId);
 
         // 대상 멤버 대기 상태 모킹
         Member targetMember = mock(Member.class);
@@ -206,7 +204,7 @@ class GroupServiceTest {
 
         // then
         assertEquals(MemberRequestStatus.APPROVED, response.status());
-        verify(targetMember, times(1)).setMemberStatus(MemberStatus.ACTIVE);
+        verify(targetMember, times(1)).approve();
     }
 
     @Test
@@ -220,10 +218,9 @@ class GroupServiceTest {
         Group mockGroup = mock(Group.class);
         when(groupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
 
-        Member mockNormalMember = mock(Member.class);
-        when(mockNormalMember.getMemberRole()).thenReturn(MemberRole.MEMBER); // 일반 멤버
-        when(mockNormalMember.getMemberStatus()).thenReturn(MemberStatus.ACTIVE);
-        when(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, normalUserId)).thenReturn(Optional.of(mockNormalMember));
+        doThrow(new BusinessException(ErrorCode.GROUP_LEADER_ONLY))
+                .when(memberPermissionValidator)
+                .validateLeader(groupId, normalUserId);
 
         // when & then
         BusinessException e = assertThrows(BusinessException.class, () ->

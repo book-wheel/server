@@ -41,7 +41,7 @@ class CursorUtilsTest {
     @Test
     @DisplayName("encode and decode interest cursor")
     void encodeAndDecodeInterestCursor() {
-        InterestCursor cursor = new InterestCursor("2026-05-17T10:15:30", 20L);
+        InterestCursor cursor = new InterestCursor(LocalDateTime.of(2026, 5, 17, 10, 15, 30), 20L);
 
         String encodedCursor = cursorUtils.encode(cursor);
         InterestCursor decodedCursor = cursorUtils.decode(encodedCursor, InterestCursor.class);
