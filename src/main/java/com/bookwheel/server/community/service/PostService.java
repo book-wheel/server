@@ -102,16 +102,12 @@ public class PostService {
 
         String ownerUserPK = post.getUploader().getId();
         if (!ownerUserPK.equals(userPK)) {
-            String preview = comment.getContent();
-            if (preview != null && preview.length() > 50) {
-                preview = preview.substring(0, 50) + "...";
-            }
             eventPublisher.publishEvent(new PostCommentedEvent(
                     post.getPostId(),
                     ownerUserPK,
                     userPK,
                     user.getNickname(),
-                    preview
+                    comment.getContent()
             ));
         }
     }
