@@ -1,7 +1,7 @@
 package com.bookwheel.server.notification.listener;
 
 import com.bookwheel.server.notification.enums.NotificationType;
-import com.bookwheel.server.notification.event.NotificationEvent;
+import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.support.NotificationText;
 import com.bookwheel.server.order.event.ReadOrderAssignedEvent;
 import lombok.RequiredArgsConstructor;
@@ -20,16 +20,17 @@ public class OrderNotificationListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReadOrderAssigned(ReadOrderAssignedEvent event) {
-        String group = NotificationText.safe(event.groupName(), 30);
-        for (String userPK : event.orderedUserPKs()) {
-            eventPublisher.publishEvent(NotificationEvent.builder()
-                    .recipientUserPK(userPK)
-                    .type(NotificationType.READ_ORDER_ASSIGNED)
-                    .title("독서 순서 확정")
-                    .body("'" + group + "' 그룹의 독서 순서가 정해졌어요.")
-                    .deepLink("/groups/" + event.groupId() + "/order")
-                    .payload(Map.of("groupId", event.groupId()))
-                    .build());
+        if (event.orderedUserPKs() == null || event.orderedUserPKs().isEmpty()) {
+            return;
         }
+        String group = NotificationText.safe(event.groupName(), 30);
+        eventPublisher.publishEvent(BulkNotificationEvent.builder()
+                .recipientUserPKs(event.orderedUserPKs())
+                .type(NotificationType.READ_ORDER_ASSIGNED)
+                .title("독서 순서 확정")
+                .body("'" + group + "' 그룹의 독서 순서가 정해졌어요.")
+                .deepLink("/groups/" + event.groupId() + "/order")
+                .payload(Map.of("groupId", event.groupId()))
+                .build());
     }
 }

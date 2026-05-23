@@ -1,5 +1,6 @@
 package com.bookwheel.server.notification.listener;
 
+import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
 import com.bookwheel.server.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ public class NotificationDispatcher {
 
     private final NotificationService notificationService;
 
-    @Async
+    @Async("notificationTaskExecutor")
     @EventListener
     public void handle(NotificationEvent event) {
         try {
@@ -28,6 +29,18 @@ public class NotificationDispatcher {
         } catch (Exception e) {
             log.warn("알림 처리 실패: type={}, recipient={}, reason={}",
                     event.type(), event.recipientUserPK(), e.getMessage());
+        }
+    }
+
+    @Async("notificationTaskExecutor")
+    @EventListener
+    public void handleBulk(BulkNotificationEvent event) {
+        try {
+            notificationService.createBulk(event);
+        } catch (Exception e) {
+            int size = event.recipientUserPKs() == null ? 0 : event.recipientUserPKs().size();
+            log.warn("벌크 알림 처리 실패: type={}, recipients={}, reason={}",
+                    event.type(), size, e.getMessage());
         }
     }
 }

@@ -1,10 +1,9 @@
 package com.bookwheel.server.notification.listener;
 
-import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.notification.enums.NotificationType;
-import com.bookwheel.server.notification.event.NotificationEvent;
+import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.support.NotificationText;
 import com.bookwheel.server.schedule.event.GroupCompletedEvent;
 import com.bookwheel.server.schedule.event.GroupStartedEvent;
@@ -100,16 +99,21 @@ public class RoundNotificationListener {
             String body,
             Map<String, Object> payload
     ) {
-        List<Member> members = memberRepository.findAllWithUserByGroupIdAndStatus(groupId, MemberStatus.ACTIVE);
-        for (Member member : members) {
-            eventPublisher.publishEvent(NotificationEvent.builder()
-                    .recipientUserPK(member.getUser().getId())
-                    .type(type)
-                    .title(title)
-                    .body(body)
-                    .deepLink("/groups/" + groupId)
-                    .payload(payload)
-                    .build());
+        List<String> recipients = memberRepository
+                .findAllWithUserByGroupIdAndStatus(groupId, MemberStatus.ACTIVE)
+                .stream()
+                .map(m -> m.getUser().getId())
+                .toList();
+        if (recipients.isEmpty()) {
+            return;
         }
+        eventPublisher.publishEvent(BulkNotificationEvent.builder()
+                .recipientUserPKs(recipients)
+                .type(type)
+                .title(title)
+                .body(body)
+                .deepLink("/groups/" + groupId)
+                .payload(payload)
+                .build());
     }
 }
