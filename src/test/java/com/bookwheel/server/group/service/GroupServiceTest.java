@@ -203,7 +203,7 @@ class GroupServiceTest {
 
         when(groupRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Group>>any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(groups, pageable, groups.size()));
-        when(memberRepository.findMembershipSummariesByUserIdAndGroupIds(eq(userPK), eq(groupIds)))
+        when(memberRepository.findMembershipSummariesByUserPKAndGroupIds(eq(userPK), eq(groupIds)))
                 .thenReturn(List.of(
                         new TestGroupMembershipSummary("leader-group", MemberRole.LEADER, MemberStatus.ACTIVE),
                         new TestGroupMembershipSummary("joined-group", MemberRole.MEMBER, MemberStatus.ACTIVE),
@@ -229,7 +229,7 @@ class GroupServiceTest {
                         .map(GroupSearchResponse::bottomButtonType)
                         .toList()
         );
-        verify(memberRepository, times(1)).findMembershipSummariesByUserIdAndGroupIds(eq(userPK), eq(groupIds));
+        verify(memberRepository, times(1)).findMembershipSummariesByUserPKAndGroupIds(eq(userPK), eq(groupIds));
         verify(memberRepository, never()).findByGroup_GroupIdAndUser_Id(anyString(), eq(userPK));
     }
 
@@ -259,7 +259,7 @@ class GroupServiceTest {
                         .map(GroupSearchResponse::bottomButtonType)
                         .toList()
         );
-        verify(memberRepository, never()).findMembershipSummariesByUserIdAndGroupIds(anyString(), anyList());
+        verify(memberRepository, never()).findMembershipSummariesByUserPKAndGroupIds(anyString(), anyList());
     }
 
     @Test
