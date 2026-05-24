@@ -46,7 +46,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
             where m.user.id = :userPK
               and m.group.groupId in :groupIds
             """)
-    List<GroupMembershipSummary> findMembershipSummariesByUserIdAndGroupIds(
+    List<GroupMembershipSummary> findMembershipSummariesByUserPKAndGroupIds(
             @Param("userPK") String userPK,
             @Param("groupIds") List<String> groupIds
     );
@@ -88,7 +88,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
               and m.memberStatus = :status
             order by m.requestDate desc
             """)
-    List<Group> findGroupsByUserIdAndMemberStatus(
+    List<Group> findGroupsByUserPKAndMemberStatus(
             @Param("userPK") String userPK,
             @Param("status") MemberStatus status
     );

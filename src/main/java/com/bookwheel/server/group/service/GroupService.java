@@ -94,7 +94,7 @@ public class GroupService {
     }
 
     public List<GroupSearchResponse> getMyGroups(String userPK) {
-        List<Group> groups = memberRepository.findGroupsByUserIdAndMemberStatus(userPK, MemberStatus.ACTIVE);
+        List<Group> groups = memberRepository.findGroupsByUserPKAndMemberStatus(userPK, MemberStatus.ACTIVE);
         // 내 모임 목록도 상세/탐색과 같은 버튼 상태 규칙을 재사용한다.
         Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groups, userPK);
 
@@ -196,7 +196,7 @@ public class GroupService {
             return Map.of();
         }
 
-        return memberRepository.findMembershipSummariesByUserIdAndGroupIds(userPK, groupIds)
+        return memberRepository.findMembershipSummariesByUserPKAndGroupIds(userPK, groupIds)
                 .stream()
                 .collect(Collectors.toMap(
                         MemberRepository.GroupMembershipSummary::getGroupId,
