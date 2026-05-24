@@ -214,14 +214,14 @@ public class GroupService {
     }
 
     private GroupDetailButtonType resolveBottomButtonType(MemberRole memberRole, MemberStatus memberStatus) {
-        if (memberStatus == MemberStatus.PENDING) {
-            return GroupDetailButtonType.PENDING;
-        }
-
         if (memberStatus == MemberStatus.ACTIVE) {
             if (memberRole == MemberRole.LEADER) {
-                return GroupDetailButtonType.OWNER;
+                return GroupDetailButtonType.LEADER_SETTING;
             }
+            return GroupDetailButtonType.JOINED;
+        }
+
+        if (memberStatus == MemberStatus.PENDING) {
             return GroupDetailButtonType.JOINED;
         }
 

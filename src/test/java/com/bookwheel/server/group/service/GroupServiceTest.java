@@ -193,19 +193,19 @@ class GroupServiceTest {
     void getGroups_IncludesBottomButtonTypes() {
         // given
         String userPK = "user1";
-        Group ownerGroup = mockGroup("owner-group");
+        Group leaderGroup = mockGroup("leader-group");
         Group joinedGroup = mockGroup("joined-group");
         Group pendingGroup = mockGroup("pending-group");
         Group joinGroup = mockGroup("join-group");
-        List<Group> groups = List.of(ownerGroup, joinedGroup, pendingGroup, joinGroup);
-        List<String> groupIds = List.of("owner-group", "joined-group", "pending-group", "join-group");
+        List<Group> groups = List.of(leaderGroup, joinedGroup, pendingGroup, joinGroup);
+        List<String> groupIds = List.of("leader-group", "joined-group", "pending-group", "join-group");
         PageRequest pageable = PageRequest.of(0, 4);
 
         when(groupRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Group>>any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(groups, pageable, groups.size()));
         when(memberRepository.findMembershipSummariesByUserIdAndGroupIds(eq(userPK), eq(groupIds)))
                 .thenReturn(List.of(
-                        new TestGroupMembershipSummary("owner-group", MemberRole.LEADER, MemberStatus.ACTIVE),
+                        new TestGroupMembershipSummary("leader-group", MemberRole.LEADER, MemberStatus.ACTIVE),
                         new TestGroupMembershipSummary("joined-group", MemberRole.MEMBER, MemberStatus.ACTIVE),
                         new TestGroupMembershipSummary("pending-group", MemberRole.MEMBER, MemberStatus.PENDING)
                 ));
@@ -220,9 +220,9 @@ class GroupServiceTest {
         // then
         assertEquals(
                 List.of(
-                        GroupDetailButtonType.OWNER,
+                        GroupDetailButtonType.LEADER_SETTING,
                         GroupDetailButtonType.JOINED,
-                        GroupDetailButtonType.PENDING,
+                        GroupDetailButtonType.JOINED,
                         GroupDetailButtonType.JOIN
                 ),
                 response.getContent().stream()
@@ -263,8 +263,8 @@ class GroupServiceTest {
     }
 
     @Test
-    @DisplayName("그룹 상세 조회 - ACTIVE 리더는 OWNER를 반환한다.")
-    void getGroup_ReturnsOwnerForActiveLeader() {
+    @DisplayName("그룹 상세 조회 - ACTIVE 리더는 LEADER_SETTING을 반환한다.")
+    void getGroup_ReturnsLeaderSettingForActiveLeader() {
         // given
         String groupId = "group1";
         String userPK = "user1";
@@ -280,11 +280,11 @@ class GroupServiceTest {
         GroupDetailResponse response = groupService.getGroup(groupId, userPK);
 
         // then
-        assertEquals(GroupDetailButtonType.OWNER, response.bottomButtonType());
+        assertEquals(GroupDetailButtonType.LEADER_SETTING, response.bottomButtonType());
     }
 
     @Test
-    @DisplayName("그룹 상세 조회 - 가입 신청 중인 사용자는 PENDING을 반환한다.")
+    @DisplayName("그룹 상세 조회 - 가입 신청 중인 사용자는 JOINED를 반환한다.")
     void getGroup_ReturnsPendingForPendingMember() {
         // given
         String groupId = "group1";
@@ -301,7 +301,7 @@ class GroupServiceTest {
         GroupDetailResponse response = groupService.getGroup(groupId, userPK);
 
         // then
-        assertEquals(GroupDetailButtonType.PENDING, response.bottomButtonType());
+        assertEquals(GroupDetailButtonType.JOINED, response.bottomButtonType());
     }
 
     @Test
@@ -317,6 +317,8 @@ class GroupServiceTest {
         when(mockGroup.getMaxMembers()).thenReturn(10);
         when(groupRepository.findByGroupIdForUpdate(groupId)).thenReturn(Optional.of(mockGroup)); // APPROVED인 경우 Lock 적용 메서드 호출
 
+        doNothing().when(memberPermissionValidator).validateLeader(groupId, leaderId);
+
         // 대상 멤버 대기 상태 모킹
         Member targetMember = mock(Member.class);
         when(targetMember.getMemberStatus()).thenReturn(MemberStatus.PENDING);
@@ -327,7 +329,6 @@ class GroupServiceTest {
 
         // then
         assertEquals(MemberRequestStatus.APPROVED, response.status());
-        verify(memberPermissionValidator, times(1)).validateLeader(groupId, leaderId);
         verify(targetMember, times(1)).approve();
     }
 
@@ -337,16 +338,17 @@ class GroupServiceTest {
         // given
         String groupId = "group1";
         String memberId = "member1";
-        String normalUserId = "user2";
+        String normalUserPK = "user2";
 
         Group mockGroup = mock(Group.class);
         when(groupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
         doThrow(new BusinessException(ErrorCode.GROUP_LEADER_ONLY))
-                .when(memberPermissionValidator).validateLeader(groupId, normalUserId);
+                .when(memberPermissionValidator)
+                .validateLeader(groupId, normalUserPK);
 
         // when & then
         BusinessException e = assertThrows(BusinessException.class, () ->
-                groupService.updateMemberRequestStatus(groupId, memberId, normalUserId, MemberRequestStatus.REJECTED));
+                groupService.updateMemberRequestStatus(groupId, memberId, normalUserPK, MemberRequestStatus.REJECTED));
 
         assertEquals(ErrorCode.GROUP_LEADER_ONLY, e.getErrorCode());
     }
