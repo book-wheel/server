@@ -4,9 +4,12 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
 import com.bookwheel.server.group.dto.member.*;
+import com.bookwheel.server.group.dto.search.GroupSearchCondition;
+import com.bookwheel.server.group.dto.search.GroupSearchResponse;
 import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.Region;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
@@ -23,13 +26,19 @@ import org.junit.jupiter.api.extension.TestWatcher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +55,8 @@ class GroupServiceTest {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private GroupMemberPermissionValidator memberPermissionValidator;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -178,7 +189,123 @@ class GroupServiceTest {
     }
 
     @Test
-    @DisplayName("가입 요청 처리 성공 - 리더가 요청을 승인(APPROVED)하면 멤버 상태가 ACTIVE로 변경된다.")
+    @DisplayName("그룹 목록 조회 - 현재 사용자 기준 bottomButtonType을 페이지당 한 번의 멤버십 조회로 매핑한다.")
+    void getGroups_IncludesBottomButtonTypes() {
+        // given
+        String userPK = "user1";
+        Group leaderGroup = mockGroup("leader-group");
+        Group joinedGroup = mockGroup("joined-group");
+        Group pendingGroup = mockGroup("pending-group");
+        Group joinGroup = mockGroup("join-group");
+        List<Group> groups = List.of(leaderGroup, joinedGroup, pendingGroup, joinGroup);
+        List<String> groupIds = List.of("leader-group", "joined-group", "pending-group", "join-group");
+        PageRequest pageable = PageRequest.of(0, 4);
+
+        when(groupRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Group>>any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(groups, pageable, groups.size()));
+        when(memberRepository.findMembershipSummariesByUserPKAndGroupIds(eq(userPK), eq(groupIds)))
+                .thenReturn(List.of(
+                        new TestGroupMembershipSummary("leader-group", MemberRole.LEADER, MemberStatus.ACTIVE),
+                        new TestGroupMembershipSummary("joined-group", MemberRole.MEMBER, MemberStatus.ACTIVE),
+                        new TestGroupMembershipSummary("pending-group", MemberRole.MEMBER, MemberStatus.PENDING)
+                ));
+
+        // when
+        Page<GroupSearchResponse> response = groupService.getGroups(
+                new GroupSearchCondition(null, null, null, null),
+                pageable,
+                userPK
+        );
+
+        // then
+        assertEquals(
+                List.of(
+                        GroupDetailButtonType.LEADER_SETTING,
+                        GroupDetailButtonType.JOINED,
+                        GroupDetailButtonType.JOINED,
+                        GroupDetailButtonType.JOIN
+                ),
+                response.getContent().stream()
+                        .map(GroupSearchResponse::bottomButtonType)
+                        .toList()
+        );
+        verify(memberRepository, times(1)).findMembershipSummariesByUserPKAndGroupIds(eq(userPK), eq(groupIds));
+        verify(memberRepository, never()).findByGroup_GroupIdAndUser_Id(anyString(), eq(userPK));
+    }
+
+    @Test
+    @DisplayName("그룹 목록 조회 - 비로그인 사용자는 멤버십 조회 없이 JOIN을 반환한다.")
+    void getGroups_GuestReturnsJoinWithoutMembershipLookup() {
+        // given
+        Group firstGroup = mockGroup("first-group");
+        Group secondGroup = mockGroup("second-group");
+        List<Group> groups = List.of(firstGroup, secondGroup);
+        PageRequest pageable = PageRequest.of(0, 2);
+
+        when(groupRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Group>>any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(groups, pageable, groups.size()));
+
+        // when
+        Page<GroupSearchResponse> response = groupService.getGroups(
+                new GroupSearchCondition(null, null, null, null),
+                pageable,
+                null
+        );
+
+        // then
+        assertEquals(
+                List.of(GroupDetailButtonType.JOIN, GroupDetailButtonType.JOIN),
+                response.getContent().stream()
+                        .map(GroupSearchResponse::bottomButtonType)
+                        .toList()
+        );
+        verify(memberRepository, never()).findMembershipSummariesByUserPKAndGroupIds(anyString(), anyList());
+    }
+
+    @Test
+    @DisplayName("그룹 상세 조회 - ACTIVE 리더는 LEADER_SETTING을 반환한다.")
+    void getGroup_ReturnsLeaderSettingForActiveLeader() {
+        // given
+        String groupId = "group1";
+        String userPK = "user1";
+        Group group = mockGroup(groupId);
+        Member member = mock(Member.class);
+
+        when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
+        when(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)).thenReturn(Optional.of(member));
+        when(member.getMemberRole()).thenReturn(MemberRole.LEADER);
+        when(member.getMemberStatus()).thenReturn(MemberStatus.ACTIVE);
+
+        // when
+        GroupDetailResponse response = groupService.getGroup(groupId, userPK);
+
+        // then
+        assertEquals(GroupDetailButtonType.LEADER_SETTING, response.bottomButtonType());
+    }
+
+    @Test
+    @DisplayName("그룹 상세 조회 - 가입 신청 중인 사용자는 JOINED를 반환한다.")
+    void getGroup_ReturnsPendingForPendingMember() {
+        // given
+        String groupId = "group1";
+        String userPK = "user1";
+        Group group = mockGroup(groupId);
+        Member member = mock(Member.class);
+
+        when(groupRepository.findById(groupId)).thenReturn(Optional.of(group));
+        when(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)).thenReturn(Optional.of(member));
+        when(member.getMemberRole()).thenReturn(MemberRole.MEMBER);
+        when(member.getMemberStatus()).thenReturn(MemberStatus.PENDING);
+
+        // when
+        GroupDetailResponse response = groupService.getGroup(groupId, userPK);
+
+        // then
+        assertEquals(GroupDetailButtonType.JOINED, response.bottomButtonType());
+    }
+
+    @Test
+    @DisplayName("가입 요청 처리 성공 - 리더가 요청을 승인하면 멤버 approve를 호출한다.")
     void updateMemberRequestStatus_Approve_Success() {
         // given
         String groupId = "group1";
@@ -190,11 +317,7 @@ class GroupServiceTest {
         when(mockGroup.getMaxMembers()).thenReturn(10);
         when(groupRepository.findByGroupIdForUpdate(groupId)).thenReturn(Optional.of(mockGroup)); // APPROVED인 경우 Lock 적용 메서드 호출
 
-        // 리더 권한 검증 모킹
-        Member mockLeader = mock(Member.class);
-        when(mockLeader.getMemberRole()).thenReturn(MemberRole.LEADER);
-        when(mockLeader.getMemberStatus()).thenReturn(MemberStatus.ACTIVE);
-        when(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, leaderId)).thenReturn(Optional.of(mockLeader));
+        doNothing().when(memberPermissionValidator).validateLeader(groupId, leaderId);
 
         // 대상 멤버 대기 상태 모킹
         Member targetMember = mock(Member.class);
@@ -206,7 +329,7 @@ class GroupServiceTest {
 
         // then
         assertEquals(MemberRequestStatus.APPROVED, response.status());
-        verify(targetMember, times(1)).setMemberStatus(MemberStatus.ACTIVE);
+        verify(targetMember, times(1)).approve();
     }
 
     @Test
@@ -215,20 +338,48 @@ class GroupServiceTest {
         // given
         String groupId = "group1";
         String memberId = "member1";
-        String normalUserId = "user2";
+        String normalUserPK = "user2";
 
         Group mockGroup = mock(Group.class);
         when(groupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
-
-        Member mockNormalMember = mock(Member.class);
-        when(mockNormalMember.getMemberRole()).thenReturn(MemberRole.MEMBER); // 일반 멤버
-        when(mockNormalMember.getMemberStatus()).thenReturn(MemberStatus.ACTIVE);
-        when(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, normalUserId)).thenReturn(Optional.of(mockNormalMember));
+        doThrow(new BusinessException(ErrorCode.GROUP_LEADER_ONLY))
+                .when(memberPermissionValidator)
+                .validateLeader(groupId, normalUserPK);
 
         // when & then
         BusinessException e = assertThrows(BusinessException.class, () ->
-                groupService.updateMemberRequestStatus(groupId, memberId, normalUserId, MemberRequestStatus.REJECTED));
+                groupService.updateMemberRequestStatus(groupId, memberId, normalUserPK, MemberRequestStatus.REJECTED));
 
         assertEquals(ErrorCode.GROUP_LEADER_ONLY, e.getErrorCode());
+    }
+
+    private Group mockGroup(String groupId) {
+        Group group = mock(Group.class);
+        when(group.getGroupId()).thenReturn(groupId);
+        when(group.getGroupState()).thenReturn(State.RECRUITING);
+        when(group.getStartDate()).thenReturn(LocalDate.now().plusDays(1));
+        when(group.getMaxMembers()).thenReturn(10);
+        return group;
+    }
+
+    private record TestGroupMembershipSummary(
+            String groupId,
+            MemberRole memberRole,
+            MemberStatus memberStatus
+    ) implements MemberRepository.GroupMembershipSummary {
+        @Override
+        public String getGroupId() {
+            return groupId;
+        }
+
+        @Override
+        public MemberRole getMemberRole() {
+            return memberRole;
+        }
+
+        @Override
+        public MemberStatus getMemberStatus() {
+            return memberStatus;
+        }
     }
 }

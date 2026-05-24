@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPKOrNull;
 
 @RestController
 @RequiredArgsConstructor
@@ -57,10 +58,21 @@ public class GroupController {
             @Parameter(description = "그룹명 검색어", example = "독서")
             @RequestParam(required = false) String keyword,
             @ParameterObject
-            @PageableDefault(size = 10, sort = "startDate", direction = Sort.Direction.DESC) Pageable pageable
+            @PageableDefault(size = 10, sort = "startDate", direction = Sort.Direction.DESC) Pageable pageable,
+            @AuthenticationPrincipal Object principal
     ) {
         GroupSearchCondition condition = new GroupSearchCondition(state, type, region, keyword);
-        Page<GroupSearchResponse> response = groupService.getGroups(condition, pageable);
+        // 로그인 여부에 따라 목록 버튼 상태 개인화 여부를 서비스에서 결정한다.
+        Page<GroupSearchResponse> response = groupService.getGroups(condition, pageable, getUserPKOrNull(principal));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "내 모임 조회", description = "현재 로그인한 사용자가 ACTIVE 상태로 가입한 모임 목록을 최신 신청일 순으로 반환합니다.")
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<GroupSearchResponse>>> getMyGroups(
+            @AuthenticationPrincipal Object principal
+    ) {
+        List<GroupSearchResponse> response = groupService.getMyGroups(getUserPK(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

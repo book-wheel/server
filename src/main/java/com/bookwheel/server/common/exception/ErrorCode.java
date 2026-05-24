@@ -70,6 +70,8 @@ public enum ErrorCode {
     ROLE_ALREADY_ASSIGNED(HttpStatus.BAD_REQUEST, "GROUP_029", "이미 해당 권한을 가지고 있는 멤버입니다."),
     INVALID_ROLE_TRANSITION(HttpStatus.BAD_REQUEST, "GROUP_030", "허용되지 않는 권한 변경 요청입니다."),
     CANNOT_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "GROUP_031", "자기 자신에게 리더를 위임할 수 없습니다."),
+    LEADER_CANNOT_EXIT(HttpStatus.BAD_REQUEST, "GROUP_032", "그룹장/부그룹장은 권한을 위임하거나 해제한 뒤 중도하차할 수 있습니다."),
+    READING_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "GROUP_033", "현재 라운드의 책을 완독 처리한 뒤 중도하차할 수 있습니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
@@ -101,7 +103,11 @@ public enum ErrorCode {
     //리뷰 관련 에러
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "해당 리뷰를 찾을 수 없습니다."),
     ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "REVIEW_002", "이미 이 책에 리뷰를 작성했습니다."),
-    UNAUTHORIZED_REVIEW(HttpStatus.FORBIDDEN, "REVIEW_003", "책을 읽은 참여자만 리뷰를 작성할 수 있습니다.");
+    UNAUTHORIZED_REVIEW(HttpStatus.FORBIDDEN, "REVIEW_003", "책을 읽은 참여자만 리뷰를 작성할 수 있습니다."),
+
+    // 페이징/커서 관련 에러
+    INVALID_CURSOR(HttpStatus.BAD_REQUEST, "CURSOR_001", "유효하지 않은 커서 값입니다."),
+    CURSOR_ENCODING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "CURSOR_002", "커서 데이터를 생성하는 중 서버 오류가 발생했습니다.");
 
     private final HttpStatus status;
     private final String code;
