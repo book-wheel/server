@@ -41,4 +41,14 @@ public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecif
             @Param("inProgress") State inProgress,
             @Param("today") LocalDate today
     );
+
+    // 오늘 시작해야 하는데 아직 모집중인 그룹들 (알림 대상 후보)
+    List<Group> findByGroupStateAndStartDateLessThanEqual(State state, LocalDate today);
+
+    // 마지막 라운드 종료일이 today 이전인, IN_PROGRESS 그룹들 (종료 알림 대상)
+    @Query("SELECT g FROM Group g WHERE g.groupState = :inProgress AND g.groupId IN (" +
+            "    SELECT r.group.groupId FROM Round r " +
+            "    WHERE r.endDate < :today AND r.roundNumber = g.groupRoundCount" +
+            ")")
+    List<Group> findGroupsBecomingComplete(@Param("inProgress") State inProgress, @Param("today") LocalDate today);
 }

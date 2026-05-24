@@ -15,6 +15,10 @@ import com.bookwheel.server.schedule.dto.ExcludedDateRange;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.entity.Round;
+import com.bookwheel.server.schedule.event.GroupCompletedEvent;
+import com.bookwheel.server.schedule.event.GroupStartedEvent;
+import com.bookwheel.server.schedule.event.RoundFinishedUnfinishedEvent;
+import com.bookwheel.server.schedule.event.RoundStartedEvent;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -22,6 +26,7 @@ import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +47,7 @@ public class GroupScheduleService {
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
 
     @Transactional
@@ -128,11 +134,21 @@ public class GroupScheduleService {
     public int updateStartedGroupsToInProgress() {
         LocalDate localDate = LocalDate.now();
 
-        return groupRepository.updateGroupStateToInProcess(
+        // 알림 대상 그룹을 먼저 조회 (벌크 업데이트 후에는 식별이 어려움)
+        List<Group> startingGroups = groupRepository.findByGroupStateAndStartDateLessThanEqual(
+                State.RECRUITING, localDate
+        );
+
+        int updated = groupRepository.updateGroupStateToInProcess(
                 State.IN_PROGRESS,
                 State.RECRUITING,
                 localDate
         );
+
+        for (Group group : startingGroups) {
+            eventPublisher.publishEvent(new GroupStartedEvent(group.getGroupId(), group.getGroupName()));
+        }
+        return updated;
     }
 
     // 끝난 라운드를 종료시키는 로직
@@ -147,7 +163,17 @@ public class GroupScheduleService {
         if (expiredRoundIds.isEmpty()) return 0;
 
         // 2. expiredRoundIds에 속하면서, 아직 완료되지 않은 책바퀴 종료.
-        return wheelStateRepository.bulkCloseWheelStates(expiredRoundIds, WheelStatus.UNFINISHED);
+        int updated = wheelStateRepository.bulkCloseWheelStates(expiredRoundIds, WheelStatus.UNFINISHED);
+
+        // 3. 어제(=오늘 종료된) 라운드들은 명시적으로 알림 발행 - 라운드 단위 이벤트
+        List<Round> closedYesterday = roundRepository.findByEndDate(localDate.minusDays(1));
+        for (Round round : closedYesterday) {
+            Group group = round.getGroup();
+            eventPublisher.publishEvent(new RoundFinishedUnfinishedEvent(
+                    group.getGroupId(), group.getGroupName(), round.getRoundNumber()
+            ));
+        }
+        return updated;
     }
 
     @Transactional
@@ -224,6 +250,14 @@ public class GroupScheduleService {
         }
         // 한 번에 DB에 저장
         wheelStateRepository.saveAll(newWheels);
+
+        // 라운드 시작 알림
+        for (Round round : startingRounds) {
+            Group group = round.getGroup();
+            eventPublisher.publishEvent(new RoundStartedEvent(
+                    group.getGroupId(), group.getGroupName(), round.getRoundNumber()
+            ));
+        }
         return cnt;
     }
 
@@ -232,11 +266,18 @@ public class GroupScheduleService {
     public int closeFinishedGroups() {
         LocalDate today = LocalDate.now();
 
-        return groupRepository.updateFinishedGroupsToComplete(
+        List<Group> completing = groupRepository.findGroupsBecomingComplete(State.IN_PROGRESS, today);
+
+        int updated = groupRepository.updateFinishedGroupsToComplete(
                 State.COMPLETE,
                 State.IN_PROGRESS,
                 today
         );
+
+        for (Group group : completing) {
+            eventPublisher.publishEvent(new GroupCompletedEvent(group.getGroupId(), group.getGroupName()));
+        }
+        return updated;
     }
 
     // 제외된 날짜를 건너뛰며 실제 독서 기간(readingPeriod)을 채우는 종료일 계산

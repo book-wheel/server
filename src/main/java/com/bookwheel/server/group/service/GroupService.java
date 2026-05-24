@@ -7,6 +7,8 @@ import com.bookwheel.server.group.dto.member.*;
 import com.bookwheel.server.group.dto.search.*;
 import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.*;
+import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
+import com.bookwheel.server.group.event.GroupJoinRequestedEvent;
 import com.bookwheel.server.group.repository.*;
 import com.bookwheel.server.member.entity.*;
 import com.bookwheel.server.member.enums.*;
@@ -14,6 +16,7 @@ import com.bookwheel.server.member.repository.*;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,6 +37,7 @@ public class GroupService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
 
     @Transactional
@@ -80,6 +84,14 @@ public class GroupService {
                 .build();
 
         Member savedMember = memberRepository.save(member);
+
+        eventPublisher.publishEvent(new GroupJoinRequestedEvent(
+                group.getGroupId(),
+                group.getGroupName(),
+                user.getId(),
+                user.getNickname()
+        ));
+
         return GroupJoinResponse.of(savedMember.getMemberId(), savedMember.getMemberStatus());
     }
 
@@ -149,6 +161,13 @@ public class GroupService {
         } else {
             targetMember.reject();
         }
+
+        eventPublisher.publishEvent(new GroupJoinDecidedEvent(
+                group.getGroupId(),
+                group.getGroupName(),
+                targetMember.getUser().getId(),
+                status
+        ));
 
         return MemberRequestStatusUpdateResponse.of(targetMember.getMemberId(), status);
     }

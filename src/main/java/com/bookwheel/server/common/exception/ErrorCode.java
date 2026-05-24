@@ -105,6 +105,10 @@ public enum ErrorCode {
     ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "REVIEW_002", "이미 이 책에 리뷰를 작성했습니다."),
     UNAUTHORIZED_REVIEW(HttpStatus.FORBIDDEN, "REVIEW_003", "책을 읽은 참여자만 리뷰를 작성할 수 있습니다."),
 
+    //알림 관련 에러
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTI_001", "해당 알림을 찾을 수 없습니다."),
+    NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "NOTI_002", "본인의 알림만 처리할 수 있습니다."),
+
     // 페이징/커서 관련 에러
     INVALID_CURSOR(HttpStatus.BAD_REQUEST, "CURSOR_001", "유효하지 않은 커서 값입니다."),
     CURSOR_ENCODING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "CURSOR_002", "커서 데이터를 생성하는 중 서버 오류가 발생했습니다.");

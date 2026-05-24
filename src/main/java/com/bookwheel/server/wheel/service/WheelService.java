@@ -5,14 +5,17 @@ import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.*;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.wheel.dto.*;
 import com.bookwheel.server.wheel.entity.*;
 import com.bookwheel.server.wheel.enums.WheelStatus;
+import com.bookwheel.server.wheel.event.WheelCompletedEvent;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ public class WheelService {
     private final RoundRepository roundRepository;
     private final OwnBookRepository ownBookRepository;
     private final S3Service s3Service;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public WheelCompleteResponse completedReading(String userPK, String wheelStateId, WheelCompleteRequest request) {
@@ -52,6 +56,17 @@ public class WheelService {
         }
 
         wheelState.complete(request.reviewText(), normalizedKeys);
+
+        Member member = wheelState.getMember();
+        OwnBook ownBook = wheelState.getOwnBook();
+        eventPublisher.publishEvent(new WheelCompletedEvent(
+                wheelState.getWheelStateId(),
+                member.getGroup().getGroupId(),
+                member.getGroup().getGroupName(),
+                member.getUser().getId(),
+                member.getUser().getNickname(),
+                ownBook.getBook() != null ? ownBook.getBook().getTitle() : null
+        ));
 
         return WheelCompleteResponse.of(wheelState.getWheelStateId(), wheelState.getIsCompleted(), wheelState.getWheelState());
     }
