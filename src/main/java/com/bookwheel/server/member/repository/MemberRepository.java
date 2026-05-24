@@ -2,6 +2,7 @@ package com.bookwheel.server.member.repository;
 
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.member.entity.Member;
+import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.*;
@@ -11,6 +12,14 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, String> {
+    interface GroupMembershipSummary {
+        String getGroupId();
+
+        MemberRole getMemberRole();
+
+        MemberStatus getMemberStatus();
+    }
+
     // 특정 그룹에 특정 사용자가 이미 멤버로 등록되어 있는지 확인
     // 특정 사용자가 해당 그룹에 속하는 유저인지 확인하는 용도 (중복 방지 시 사용)
     boolean existsByGroup_GroupIdAndUser_Id(String groupId, String userPK);
@@ -27,6 +36,20 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     // 특정 그룹 안에서 이 사용자가 '어떤 멤버'로 등록되어 있는지 단 한 명의 정보 조회
     // 로그인한 '나(User)'의 정보를 기준으로 해당 그룹에서의 멤버 프로필을 찾는 용도
     Optional<Member> findByGroup_GroupIdAndUser_Id(String groupId, String userPK);
+
+    // 목록 페이지의 그룹들에 대한 현재 사용자 멤버십만 한 번에 조회한다.
+    @Query("""
+            select m.group.groupId as groupId,
+                   m.memberRole as memberRole,
+                   m.memberStatus as memberStatus
+            from Member m
+            where m.user.id = :userPK
+              and m.group.groupId in :groupIds
+            """)
+    List<GroupMembershipSummary> findMembershipSummariesByUserPKAndGroupIds(
+            @Param("userPK") String userPK,
+            @Param("groupIds") List<String> groupIds
+    );
 
     // 모임에 속한 특정 멤버 한 명을 조회하는 기능
     // 특정 멤버의 '가입 번호(MemberId)'를 알고 있을 때, 그 멤버가 우리 그룹 소속이 맞는지 콕 집어 확인할 때 사용
@@ -65,7 +88,7 @@ public interface MemberRepository extends JpaRepository<Member, String> {
               and m.memberStatus = :status
             order by m.requestDate desc
             """)
-    List<Group> findGroupsByUserIdAndMemberStatus(
+    List<Group> findGroupsByUserPKAndMemberStatus(
             @Param("userPK") String userPK,
             @Param("status") MemberStatus status
     );
