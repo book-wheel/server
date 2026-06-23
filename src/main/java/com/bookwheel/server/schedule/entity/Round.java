@@ -40,4 +40,9 @@ public class Round {
 
     @Column(name = "end_date")
     private LocalDate endDate;
+
+    public void updateSchedule(LocalDate startDate, LocalDate endDate) {
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
 }
