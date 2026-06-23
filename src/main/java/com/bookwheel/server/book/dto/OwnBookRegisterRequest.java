@@ -12,12 +12,12 @@ import java.time.LocalDate;
 @Builder
 @Schema(description = "그룹 참여 도서 등록 요청")
 public record OwnBookRegisterRequest(
-        @Schema(description = "도서 ISBN", example = "9791190090018")
+        @Schema(description = "도서 ISBN. 필수값입니다.", example = "9791190090018")
         @NotBlank(message = "ISBN을 등록해주세요.")
         @Size(max = 20, message = "ISBN can be up to 20 characters.")
         String isbn,
 
-        @Schema(description = "도서 제목", example = "채식주의자")
+        @Schema(description = "도서 제목. 필수값입니다.", example = "채식주의자")
         @NotBlank(message = "책 제목을 등록해주세요.")
         @Size(max = 255)
         String title,
@@ -33,11 +33,11 @@ public record OwnBookRegisterRequest(
         @Schema(description = "출판일", example = "2007-10-30")
         LocalDate pubDate,
 
-        @Schema(description = "표지 이미지 URL", example = "https://image.aladin.co.kr/product/...")
+        @Schema(description = "표지 이미지 URL. 도서 상세 응답의 cover 값은 이 필드로 매핑합니다.", example = "https://image.aladin.co.kr/product/...")
         @Size(max = 255)
         String coverImage,
 
-        @Schema(description = "총 페이지 수", example = "250")
+        @Schema(description = "총 페이지 수. 필수값이며 1 이상이어야 합니다.", example = "250")
         @NotNull(message = "총 페이지 수를 등록해주세요.")
         @Min(value = 1)
         Integer totalPage,
@@ -46,7 +46,7 @@ public record OwnBookRegisterRequest(
         @Size(max = 100)
         String bookCondition,
 
-        @Schema(description = "독자에게 전하는 메모", example = "제가 정말 아끼는 책입니다. 소중히 다뤄주세요!")
+        @Schema(description = "다음 독자에게 남길 메모", example = "제가 정말 아끼는 책입니다. 소중히 다뤄주세요!")
         String noteToReader
 ) {
 }

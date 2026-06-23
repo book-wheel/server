@@ -24,7 +24,7 @@ public class GroupDashboardController {
 
     @Operation(
             summary = "그룹 대시보드 조회",
-            description = "로그인한 사용자의 그룹 대시보드 정보를 조회합니다. 현재 라운드, D-Day, 내가 읽을 책(myStep), 내 책 전달 상태(myBookStep)를 반환합니다."
+            description = "시작 전에는 currentRound=0을 반환합니다. 책 등록 전 myBookStep은 null, 등록 후에는 내 책 정보를 반환합니다."
     )
     @GetMapping("/{groupId}/dashboard")
     public ApiResponse<DashboardResponse> getDashboard(
