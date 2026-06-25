@@ -17,6 +17,8 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
     // 그룹 대시보드 조회 시, '내가 현재 라운드에서 어떤 책을 읽어야 하는지(myStep)'를 찾을 때 사용
     Optional<WheelState> findFirstByRoundIdAndMember_MemberId(String roundId, String memberId);
 
+    boolean existsByRoundId(String roundId);
+
     // 하루가 지났지만, 마감되지 않은 책바퀴(BookWheel)을 찾아내기.
     @Modifying
     @Query("UPDATE WheelState w SET w.wheelState = :status, w.isCompleted = true " +

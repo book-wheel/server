@@ -16,7 +16,9 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
+import com.bookwheel.server.wheel.service.WheelAssignmentService;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ public class GroupDashboardService {
     private final OwnBookRepository ownBookRepository;
     private final WheelStateRepository wheelStateRepository;
     private final RoundRepository roundRepository;
+    private final WheelAssignmentService wheelAssignmentService;
 
     public DashboardResponse getDashboard(String groupId, String userPK) {
         // 1. 유저, 그룹, 멤버 권한 체크
@@ -58,15 +61,32 @@ public class GroupDashboardService {
                 dDay = (int) ChronoUnit.DAYS.between(LocalDate.now(), plannedStartDate);
             }
 
+            // 첫 라운드에서 읽게 될 예정 책 계산
+            MyStepResponse myStep = resolvePreStartMyStep(groupId, member);
+
+            // 내가 등록한 책이 있으면 myBookStep 계산
+            MyBookStepResponse myBookStep = null;
+            Optional<OwnBook> myOwnBookOpt = ownBookRepository.findByGroup_GroupIdAndOwner_Id(groupId, user.getId());
+            if (myOwnBookOpt.isPresent()) {
+                OwnBook myOwnBook = myOwnBookOpt.get();
+                myBookStep = MyBookStepResponse.of(
+                        myOwnBook.getBook().getBookId(),
+                        myOwnBook.getBook().getTitle(),
+                        null,
+                        WheelStatus.READY,
+                        null
+                );
+            }
+
             return DashboardResponse.of(
                     group.getGroupName(),
                     0,                              // currentRound (아직 0회차)
                     group.getGroupRoundCount(),     // totalRound (총 회차 수)
                     plannedStartDate,               // startDate (예비 시작 날짜 반환)
-                    null,                           // endDate (아직 정확한 일정이 없으므로 null)
+                    plannedStartDate,               // endDate (0회차 종료일은 시작 예정일)
                     dDay,                           // dDay (시작일까지 남은 일수)
-                    null,                           // myStep (해당 라운드 책 없음)
-                    null                            // myBookStep (내 책 전달 정보 없음)
+                    myStep,                         // myStep (첫 라운드에 읽을 예정인 책)
+                    myBookStep                      // myBookStep (내 책 등록 정보)
             );
         }
 
@@ -127,6 +147,26 @@ public class GroupDashboardService {
                 dDay,
                 myStep,
                 myBookStep
+        );
+    }
+
+    // 첫 라운드에 읽을 예정인 책을 계산
+    private MyStepResponse resolvePreStartMyStep(String groupId, Member member) {
+        Optional<OwnBook> assignedBookOpt = wheelAssignmentService.findAssignedBook(groupId, member, 1);
+        if (assignedBookOpt.isEmpty()) {
+            return null;
+        }
+
+        OwnBook assignedBook = assignedBookOpt.get();
+        Book book = assignedBook.getBook();
+
+        return MyStepResponse.of(
+                null,
+                book.getBookId(),
+                WheelStatus.READY,
+                book.getTitle(),
+                book.getCoverImage(),
+                assignedBook.getOwner().getNickname()
         );
     }
 

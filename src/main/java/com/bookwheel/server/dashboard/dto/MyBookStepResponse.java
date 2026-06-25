@@ -10,16 +10,16 @@ public record MyBookStepResponse(
         @Schema(description = "책 ID", example = "book-uuid-123")
         String bookId,
 
-        @Schema(description = "내 책 제목", example = "채식주의자")
+        @Schema(description = "내가 등록한 책 제목", example = "채식주의자")
         String bookTitle,
 
-        @Schema(description = "현재 보유자 닉네임", example = "홍길동")
+        @Schema(description = "현재 책을 가진 사람 닉네임. 시작 전에는 null입니다.", example = "홍길동", nullable = true)
         String holderNickname,
 
-        @Schema(description = "상태값", example = "READING")
+        @Schema(description = "상태값. 시작 전에는 READY입니다.", example = "READY")
         WheelStatus status,
 
-        @Schema(description = "책 위치 정보 (없으면 null)", example = "서울시 마포구", nullable = true)
+        @Schema(description = "오프라인 그룹의 책 위치. 온라인이거나 시작 전이면 null입니다.", example = "서울특별시", nullable = true)
         String location
 ) {
     public static MyBookStepResponse of(
