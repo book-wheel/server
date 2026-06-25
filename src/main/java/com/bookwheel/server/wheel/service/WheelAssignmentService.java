@@ -110,15 +110,30 @@ public class WheelAssignmentService {
         return assignments;
     }
 
-    // 읽기 순서가 없다면 memberId 기준으로 임의 정렬
+    // 읽기 순서가 있는 멤버를 먼저 정렬하고, 읽기 순서가 없다면 memberId 기준으로 정렬
     private List<Member> sortMembers(List<Member> members) {
-        if (!members.isEmpty() && members.get(0).getReadOrder() == null) {
-            return members.stream()
-                    .sorted(Comparator.comparing(Member::getMemberId))
-                    .toList();
-        }
+        List<Member> sortedMembers = new ArrayList<>(members);
 
-        return members;
+        sortedMembers.sort((left, right) -> {
+            Integer leftReadOrder = left.getReadOrder();
+            Integer rightReadOrder = right.getReadOrder();
+
+            if (leftReadOrder == null && rightReadOrder == null) {
+                return left.getMemberId().compareTo(right.getMemberId());
+            }
+
+            if (leftReadOrder == null) {
+                return 1;
+            }
+
+            if (rightReadOrder == null) {
+                return -1;
+            }
+
+            return leftReadOrder.compareTo(rightReadOrder);
+        });
+
+        return sortedMembers;
     }
 
     // 한 멤버에게 어떤 책이 배정되었는지 담는 값 객체
