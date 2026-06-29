@@ -217,7 +217,10 @@ public class UserService {
         String mail = user.getMail();
 
         // 계정 비활성화 (Soft Delete)
+        // deleteByUser_IdAndMemberStatus의 clearAutomatically=true가 영속성 컨텍스트를 비워
+        // user 엔티티가 detach된 상태이므로 save()로 명시적으로 병합한다
         user.deactivate();
+        userRepository.save(user);
 
         // Redis에 저장된 Refresh Token 삭제
         refreshTokenRepository.deleteById(userPK);
