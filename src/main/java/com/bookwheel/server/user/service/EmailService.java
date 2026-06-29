@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.security.SecureRandom;
 import java.util.concurrent.TimeUnit;
@@ -22,6 +23,9 @@ public class EmailService {
     private static final int CODE_LENGTH = 6;
     private static final int EXPIRATION_MINUTES = 5;
     private static final int VERIFIED_EXPIRATION_MINUTES = 30; // 인증 완료 상태 유지 시간 - 30분
+
+    @Value("${app.mail.from}")
+    private String mailFrom;
 
     private final JavaMailSender mailSender;
     private final StringRedisTemplate redisTemplate;
@@ -99,6 +103,7 @@ public class EmailService {
 
     private void sendEmail(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailFrom);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(text);
