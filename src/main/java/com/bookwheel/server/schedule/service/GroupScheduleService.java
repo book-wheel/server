@@ -47,7 +47,6 @@ public class GroupScheduleService {
     private final OwnBookRepository ownBookRepository;
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
-    private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
     private final WheelAssignmentService wheelAssignmentService;
@@ -62,11 +61,13 @@ public class GroupScheduleService {
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
 
+        // 이미 완료된 그룹은 재생성 불가능
+        if (group.getGroupState() == State.COMPLETE) {
+            throw new BusinessException(ErrorCode.COMPLETED_GROUP_CANNOT_SCHEDULE);
+        }
+
         // ACTIVE 멤버 수를 기준으로 총 라운드 수를 결정
-        int activeMemberCount = memberRepository.findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(
-                List.of(groupId),
-                MemberStatus.ACTIVE
-        ).size();
+        int activeMemberCount = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE).size();
         if (activeMemberCount < 2) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED);
         }
@@ -113,9 +114,11 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
         }
 
-        // 기존 스케줄 초기화 (이전 논의 내용 반영: Repository 벌크 삭제 사용)
-        roundRepository.deleteByGroup_GroupId(groupId);
-        group.updateScheduleInfo(startDate, roundCount);
+        // 기존 스케줄 초기화
+        if (group.getGroupState() == State.RECRUITING) {
+            roundRepository.deleteByGroup_GroupId(groupId);
+            group.updateScheduleInfo(startDate, roundCount);
+        }
 
         // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
         List<Round> roundEntities = rounds.stream()
