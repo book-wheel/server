@@ -28,7 +28,6 @@ import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.wheel.service.WheelAssignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +59,8 @@ public class GroupScheduleService {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
-
-        // 이미 완료된 그룹은 재생성 불가능
-        if (group.getGroupState() == State.COMPLETE) {
-            throw new BusinessException(ErrorCode.COMPLETED_GROUP_CANNOT_SCHEDULE);
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
         }
 
         // ACTIVE 멤버 수를 기준으로 총 라운드 수를 결정
@@ -115,10 +112,8 @@ public class GroupScheduleService {
         }
 
         // 기존 스케줄 초기화
-        if (group.getGroupState() == State.RECRUITING) {
-            roundRepository.deleteByGroup_GroupId(groupId);
-            group.updateScheduleInfo(startDate, roundCount);
-        }
+        roundRepository.deleteByGroup_GroupId(groupId);
+        group.updateScheduleInfo(startDate, roundCount);
 
         // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
         List<Round> roundEntities = rounds.stream()

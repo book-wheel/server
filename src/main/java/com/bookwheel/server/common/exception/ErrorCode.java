@@ -73,7 +73,7 @@ public enum ErrorCode {
     LEADER_CANNOT_EXIT(HttpStatus.BAD_REQUEST, "GROUP_032", "그룹장/부그룹장은 권한을 위임하거나 해제한 뒤 중도하차할 수 있습니다."),
     READING_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "GROUP_033", "현재 라운드의 책을 완독 처리한 뒤 중도하차할 수 있습니다."),
     GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_034", "일정을 생성하려면 ACTIVE 멤버가 2명 이상이어야 합니다."),
-    COMPLETED_GROUP_CANNOT_SCHEDULE(HttpStatus.BAD_REQUEST, "GROUP_035", "이미 완료된 그룹은 일정 생성이 불가능합니다."),
+    GROUP_RECRUITING_STATE_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_035", "모집 중인 모임에서만 수행할 수 있습니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
