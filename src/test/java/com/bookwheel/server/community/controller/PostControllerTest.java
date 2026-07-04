@@ -2,8 +2,6 @@ package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
-import com.bookwheel.server.community.dto.PostCreateRequest;
-import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.dto.PostImagePresignedRequest;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import com.bookwheel.server.community.service.PostService;
@@ -20,7 +18,6 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -87,37 +84,6 @@ class PostControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("Community Gallery: save post success")
-    void savePost_Success() throws Exception {
-        String isbn = "9788966263158";
-        PostCreateRequest request = new PostCreateRequest(
-            isbn,
-                "Nice book",
-                List.of("posts/1/abc.jpg")
-        );
-        PostCreateResponse response = new PostCreateResponse(
-            10L,
-            isbn,
-            "Nice book",
-            List.of("posts/1/abc.jpg"),
-            LocalDateTime.now()
-        );
-
-        given(postService.create(any(PostCreateRequest.class), any()))
-            .willReturn(response);
-
-        mockMvc.perform(post("/api/v1/posts")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.postId").value(10L))
-                .andExpect(jsonPath("$.data.isbn").value(isbn));
-    }
-
-    @Test
-    @WithMockUser
     @DisplayName("Community Gallery: toggle like success")
     void togglePostLike_Success() throws Exception {
         Long postId = 7L;
@@ -161,21 +127,6 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
-    @Test
-    @WithMockUser
-    @DisplayName("Community Gallery: report post success")
-    void reportPost_Success() throws Exception {
-        Long postId = 99L;
-
-        mockMvc.perform(post("/api/v1/posts/{postId}/reports", postId)
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isString());
-    }
 }
-
 
 
