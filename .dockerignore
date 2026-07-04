@@ -7,3 +7,4 @@ out
 .DS_Store
 .env
 application-secret*
+src/main/resources/application-dev.properties
