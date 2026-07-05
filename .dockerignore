@@ -1,0 +1,10 @@
+.git
+.github
+.gradle
+build
+out
+*.iml
+.DS_Store
+.env
+application-secret*
+src/main/resources/application-dev.properties

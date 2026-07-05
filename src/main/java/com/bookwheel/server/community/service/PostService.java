@@ -9,10 +9,13 @@ import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.dto.PostReportRequest;
 import com.bookwheel.server.community.entity.*;
+import com.bookwheel.server.community.event.PostCommentedEvent;
+import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.repository.*;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
     private final PostReportRepository postReportRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PostCreateResponse create(PostCreateRequest request, String userPK) {
@@ -70,6 +74,15 @@ public class PostService {
                 () -> {
                     postLikeRepository.save(PostLike.create(post, user));
                     post.increaseLikeCount();
+                    String ownerUserPK = post.getUploader().getId();
+                    if (!ownerUserPK.equals(userPK)) {
+                        eventPublisher.publishEvent(new PostLikedEvent(
+                                post.getPostId(),
+                                ownerUserPK,
+                                userPK,
+                                user.getNickname()
+                        ));
+                    }
                 }
             );
     }
@@ -86,6 +99,17 @@ public class PostService {
         PostComment comment = request.toEntity(post, user);
 
         postCommentRepository.save(comment);
+
+        String ownerUserPK = post.getUploader().getId();
+        if (!ownerUserPK.equals(userPK)) {
+            eventPublisher.publishEvent(new PostCommentedEvent(
+                    post.getPostId(),
+                    ownerUserPK,
+                    userPK,
+                    user.getNickname(),
+                    comment.getContent()
+            ));
+        }
     }
 
     @Transactional

@@ -12,6 +12,7 @@ import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.ReviewLike;
+import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
@@ -20,6 +21,7 @@ import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
@@ -35,6 +37,7 @@ public class BookService {
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final BookLikeRepository bookLikeRepository;
     private final PostRepository postRepository;
     private final CursorUtils cursorUtils;
@@ -87,6 +90,15 @@ public class BookService {
                 () -> {
                     reviewLikeRepository.save(ReviewLike.create(review, user));
                     review.increaseLikeCount();
+                    String reviewerUserPK = review.getReviewer().getId();
+                    if (!reviewerUserPK.equals(userPK)) {
+                        eventPublisher.publishEvent(new ReviewLikedEvent(
+                                review.getReviewId(),
+                                reviewerUserPK,
+                                userPK,
+                                user.getNickname()
+                        ));
+                    }
                 }
             );
     }

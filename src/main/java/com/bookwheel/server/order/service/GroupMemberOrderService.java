@@ -10,9 +10,11 @@ import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.order.dto.MemberReadOrderRequest;
 import com.bookwheel.server.order.dto.MemberReadOrderResponse;
+import com.bookwheel.server.order.event.ReadOrderAssignedEvent;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -32,6 +34,7 @@ public class GroupMemberOrderService {
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public List<MemberReadOrderResponse> assignReadOrder(
@@ -39,7 +42,7 @@ public class GroupMemberOrderService {
             MemberReadOrderRequest request,
             String userPK
     ) {
-        findGroupById(groupId);
+        Group group = findGroupById(groupId);
         findActiveUserById(userPK);
         validateManagerPermission(groupId, userPK);
         validateRequestShape(request);
@@ -55,6 +58,12 @@ public class GroupMemberOrderService {
         }
 
         memberRepository.saveAll(activeMembers);
+
+        eventPublisher.publishEvent(new ReadOrderAssignedEvent(
+                group.getGroupId(),
+                group.getGroupName(),
+                orderedMembers.stream().map(m -> m.getUser().getId()).toList()
+        ));
 
         return orderedMembers.stream()
                 .map(member -> MemberReadOrderResponse.of(

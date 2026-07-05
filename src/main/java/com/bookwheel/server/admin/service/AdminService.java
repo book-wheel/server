@@ -3,6 +3,7 @@ package com.bookwheel.server.admin.service;
 
 import com.bookwheel.server.admin.dto.*;
 import com.bookwheel.server.admin.entity.Penalty;
+import com.bookwheel.server.admin.event.UserBannedEvent;
 import com.bookwheel.server.admin.repository.PenaltyRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -13,6 +14,7 @@ import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +33,7 @@ public class AdminService {
     private final PenaltyRepository penaltyRepository;
     private final PostRepository postRepository;
     private final S3Service s3Service;
+    private final ApplicationEventPublisher eventPublisher;
 
     //회원 강제 탈퇴/정지 시키기
     @Transactional
@@ -59,6 +62,13 @@ public class AdminService {
             .build();
 
         penaltyRepository.save(history);
+
+        eventPublisher.publishEvent(new UserBannedEvent(
+                user.getId(),
+                request.banType(),
+                reasonMessage,
+                user.getBanExpiredAt()
+        ));
 
         return AdminBanResponse.builder()
             .userPK(user.getId())
