@@ -7,6 +7,7 @@ import com.bookwheel.server.group.dto.member.*;
 import com.bookwheel.server.group.dto.search.*;
 import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.*;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
 import com.bookwheel.server.group.event.GroupJoinRequestedEvent;
 import com.bookwheel.server.group.repository.*;
@@ -154,6 +155,9 @@ public class GroupService {
         }
 
         if (status == MemberRequestStatus.APPROVED) {
+            if (group.getGroupState() != State.RECRUITING) {
+                throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+            }
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }

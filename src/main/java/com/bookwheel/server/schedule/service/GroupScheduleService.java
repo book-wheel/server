@@ -28,7 +28,6 @@ import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.wheel.service.WheelAssignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +46,6 @@ public class GroupScheduleService {
     private final OwnBookRepository ownBookRepository;
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
-    private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
     private final WheelAssignmentService wheelAssignmentService;
@@ -61,12 +59,12 @@ public class GroupScheduleService {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
 
         // ACTIVE 멤버 수를 기준으로 총 라운드 수를 결정
-        int activeMemberCount = memberRepository.findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(
-                List.of(groupId),
-                MemberStatus.ACTIVE
-        ).size();
+        int activeMemberCount = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE).size();
         if (activeMemberCount < 2) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED);
         }
@@ -113,7 +111,7 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
         }
 
-        // 기존 스케줄 초기화 (이전 논의 내용 반영: Repository 벌크 삭제 사용)
+        // 기존 스케줄 초기화
         roundRepository.deleteByGroup_GroupId(groupId);
         group.updateScheduleInfo(startDate, roundCount);
 
