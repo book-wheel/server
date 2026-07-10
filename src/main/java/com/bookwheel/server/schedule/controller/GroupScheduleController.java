@@ -29,7 +29,7 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "ACTIVE 멤버 수 기준으로 라운드를 생성합니다. endDate는 선택값이며, 책 등록 전에도 일정 생성이 가능합니다."
+            description = "모집 중(RECRUITING)인 모임에서만 ACTIVE 멤버 수 기준으로 라운드를 생성하거나 재생성합니다. endDate는 선택값이며, 책 등록 전에도 일정 생성이 가능합니다. 진행 중 또는 완료된 모임에서는 GROUP_035 오류가 반환됩니다."
     )
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(

@@ -143,8 +143,15 @@ public class GroupScheduleService {
         );
 
         List<Group> startableGroups = new ArrayList<>();
-        for (Group group : startingGroups) {
-            if (prepareStartableSchedule(group, localDate)) {
+        for (Group candidateGroup : startingGroups) {
+            // 시작 처리와 멤버 변경이 동시에 일어나도 같은 모임을 중복 판단하지 않도록 잠근다.
+            Optional<Group> lockedGroup = groupRepository.findByGroupIdForUpdate(candidateGroup.getGroupId());
+            if (lockedGroup.isEmpty()) {
+                continue;
+            }
+
+            Group group = lockedGroup.get();
+            if (group.getGroupState() == State.RECRUITING && prepareStartableSchedule(group, localDate)) {
                 startableGroups.add(group);
             }
         }
@@ -170,8 +177,8 @@ public class GroupScheduleService {
     }
 
     private boolean prepareStartableSchedule(Group group, LocalDate startDate) {
-        List<Member> activeMembers = memberRepository.findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(
-                List.of(group.getGroupId()),
+        List<Member> activeMembers = memberRepository.findByGroupIdAndMemberStatusForUpdate(
+                group.getGroupId(),
                 MemberStatus.ACTIVE
         );
         if (activeMembers.size() < 2) {
@@ -191,16 +198,51 @@ public class GroupScheduleService {
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
         int expectedRoundCount = activeMembers.size() - 1;
 
-        // TODO: 일정 생성 이후 ACTIVE 멤버 수가 바뀐 경우, 일정 재생성 또는 시작 차단 정책을 별도로 정해야 한다.
         if (rounds.isEmpty()) {
             createDefaultRounds(group, expectedRoundCount, startDate, readingPeriod);
             group.updateScheduleInfo(startDate, expectedRoundCount);
             return true;
         }
 
+        // 저장된 계획이 현재 ACTIVE 멤버 수와 맞지 않으면 자동 시작하지 않는다.
+        if (!hasValidExistingRoundShape(rounds, expectedRoundCount)) {
+            return false;
+        }
+
         Round firstRound = rounds.get(0);
+        if (firstRound.getStartDate().isAfter(startDate)) {
+            return false;
+        }
         if (firstRound.getStartDate().isBefore(startDate)) {
             shiftRoundsFromStartDate(group, rounds, startDate, readingPeriod);
+        }
+
+        return true;
+    }
+
+    private boolean hasValidExistingRoundShape(List<Round> rounds, int expectedRoundCount) {
+        if (rounds.size() != expectedRoundCount) {
+            return false;
+        }
+
+        LocalDate previousEndDate = null;
+        for (int index = 0; index < rounds.size(); index++) {
+            Round round = rounds.get(index);
+            int expectedRoundNumber = index + 1;
+            if (!Objects.equals(round.getRoundNumber(), expectedRoundNumber)) {
+                return false;
+            }
+            if (round.getStartDate() == null || round.getEndDate() == null) {
+                return false;
+            }
+            if (round.getStartDate().isAfter(round.getEndDate())) {
+                return false;
+            }
+            // 라운드 번호와 날짜가 연속되지 않으면 기존 일정은 손상된 것으로 본다.
+            if (previousEndDate != null && !round.getStartDate().equals(previousEndDate.plusDays(1))) {
+                return false;
+            }
+            previousEndDate = round.getEndDate();
         }
 
         return true;
