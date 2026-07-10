@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +19,12 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
     Optional<WheelState> findFirstByRoundIdAndMember_MemberId(String roundId, String memberId);
 
     boolean existsByRoundId(String roundId);
+
+    boolean existsByRoundIdIn(Collection<String> roundIds);
+
+    List<WheelState> findByRoundIdIn(Collection<String> roundIds);
+
+    void deleteByRoundIdIn(Collection<String> roundIds);
 
     // 하루가 지났지만, 마감되지 않은 책바퀴(BookWheel)을 찾아내기.
     @Modifying
