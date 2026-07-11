@@ -19,6 +19,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,7 @@ public class WheelService {
     private final OwnBookRepository ownBookRepository;
     private final S3Service s3Service;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     @Transactional
     public WheelCompleteResponse completedReading(String userPK, String wheelStateId, WheelCompleteRequest request) {
@@ -45,6 +48,8 @@ public class WheelService {
         if (!wheelState.getMember().getUser().getId().equals(userPK)) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
         }
+
+        validateCompletableWheelState(wheelState);
 
         // TODO: 북 게시판 사진첩 연동 기능 추가 예정 (BookService 연동)
 
@@ -69,6 +74,22 @@ public class WheelService {
         ));
 
         return WheelCompleteResponse.of(wheelState.getWheelStateId(), wheelState.getIsCompleted(), wheelState.getWheelState());
+    }
+
+    private void validateCompletableWheelState(WheelState wheelState) {
+        if (Boolean.TRUE.equals(wheelState.getIsCompleted())) {
+            return;
+        }
+        if (wheelState.getWheelState() != WheelStatus.READY) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String groupId = wheelState.getMember().getGroup().getGroupId();
+        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
+        if (!currentRound.getRoundId().equals(wheelState.getRoundId())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
     }
 
     @Transactional(readOnly = true)

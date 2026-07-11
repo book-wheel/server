@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,10 @@ public interface RoundRepository extends JpaRepository<Round, String> {
     @Modifying
     @Query("DELETE FROM Round r WHERE r.group.groupId = :groupId")
     void deleteByGroup_GroupId(String groupId);
+
+    @Modifying
+    @Query("DELETE FROM Round r WHERE r.roundId IN :roundIds")
+    void deleteByRoundIdIn(@Param("roundIds") Collection<String> roundIds);
     
     // 특정 라운드 조회 (현재 라운드 계산, 전체 일정 표시용)
     List<Round> findByGroup_GroupIdOrderByRoundNumberAsc(String groupId);

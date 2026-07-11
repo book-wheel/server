@@ -2,6 +2,7 @@ package com.bookwheel.server.schedule.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.service.GroupScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +39,24 @@ public class GroupScheduleController {
             @AuthenticationPrincipal Object principal
     ) {
         List<GroupScheduleRoundResponse> response = groupScheduleService.createSchedule(
+                groupId,
+                request,
+                getUserPK(principal)
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "미래 독서 일정 재생성",
+            description = "진행 중(IN_PROGRESS)인 모임에서 이미 시작된 라운드는 보존하고, 미래 라운드만 최종 전체 라운드 수에 맞춰 재생성합니다."
+    )
+    @PostMapping("/{groupId}/schedule/future")
+    public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> regenerateFutureSchedule(
+            @PathVariable String groupId,
+            @RequestBody @Valid GroupScheduleFutureRequest request,
+            @AuthenticationPrincipal Object principal
+    ) {
+        List<GroupScheduleRoundResponse> response = groupScheduleService.regenerateFutureSchedule(
                 groupId,
                 request,
                 getUserPK(principal)

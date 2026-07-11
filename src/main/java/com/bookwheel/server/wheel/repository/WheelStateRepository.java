@@ -24,7 +24,11 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
 
     List<WheelState> findByRoundIdIn(Collection<String> roundIds);
 
+    List<WheelState> findByRoundId(String roundId);
+
     void deleteByRoundIdIn(Collection<String> roundIds);
+
+    void deleteByRoundIdInAndWheelState(Collection<String> roundIds, WheelStatus wheelState);
 
     // 하루가 지났지만, 마감되지 않은 책바퀴(BookWheel)을 찾아내기.
     @Modifying

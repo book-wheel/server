@@ -16,14 +16,18 @@ import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.dto.WheelAssignmentPlan;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.wheel.service.WheelReassignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +39,7 @@ public class GroupSettingService {
     private final WheelStateRepository wheelStateRepository;
     private final WheelReassignmentService wheelReassignmentService;
     private final GroupMemberPermissionValidator memberPermissionValidator;
+    private final Clock clock;
 
     @Transactional
     public MemberKickResponse kickMember(String groupId, String targetUserPK, String leaderUserPK) {
@@ -52,8 +57,14 @@ public class GroupSettingService {
         validateKickableTarget(targetMember);
         List<Member> remainingMembers = remainingMembers(activeMembers, targetMember);
 
-        prepareRemovalBeforeStatusMutation(lockedMembers.group(), targetMember, remainingMembers);
+        Runnable postStatusMutation = prepareRemovalBeforeStatusMutation(
+                lockedMembers.group(),
+                targetMember,
+                remainingMembers,
+                false
+        );
         targetMember.kick();
+        postStatusMutation.run();
 
         return MemberKickResponse.of(targetUserPK, targetMember.getMemberStatus());
     }
@@ -151,9 +162,15 @@ public class GroupSettingService {
         }
 
         List<Member> remainingMembers = remainingMembers(activeMembers, member);
-        prepareRemovalBeforeStatusMutation(lockedMembers.group(), member, remainingMembers);
+        Runnable postStatusMutation = prepareRemovalBeforeStatusMutation(
+                lockedMembers.group(),
+                member,
+                remainingMembers,
+                true
+        );
 
         member.exit();
+        postStatusMutation.run();
 
         return MemberExitResponse.of(groupId, userPK, member.getMemberStatus());
     }
@@ -165,18 +182,77 @@ public class GroupSettingService {
         return new LockedActiveMembers(group, activeMembers);
     }
 
-    private void prepareRemovalBeforeStatusMutation(Group group, Member member, List<Member> remainingMembers) {
+    private Runnable prepareRemovalBeforeStatusMutation(
+            Group group,
+            Member member,
+            List<Member> remainingMembers,
+            boolean validateCurrentReading
+    ) {
         switch (group.getGroupState()) {
             case IN_PROGRESS -> {
                 // 현재/완료 라운드는 보존하고, 미래 라운드만 모두 재배정 가능할 때 탈퇴를 허용한다.
-                validateCurrentRoundCompletion(group.getGroupId(), member);
-                wheelReassignmentService.reassignFutureRounds(group.getGroupId(), member, remainingMembers);
+                if (validateCurrentReading) {
+                    validateCurrentRoundCompletion(group.getGroupId(), member);
+                }
+                try {
+                    WheelAssignmentPlan plan = wheelReassignmentService.reassignFutureRounds(
+                            group.getGroupId(),
+                            member,
+                            remainingMembers
+                    );
+                    return () -> wheelReassignmentService.replaceFuturePlannedAssignments(
+                            group.getGroupId(),
+                            plan,
+                            remainingMembers
+                    );
+                } catch (BusinessException exception) {
+                    if (exception.getErrorCode() != ErrorCode.WHEEL_REASSIGNMENT_IMPOSSIBLE) {
+                        throw exception;
+                    }
+                    return () -> deleteFutureRoundsForManualRegeneration(group);
+                }
             }
             // 모집 중에 바뀐 멤버 구성은 다음 일정 생성 시점에 다시 반영한다.
-            case RECRUITING -> invalidateGeneratedScheduleIfPresent(group);
+            case RECRUITING -> {
+                invalidateGeneratedScheduleIfPresent(group);
+                return () -> {
+                };
+            }
             case COMPLETE -> {
+                return () -> {
+                };
             }
         }
+        throw new IllegalStateException("Unsupported group state: " + group.getGroupState());
+    }
+
+    private void deleteFutureRoundsForManualRegeneration(Group group) {
+        LocalDate today = LocalDate.now(clock);
+        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
+        List<Round> futureRounds = rounds.stream()
+                .filter(round -> isFutureRound(round, today))
+                .toList();
+        if (futureRounds.isEmpty()) {
+            return;
+        }
+
+        List<String> futureRoundIds = futureRounds.stream()
+                .map(Round::getRoundId)
+                .toList();
+        int lastProtectedRoundNumber = rounds.stream()
+                .filter(round -> !isFutureRound(round, today))
+                .map(Round::getRoundNumber)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+
+        wheelStateRepository.deleteByRoundIdIn(futureRoundIds);
+        roundRepository.deleteAllByIdInBatch(futureRoundIds);
+        group.updateScheduleInfo(group.getStartDate(), lastProtectedRoundNumber);
+    }
+
+    private boolean isFutureRound(Round round, LocalDate today) {
+        return round.getStartDate() != null && round.getStartDate().isAfter(today);
     }
 
     private void invalidateGeneratedScheduleIfPresent(Group group) {
@@ -186,11 +262,15 @@ public class GroupSettingService {
         }
 
         List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
-        if (wheelStateRepository.existsByRoundIdIn(roundIds)) {
+        List<WheelState> wheelStates = wheelStateRepository.findByRoundIdIn(roundIds);
+        boolean hasStartedWheelState = wheelStates.stream()
+                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
+        if (hasStartedWheelState) {
             // 이미 생성된 진행 기록은 모집 일정 무효화로 지우지 않는다.
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
         }
 
+        wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
         roundRepository.deleteByGroup_GroupId(group.getGroupId());
         group.invalidateSchedule();
     }
@@ -226,7 +306,7 @@ public class GroupSettingService {
     }
 
     private void validateCurrentRoundCompletion(String groupId, Member member) {
-        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now())
+        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
                 .orElse(null);
 
         if (currentRound != null) {
