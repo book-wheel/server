@@ -74,6 +74,9 @@ public enum ErrorCode {
     READING_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "GROUP_033", "현재 라운드의 책을 완독 처리한 뒤 중도하차할 수 있습니다."),
     GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_034", "일정을 생성하려면 ACTIVE 멤버가 2명 이상이어야 합니다."),
 
+    // 채팅 관련 에러
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
+
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),

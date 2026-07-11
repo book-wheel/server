@@ -41,9 +41,8 @@ public class ChatService {
     private final MemberRepository memberRepository;
     private final S3Service s3Service;
 
-    @Transactional
     public ChatRoomResponse getChatRoom(String groupId, String userPK) {
-        ChatRoom chatRoom = findOrCreateAccessibleChatRoom(groupId, userPK);
+        ChatRoom chatRoom = findAccessibleChatRoom(groupId, userPK);
 
         Long lastReadMessageId = findLastReadMessageId(chatRoom, userPK);
         long unreadCount = countUnreadMessages(chatRoom, lastReadMessageId);
@@ -57,7 +56,7 @@ public class ChatService {
     }
 
     public ChatMessageListResponse getMessages(String groupId, String userPK, Long cursor, Integer size) {
-        ChatRoom chatRoom = findOrCreateAccessibleChatRoom(groupId, userPK);
+        ChatRoom chatRoom = findAccessibleChatRoom(groupId, userPK);
         Long baseCursor = resolveCursor(chatRoom, userPK, cursor);
         PageRequest pageRequest = PageRequest.of(0, normalizeSize(size));
 
@@ -87,7 +86,7 @@ public class ChatService {
 
     @Transactional
     public ChatRoomReadResponse updateReadState(String groupId, String userPK, Long lastReadMessageId) {
-        ChatRoom chatRoom = findOrCreateAccessibleChatRoom(groupId, userPK);
+        ChatRoom chatRoom = findAccessibleChatRoom(groupId, userPK);
         Member member = validateActiveMember(groupId, userPK);
 
         ChatMessage lastReadMessage = chatMessageRepository.findByChatMessageIdAndChatRoom(lastReadMessageId, chatRoom)
@@ -108,13 +107,11 @@ public class ChatService {
                 .build();
     }
 
-    private ChatRoom findOrCreateAccessibleChatRoom(String groupId, String userPK) {
-        Group group = findGroup(groupId);
+    private ChatRoom findAccessibleChatRoom(String groupId, String userPK) {
+        findGroup(groupId);
         validateActiveMember(groupId, userPK);
         return chatRoomRepository.findByGroup_GroupId(groupId)
-                .orElseGet(() -> chatRoomRepository.save(ChatRoom.builder()
-                        .group(group)
-                        .build()));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
 
     private Group findGroup(String groupId) {
