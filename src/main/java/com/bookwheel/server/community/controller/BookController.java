@@ -77,8 +77,11 @@ public class BookController {
 
     @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서 상세 정보를 조회합니다.")
     @GetMapping("/{isbn}")
-    public ApiResponse<BookDetailResponse> getBookDetail(@PathVariable("isbn") String isbn) {
-        BookDetailResponse response = bookService.getBookDetail(isbn);
+    public ApiResponse<BookDetailResponse> getBookDetail(
+        @PathVariable("isbn") String isbn,
+        @AuthenticationPrincipal Object principal
+    ) {
+        BookDetailResponse response = bookService.getBookDetail(isbn, getUserPK(principal));
         return ApiResponse.success(response);
     }
 

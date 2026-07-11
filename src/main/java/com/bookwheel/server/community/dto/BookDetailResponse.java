@@ -26,10 +26,13 @@ public record BookDetailResponse(
     String toc,
 
     @Schema(description = "13자리 ISBN", example = "9791161571188")
-    String isbn
+    String isbn,
+
+    @Schema(description = "현재 로그인한 사용자의 관심 도서(찜) 여부", example = "true")
+    boolean isInterested
 ) {
 
-    public static BookDetailResponse from(AladinBookSearchResponse.Item item) {
+    public static BookDetailResponse from(AladinBookSearchResponse.Item item, boolean isInterested) {
         var subInfo = item.subInfo();
 
         return new BookDetailResponse(
@@ -41,7 +44,8 @@ public record BookDetailResponse(
             (subInfo != null && subInfo.itemPage() != null) ? subInfo.itemPage() : 0,
             (subInfo != null && subInfo.toc() != null && !subInfo.toc().isBlank())
                 ? subInfo.toc() : "등록된 목차 정보가 없습니다.",
-            item.isbn13()
+            item.isbn13(),
+            isInterested
         );
     }
 }

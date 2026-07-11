@@ -16,6 +16,8 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
 
     Optional<BookLike> findByBookInfoAndUserPK(BookInfo bookInfo, String userPK);
 
+    boolean existsByBookInfo_IsbnAndUserPK(String isbn, String userPK);
+
     long countByUserPK(String userPK);
 
     @Query("""
