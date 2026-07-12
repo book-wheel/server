@@ -118,6 +118,9 @@ public class GroupSettingService {
             throw new BusinessException(ErrorCode.CANNOT_TRANSFER_TO_SELF);
         }
 
+        // 미래 일정 재생성의 리더 검증과 같은 그룹 잠금을 사용해 권한 변경을 직렬화한다.
+        groupRepository.findByGroupIdForUpdate(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
         memberPermissionValidator.validateLeader(groupId, leaderUserPK);
 
         Member leaderMember = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, leaderUserPK)
