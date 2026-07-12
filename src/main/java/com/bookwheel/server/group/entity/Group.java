@@ -70,6 +70,12 @@ public class Group {
         this.groupRoundCount = groupRoundCount;
     }
 
+    // 멤버 구성이 바뀌면 기존 라운드 계획은 더 이상 유효하지 않다.
+    public void invalidateSchedule() {
+        this.startDate = null;
+        this.groupRoundCount = 0;
+    }
+
     public void updateGroupPassword(String groupPassword) {
         this.groupPassword = groupPassword;
     }

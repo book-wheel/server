@@ -6,6 +6,9 @@ import com.bookwheel.server.group.dto.setting.LeadershipTransferResponse;
 import com.bookwheel.server.group.dto.setting.MemberExitResponse;
 import com.bookwheel.server.group.dto.setting.MemberKickResponse;
 import com.bookwheel.server.group.dto.setting.MemberRoleChangeResponse;
+import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -14,32 +17,44 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
+import com.bookwheel.server.wheel.service.WheelReassignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class GroupSettingService {
+    private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
+    private final WheelReassignmentService wheelReassignmentService;
     private final GroupMemberPermissionValidator memberPermissionValidator;
+    private final Clock clock;
 
     @Transactional
     public MemberKickResponse kickMember(String groupId, String targetUserPK, String leaderUserPK) {
-        memberPermissionValidator.validateLeader(groupId, leaderUserPK);
-
         if (leaderUserPK.equals(targetUserPK)) {
             throw new BusinessException(ErrorCode.CANNOT_KICK_YOURSELF);
         }
 
-        Member targetMember = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, targetUserPK)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        // 멤버 구성과 라운드 재배정 판단을 하나의 잠긴 시점에서 처리한다.
+        LockedActiveMembers lockedMembers = lockedActiveMembers(groupId);
+        List<Member> activeMembers = lockedMembers.activeMembers();
 
+        memberPermissionValidator.validateLeader(groupId, leaderUserPK);
+
+        Member targetMember = findKickTargetMember(groupId, activeMembers, targetUserPK);
+        validateKickableTarget(targetMember);
+        List<Member> remainingMembers = remainingMembers(activeMembers, targetMember);
+
+        prepareRemovalBeforeStatusMutation(lockedMembers.group(), targetMember, remainingMembers);
         targetMember.kick();
 
         return MemberKickResponse.of(targetUserPK, targetMember.getMemberStatus());
@@ -127,8 +142,9 @@ public class GroupSettingService {
 
     @Transactional
     public MemberExitResponse exitMember(String groupId, String userPK) {
-        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        LockedActiveMembers lockedMembers = lockedActiveMembers(groupId);
+        List<Member> activeMembers = lockedMembers.activeMembers();
+        Member member = findActiveMember(activeMembers, userPK);
 
         // 1. 그룹장/부그룹장은 중도하차 불가 — 권한 위임/해제 선행 필요
         MemberRole role = member.getMemberRole();
@@ -136,8 +152,83 @@ public class GroupSettingService {
             throw new BusinessException(ErrorCode.LEADER_CANNOT_EXIT);
         }
 
-        // 2. 현재 라운드의 책이 완독 처리되지 않았다면 중도하차 불가
-        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now())
+        List<Member> remainingMembers = remainingMembers(activeMembers, member);
+        prepareRemovalBeforeStatusMutation(lockedMembers.group(), member, remainingMembers);
+
+        member.exit();
+
+        return MemberExitResponse.of(groupId, userPK, member.getMemberStatus());
+    }
+
+    private LockedActiveMembers lockedActiveMembers(String groupId) {
+        Group group = groupRepository.findByGroupIdForUpdate(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        List<Member> activeMembers = memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE);
+        return new LockedActiveMembers(group, activeMembers);
+    }
+
+    private void prepareRemovalBeforeStatusMutation(Group group, Member member, List<Member> remainingMembers) {
+        switch (group.getGroupState()) {
+            case IN_PROGRESS -> {
+                // 현재/완료 라운드는 보존하고, 미래 라운드만 모두 재배정 가능할 때 탈퇴를 허용한다.
+                validateCurrentRoundCompletion(group.getGroupId(), member);
+                wheelReassignmentService.reassignFutureRounds(group.getGroupId(), member, remainingMembers);
+            }
+            // 모집 중에 바뀐 멤버 구성은 다음 일정 생성 시점에 다시 반영한다.
+            case RECRUITING -> invalidateGeneratedScheduleIfPresent(group);
+            case COMPLETE -> {
+            }
+        }
+    }
+
+    private void invalidateGeneratedScheduleIfPresent(Group group) {
+        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
+        if (rounds.isEmpty()) {
+            return;
+        }
+
+        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
+        if (wheelStateRepository.existsByRoundIdIn(roundIds)) {
+            // 이미 생성된 진행 기록은 모집 일정 무효화로 지우지 않는다.
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
+        }
+
+        roundRepository.deleteByGroup_GroupId(group.getGroupId());
+        group.invalidateSchedule();
+    }
+
+    private Member findActiveMember(List<Member> activeMembers, String userPK) {
+        return activeMembers.stream()
+                .filter(member -> member.getUser().getId().equals(userPK))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    private Member findKickTargetMember(String groupId, List<Member> activeMembers, String targetUserPK) {
+        return activeMembers.stream()
+                .filter(member -> member.getUser().getId().equals(targetUserPK))
+                .findFirst()
+                .or(() -> memberRepository.findByGroup_GroupIdAndUser_Id(groupId, targetUserPK))
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    private void validateKickableTarget(Member targetMember) {
+        if (targetMember.getMemberStatus() != MemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.INVALID_TARGET_MEMBER);
+        }
+        if (targetMember.getMemberRole() != MemberRole.MEMBER) {
+            throw new BusinessException(ErrorCode.GROUP_MEMBER_ONLY);
+        }
+    }
+
+    private List<Member> remainingMembers(List<Member> activeMembers, Member targetMember) {
+        return activeMembers.stream()
+                .filter(member -> !member.getMemberId().equals(targetMember.getMemberId()))
+                .toList();
+    }
+
+    private void validateCurrentRoundCompletion(String groupId, Member member) {
+        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
                 .orElse(null);
 
         if (currentRound != null) {
@@ -149,9 +240,8 @@ public class GroupSettingService {
                 throw new BusinessException(ErrorCode.READING_NOT_COMPLETED);
             }
         }
+    }
 
-        member.exit();
-
-        return MemberExitResponse.of(groupId, userPK, member.getMemberStatus());
+    private record LockedActiveMembers(Group group, List<Member> activeMembers) {
     }
 }

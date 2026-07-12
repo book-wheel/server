@@ -74,6 +74,8 @@ public enum ErrorCode {
     READING_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "GROUP_033", "현재 라운드의 책을 완독 처리한 뒤 중도하차할 수 있습니다."),
     GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_034", "일정을 생성하려면 ACTIVE 멤버가 2명 이상이어야 합니다."),
     GROUP_RECRUITING_STATE_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_035", "모집 중인 모임에서만 수행할 수 있습니다."),
+    WHEEL_REASSIGNMENT_IMPOSSIBLE(HttpStatus.BAD_REQUEST, "GROUP_036", "남은 멤버에게 미래 라운드의 책을 재배정할 수 없습니다."),
+    GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE(HttpStatus.INTERNAL_SERVER_ERROR, "GROUP_037", "기존 책바퀴 진행 상태가 있어 모집 일정 초기화를 중단했습니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
