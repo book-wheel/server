@@ -113,6 +113,7 @@ public class WheelReassignmentService {
         }
 
         wheelStateRepository.deleteByRoundIdInAndWheelState(futureRoundIds, WheelStatus.PLANNED);
+        // 동일한 라운드·멤버 조합을 다시 저장하기 전에 DELETE를 먼저 반영해 유니크 제약 충돌을 막는다.
         wheelStateRepository.flush();
         List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(groupId));
         savePlannedAssignments(plan, remainingMembers, books);
