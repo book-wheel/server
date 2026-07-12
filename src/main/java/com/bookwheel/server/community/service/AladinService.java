@@ -29,7 +29,7 @@ public class AladinService {
     private final RestClient restClient;
 
 
-    public BookDetailResponse getBookDetailByIsbn(String isbn) {
+    public BookDetailResponse getBookDetailByIsbn(String isbn, boolean isInterested) {
 
         URI uri = UriComponentsBuilder.fromHttpUrl(aladinApiUrl)
             .queryParam("ttbkey", aladinApiKey)
@@ -58,7 +58,7 @@ public class AladinService {
             throw new BusinessException(ErrorCode.BOOK_NOT_FOUND);
         }
 
-        return BookDetailResponse.from(response.item().get(0));
+        return BookDetailResponse.from(response.item().get(0), isInterested);
     }
 }
 

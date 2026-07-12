@@ -1,5 +1,7 @@
 package com.bookwheel.server.group.service;
 
+import com.bookwheel.server.chat.entity.ChatRoom;
+import com.bookwheel.server.chat.repository.ChatRoomRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class GroupService {
     private final GroupRepository groupRepository;
+    private final ChatRoomRepository chatRoomRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,6 +61,9 @@ public class GroupService {
             group.updateGroupPassword(passwordEncoder.encode(group.getGroupPassword()));
         }
         Group savedGroup = groupRepository.save(group);
+        chatRoomRepository.save(ChatRoom.builder()
+                .group(savedGroup)
+                .build());
 
         Member leader = Member.builder()
                 .memberId(UUID.randomUUID().toString())
