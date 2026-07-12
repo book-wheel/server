@@ -228,6 +228,7 @@ public class GroupSettingService {
     }
 
     private void validateCurrentRoundCompletion(String groupId, Member member) {
+        // 재배정 로직과 같은 Clock을 사용해 날짜 경계에서 현재 라운드 기준이 달라지는 일을 막는다.
         Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
                 .orElse(null);
 
