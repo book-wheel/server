@@ -273,7 +273,10 @@ public class GroupScheduleService {
         int expectedRoundCount = activeMembers.size() - 1;
 
         if (rounds.isEmpty()) {
-            createDefaultRounds(group, expectedRoundCount, startDate, readingPeriod);
+            List<Round> defaultRounds = createDefaultRounds(group, expectedRoundCount, startDate, readingPeriod);
+            // 자동 시작으로 생성한 일정도 수동 생성과 동일하게 모든 미래 배정을 PLANNED로 저장한다.
+            WheelAssignmentPlan assignmentPlan = planInitialAssignments(defaultRounds, activeMembers, books);
+            wheelReassignmentService.savePlannedAssignments(assignmentPlan, activeMembers, books);
             group.updateScheduleInfo(startDate, expectedRoundCount);
             return true;
         }
@@ -322,7 +325,7 @@ public class GroupScheduleService {
         return true;
     }
 
-    private void createDefaultRounds(Group group, int roundCount, LocalDate startDate, int readingPeriod) {
+    private List<Round> createDefaultRounds(Group group, int roundCount, LocalDate startDate, int readingPeriod) {
         ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.emptyCalendar();
         List<Round> rounds = new ArrayList<>(roundCount);
         LocalDate currentStart = startDate;
@@ -343,7 +346,7 @@ public class GroupScheduleService {
             currentStart = endDate.plusDays(1);
         }
 
-        roundRepository.saveAll(rounds);
+        return roundRepository.saveAll(rounds);
     }
 
     private void shiftRoundsFromStartDate(
