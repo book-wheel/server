@@ -70,6 +70,7 @@ public class FutureScheduleService {
         LocalDate today = LocalDate.now(clock);
         List<Member> activeMembers = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE);
         List<Round> existingRounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        // 오늘 시작했거나 이미 끝난 라운드는 독서 기록과 연결되므로 미래 일정 재생성 대상에서 제외한다.
         List<Round> protectedRounds = protectedRounds(existingRounds, today);
         List<Round> futureRounds = futureRounds(existingRounds, today);
 
@@ -118,6 +119,7 @@ public class FutureScheduleService {
                 .map(Round::getRoundId)
                 .toList();
         if (!futureRoundIds.isEmpty()) {
+            // 새 배정 전체가 가능한지 먼저 검증한 뒤, 미래 라운드와 PLANNED 배정만 교체한다.
             wheelStateRepository.deleteByRoundIdIn(futureRoundIds);
             roundRepository.deleteByRoundIdIn(futureRoundIds);
             roundRepository.flush();

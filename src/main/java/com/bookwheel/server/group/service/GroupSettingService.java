@@ -209,6 +209,7 @@ public class GroupSettingService {
                     if (exception.getErrorCode() != ErrorCode.WHEEL_REASSIGNMENT_IMPOSSIBLE) {
                         throw exception;
                     }
+                    // 미래 배정이 불가능해도 멤버 이탈은 막지 않고, 리더가 이후 일정을 다시 만들도록 한다.
                     return () -> deleteFutureRoundsForManualRegeneration(group);
                 }
             }

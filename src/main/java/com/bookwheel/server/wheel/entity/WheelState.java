@@ -65,6 +65,7 @@ public class WheelState {
     }
 
     public void activate() {
+        // 미래 배정은 미리 조회하되, 실제 독서는 해당 라운드 시작일에만 열어 준다.
         if (this.wheelState != WheelStatus.PLANNED) {
             return;
         }

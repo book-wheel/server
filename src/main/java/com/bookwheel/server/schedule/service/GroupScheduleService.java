@@ -438,6 +438,7 @@ public class GroupScheduleService {
 
             List<WheelState> existingWheelStates = wheelStateRepository.findByRoundId(round.getRoundId());
             if (!existingWheelStates.isEmpty()) {
+                // 미래 책 배정은 이미 저장돼 있으므로 새로 만들지 않고, 시작일에만 실제 독서 상태로 전환한다.
                 List<WheelState> plannedWheelStates = existingWheelStates.stream()
                         .filter(wheelState -> wheelState.getWheelState() == WheelStatus.PLANNED)
                         .toList();
