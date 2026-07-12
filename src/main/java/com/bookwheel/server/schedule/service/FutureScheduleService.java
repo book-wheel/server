@@ -90,7 +90,7 @@ public class FutureScheduleService {
                 request.excludedDates(),
                 request.excludedDateRanges()
         );
-        LocalDate firstFutureStartDate = firstFutureStartDate(group, protectedRounds);
+        LocalDate firstFutureStartDate = firstFutureStartDate(group, protectedRounds, today);
         validateFutureEndDate(firstFutureStartDate, request.endDate(), futureRoundCount, readingPeriod, excludedCalendar);
 
         List<Round> newFutureRounds = createFutureRounds(
@@ -119,8 +119,8 @@ public class FutureScheduleService {
                 .map(Round::getRoundId)
                 .toList();
         if (!futureRoundIds.isEmpty()) {
-            // 새 배정 전체가 가능한지 먼저 검증한 뒤, 미래 라운드와 PLANNED 배정만 교체한다.
-            wheelStateRepository.deleteByRoundIdIn(futureRoundIds);
+            // 새 배정 전체가 가능한지 먼저 검증한 뒤, 교체 가능한 미래 라운드와 배정만 교체한다.
+            wheelReassignmentService.deleteReplaceableFutureAssignments(futureRounds);
             roundRepository.deleteByRoundIdIn(futureRoundIds);
             roundRepository.flush();
         }
@@ -159,13 +159,13 @@ public class FutureScheduleService {
                 .toList();
     }
 
-    private LocalDate firstFutureStartDate(Group group, List<Round> protectedRounds) {
+    private LocalDate firstFutureStartDate(Group group, List<Round> protectedRounds, LocalDate today) {
         if (protectedRounds.isEmpty()) {
             LocalDate groupStartDate = group.getStartDate();
             if (groupStartDate == null) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
             }
-            return groupStartDate;
+            return laterDate(groupStartDate, today.plusDays(1));
         }
 
         Round lastProtectedRound = protectedRounds.get(protectedRounds.size() - 1);
@@ -173,7 +173,11 @@ public class FutureScheduleService {
         if (lastProtectedEndDate == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
-        return lastProtectedEndDate.plusDays(1);
+        return laterDate(lastProtectedEndDate.plusDays(1), today.plusDays(1));
+    }
+
+    private LocalDate laterDate(LocalDate firstDate, LocalDate secondDate) {
+        return firstDate.isAfter(secondDate) ? firstDate : secondDate;
     }
 
     private void validateFutureEndDate(

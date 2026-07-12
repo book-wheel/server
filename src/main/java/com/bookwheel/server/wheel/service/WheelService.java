@@ -41,7 +41,7 @@ public class WheelService {
     @Transactional
     public WheelCompleteResponse completedReading(String userPK, String wheelStateId, WheelCompleteRequest request) {
         // 1. DB에서 해당 WheelState가 있는지 먼저 찾기
-        WheelState wheelState = wheelStateRepository.findById(wheelStateId)
+        WheelState wheelState = wheelStateRepository.findByWheelStateIdForUpdate(wheelStateId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WHEEL_NOT_FOUND));
 
         // 2. 이 사람이 인증할 권한이 있는 사람인지 확인

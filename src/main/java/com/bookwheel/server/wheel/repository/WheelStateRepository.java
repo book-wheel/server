@@ -2,7 +2,9 @@ package com.bookwheel.server.wheel.repository;
 
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.enums.WheelStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,7 +26,17 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
 
     List<WheelState> findByRoundIdIn(Collection<String> roundIds);
 
+    // 미래 배정을 교체하는 동안 인증 처리와 같은 행을 동시에 변경하지 못하게 잠근다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select w from WheelState w where w.roundId in :roundIds")
+    List<WheelState> findByRoundIdInForUpdate(@Param("roundIds") Collection<String> roundIds);
+
     List<WheelState> findByRoundId(String roundId);
+
+    // 인증 시작부터 완료 저장까지 같은 WheelState를 단독으로 다룬다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select w from WheelState w where w.wheelStateId = :wheelStateId")
+    Optional<WheelState> findByWheelStateIdForUpdate(@Param("wheelStateId") String wheelStateId);
 
     void deleteByRoundIdIn(Collection<String> roundIds);
 

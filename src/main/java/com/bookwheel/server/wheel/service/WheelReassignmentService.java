@@ -105,18 +105,55 @@ public class WheelReassignmentService {
     ) {
         LocalDate today = LocalDate.now(clock);
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
-        List<String> futureRoundIds = futureRounds(rounds, today).stream()
-                .map(Round::getRoundId)
-                .toList();
-        if (futureRoundIds.isEmpty()) {
+        List<Round> futureRounds = futureRounds(rounds, today);
+        if (futureRounds.isEmpty()) {
             return;
         }
 
-        wheelStateRepository.deleteByRoundIdInAndWheelState(futureRoundIds, WheelStatus.PLANNED);
-        // 동일한 라운드·멤버 조합을 다시 저장하기 전에 DELETE를 먼저 반영해 유니크 제약 충돌을 막는다.
-        wheelStateRepository.flush();
+        deleteReplaceableFutureAssignments(futureRounds);
         List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(groupId));
         savePlannedAssignments(plan, remainingMembers, books);
+    }
+
+    @Transactional
+    public void deleteReplaceableFutureAssignments(List<Round> futureRounds) {
+        if (futureRounds.isEmpty()) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        boolean containsProtectedRound = futureRounds.stream()
+                .anyMatch(round -> round.getStartDate() == null || !round.getStartDate().isAfter(today));
+        if (containsProtectedRound) {
+            throw new IllegalArgumentException("Only future rounds can have replaceable assignments");
+        }
+
+        List<String> futureRoundIds = futureRounds.stream()
+                .map(Round::getRoundId)
+                .toList();
+
+        // 삭제 검증과 삭제 사이에 인증 기록이 생기지 않도록 대상 배정을 잠근다.
+        List<WheelState> futureStates = wheelStateRepository.findByRoundIdInForUpdate(futureRoundIds);
+        boolean hasProgressRecord = futureStates.stream()
+                .anyMatch(wheelState -> !isReplaceableFutureAssignment(wheelState));
+        if (hasProgressRecord) {
+            throw new BusinessException(ErrorCode.GROUP_FUTURE_SCHEDULE_WHEEL_STATE_INVALID);
+        }
+
+        // READY는 선행 정책에서 생성된 미완료 미래 배정만 허용하며, 실제 기록은 자동 삭제하지 않는다.
+        wheelStateRepository.deleteByRoundIdIn(futureRoundIds);
+        // 동일한 라운드·멤버 조합을 다시 저장하기 전에 DELETE를 먼저 반영해 유니크 제약 충돌을 막는다.
+        wheelStateRepository.flush();
+    }
+
+    private boolean isReplaceableFutureAssignment(WheelState wheelState) {
+        boolean hasReviewRecord = wheelState.getReviewText() != null
+                || (wheelState.getAuthImages() != null && !wheelState.getAuthImages().isEmpty());
+        if (Boolean.TRUE.equals(wheelState.getIsCompleted()) || hasReviewRecord) {
+            return false;
+        }
+        return wheelState.getWheelState() == WheelStatus.PLANNED
+                || wheelState.getWheelState() == WheelStatus.READY;
     }
 
     @Transactional

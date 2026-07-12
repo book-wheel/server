@@ -247,7 +247,7 @@ public class GroupSettingService {
                 .max(Integer::compareTo)
                 .orElse(0);
 
-        wheelStateRepository.deleteByRoundIdIn(futureRoundIds);
+        wheelReassignmentService.deleteReplaceableFutureAssignments(futureRounds);
         roundRepository.deleteAllByIdInBatch(futureRoundIds);
         group.updateScheduleInfo(group.getStartDate(), lastProtectedRoundNumber);
     }
