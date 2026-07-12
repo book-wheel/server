@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -35,6 +36,7 @@ public class GroupSettingService {
     private final WheelStateRepository wheelStateRepository;
     private final WheelReassignmentService wheelReassignmentService;
     private final GroupMemberPermissionValidator memberPermissionValidator;
+    private final Clock clock;
 
     @Transactional
     public MemberKickResponse kickMember(String groupId, String targetUserPK, String leaderUserPK) {
@@ -226,7 +228,7 @@ public class GroupSettingService {
     }
 
     private void validateCurrentRoundCompletion(String groupId, Member member) {
-        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now())
+        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
                 .orElse(null);
 
         if (currentRound != null) {

@@ -65,6 +65,7 @@ public class WheelReassignmentService {
 
         // 전체 미래 라운드의 해를 먼저 찾은 뒤에만 기존 미래 배정을 교체한다.
         wheelStateRepository.deleteByRoundIdIn(roundIds(futureRounds));
+        wheelStateRepository.flush();
         wheelStateRepository.saveAll(replacements);
     }
 
