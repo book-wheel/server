@@ -113,6 +113,7 @@ public class WheelReassignmentService {
         }
 
         wheelStateRepository.deleteByRoundIdInAndWheelState(futureRoundIds, WheelStatus.PLANNED);
+        wheelStateRepository.flush();
         List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(groupId));
         savePlannedAssignments(plan, remainingMembers, books);
     }
