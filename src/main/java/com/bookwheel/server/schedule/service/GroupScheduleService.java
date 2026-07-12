@@ -37,7 +37,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -407,34 +406,28 @@ public class GroupScheduleService {
         // 없을 경우, 0 리턴
         if (startingRounds.isEmpty()) return 0;
 
-        // 2. 이번에 시작하는 라운드들의 '그룹 ID'를 전부 뽑기
-        List<String> groupIds = startingRounds.stream()
-                .map(round -> round.getGroup().getGroupId())
-                .toList();
-
-        // 3. IN 쿼리로 멤버와 책을 한 번에 조회
-        List<Member> allMembers = memberRepository.findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(groupIds, MemberStatus.ACTIVE);
-        List<OwnBook> allBooks = ownBookRepository.findByGroup_GroupIdIn(groupIds);
-
-        // 4. 데이터를 그룹별로 분류해서 Map으로 정리
-        Map<String, List<Member>> membersByGroup = allMembers.stream()
-                .collect(Collectors.groupingBy(m -> m.getGroup().getGroupId()));
-        Map<String, List<OwnBook>> booksByGroup = allBooks.stream()
-                .collect(Collectors.groupingBy(b -> b.getGroup().getGroupId()));
-
         int cnt = 0;
         List<WheelState> newWheels = new ArrayList<>();
         List<Round> startedRounds = new ArrayList<>();
 
-        // 5. for문에서 실제 정렬 로직 구현 (DB 삽입 X)
+        // 그룹 잠금 이후 최신 ACTIVE 멤버와 책을 조회해 멤버 변경과의 경쟁 조건을 막는다.
         for (Round round : startingRounds) {
             String groupId = round.getGroup().getGroupId();
+            Group group = groupRepository.findByGroupIdForUpdate(groupId).orElse(null);
+            if (group == null) continue;
+            // 자정 경계에서 재생성으로 삭제된 라운드를 영속성 컨텍스트의 오래된 객체로 시작하지 않도록 DB를 재확인한다.
+            boolean isCurrentRound = roundRepository
+                    .existsByRoundIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                            round.getRoundId(), localDate, localDate
+                    );
+            if (!isCurrentRound) continue;
 
-            List<Member> members = new ArrayList<>(membersByGroup.getOrDefault(groupId, Collections.emptyList()));
-            List<OwnBook> books = booksByGroup.getOrDefault(groupId, Collections.emptyList());
+            List<Member> members = memberRepository
+                    .findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(groupId, MemberStatus.ACTIVE);
+            List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(groupId));
 
             // 멤버나 책이 없는 비정상 그룹은 스킵
-            if (round.getGroup().getGroupState() != State.IN_PROGRESS) continue;
+            if (group.getGroupState() != State.IN_PROGRESS) continue;
 
             List<WheelState> existingWheelStates = wheelStateRepository.findByRoundId(round.getRoundId());
             if (!existingWheelStates.isEmpty()) {
@@ -480,7 +473,8 @@ public class GroupScheduleService {
 
         // 라운드 시작 알림
         for (Round round : startedRounds) {
-            Group group = round.getGroup();
+            Group group = groupRepository.findByGroupIdForUpdate(round.getGroup().getGroupId()).orElse(null);
+            if (group == null) continue;
             eventPublisher.publishEvent(new RoundStartedEvent(
                     group.getGroupId(), group.getGroupName(), round.getRoundNumber()
             ));

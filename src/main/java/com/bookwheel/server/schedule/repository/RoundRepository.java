@@ -38,6 +38,13 @@ public interface RoundRepository extends JpaRepository<Round, String> {
     // 오늘 날짜가 포함된 라운드 조회 (시작일을 놓친 경우에도 현재 라운드 책바퀴 생성 가능)
     List<Round> findByStartDateLessThanEqualAndEndDateGreaterThanEqual(LocalDate startDate, LocalDate endDate);
 
+    // 스케줄러가 그룹 잠금 뒤에도 라운드가 현재 일정으로 남아 있는지 DB 기준으로 다시 확인한다.
+    boolean existsByRoundIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+            String roundId,
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
     // 종료일이 특정 날짜인 라운드 조회 (어제 종료된 라운드 → 미완독 알림)
     List<Round> findByEndDate(LocalDate endDate);
 

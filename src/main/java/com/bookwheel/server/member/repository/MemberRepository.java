@@ -77,6 +77,8 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     // 해당 그룹 안에 특정 상태의 멤버들을 정렬해서 전부 가져오기
     List<Member> findByGroup_GroupIdInAndMemberStatusOrderByReadOrderAsc(List<String> groupIds, MemberStatus memberStatus);
 
+    List<Member> findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(String groupId, MemberStatus memberStatus);
+
     // IN 절을 사용하여 여러 유저가 그룹에 속해있는지 한 번에 확인
     long countByGroup_GroupIdAndUser_IdIn(String groupId, List<String> userPK);
 
