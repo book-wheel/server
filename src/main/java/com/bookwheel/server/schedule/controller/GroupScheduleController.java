@@ -2,6 +2,7 @@ package com.bookwheel.server.schedule.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.service.GroupScheduleService;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +29,22 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 @RequestMapping("/api/v1/groups")
 public class GroupScheduleController {
     private final GroupScheduleService groupScheduleService;
+
+    @Operation(
+            summary = "내 독서 일정 조회",
+            description = "라운드별 날짜와 저장된 내 책 배정, 책바퀴 상태를 조회합니다. 시작 전 미래 배정은 PLANNED 상태로 반환됩니다."
+    )
+    @GetMapping("/{groupId}/schedule")
+    public ResponseEntity<ApiResponse<List<GroupScheduleAssignmentResponse>>> getSchedule(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal Object principal
+    ) {
+        List<GroupScheduleAssignmentResponse> response = groupScheduleService.getSchedule(
+                groupId,
+                getUserPK(principal)
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
     @Operation(
             summary = "독서 일정 생성",

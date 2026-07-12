@@ -12,6 +12,7 @@ import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.entity.Round;
@@ -37,6 +38,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -161,6 +163,72 @@ public class GroupScheduleService {
             String userPK
     ) {
         return futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
+    }
+
+    public List<GroupScheduleAssignmentResponse> getSchedule(String groupId, String userPK) {
+        findGroupById(groupId);
+        findActiveUserById(userPK);
+        Member member = findActiveMember(groupId, userPK);
+
+        // 저장된 배정이 없는 과거 일정도 날짜 정보는 함께 반환한다.
+        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        if (rounds.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
+        // 내 WheelState는 실제로 저장된 책과 상태를 그대로 보여 주기 위한 기준 데이터다.
+        Map<String, WheelState> wheelStateByRoundId = wheelStateRepository
+                .findAllByMemberIdAndRoundIdInWithBook(member.getMemberId(), roundIds)
+                .stream()
+                .collect(Collectors.toMap(WheelState::getRoundId, wheelState -> wheelState));
+        Map<Integer, Round> roundByNumber = rounds.stream()
+                .collect(Collectors.toMap(Round::getRoundNumber, round -> round));
+        // 2라운드부터는 책 주인이 아니라 직전 라운드의 독자가 전달자이므로 전체 배정을 함께 조회한다.
+        Map<RoundBookKey, String> readerNicknameByRoundAndBookId = wheelStateRepository
+                .findAllByRoundIdInWithMemberAndBook(roundIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        wheelState -> roundBookKey(wheelState.getRoundId(), wheelState.getOwnBook().getOwnBookId()),
+                        wheelState -> wheelState.getMember().getUser().getNickname()
+                ));
+
+        return rounds.stream()
+                .map(round -> {
+                    WheelState wheelState = wheelStateByRoundId.get(round.getRoundId());
+                    return GroupScheduleAssignmentResponse.of(
+                            round,
+                            wheelState,
+                            resolveSenderNickname(round, wheelState, roundByNumber, readerNicknameByRoundAndBookId)
+                    );
+                })
+                .toList();
+    }
+
+    private String resolveSenderNickname(
+            Round round,
+            WheelState wheelState,
+            Map<Integer, Round> roundByNumber,
+            Map<RoundBookKey, String> readerNicknameByRoundAndBookId
+    ) {
+        if (wheelState == null) {
+            return null;
+        }
+
+        // 첫 라운드는 원래 책 주인이, 이후 라운드는 직전 라운드의 해당 책 독자가 전달자다.
+        Round previousRound = roundByNumber.get(round.getRoundNumber() - 1);
+        if (previousRound == null) {
+            return wheelState.getOwnBook().getOwner().getNickname();
+        }
+
+        return readerNicknameByRoundAndBookId.getOrDefault(
+                roundBookKey(previousRound.getRoundId(), wheelState.getOwnBook().getOwnBookId()),
+                wheelState.getOwnBook().getOwner().getNickname()
+        );
+    }
+
+    private RoundBookKey roundBookKey(String roundId, String ownBookId) {
+        return new RoundBookKey(roundId, ownBookId);
     }
 
     private WheelAssignmentPlan planInitialAssignments(
@@ -507,6 +575,24 @@ public class GroupScheduleService {
     private Group findGroupByIdForUpdate(String groupId) {
         return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
+    private Group findGroupById(String groupId) {
+        return groupRepository.findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
+    private Member findActiveMember(String groupId, String userPK) {
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        // 미래 일정은 현재 모임에 참여 중인 멤버만 조회할 수 있다.
+        if (member.getMemberStatus() != MemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+        }
+        return member;
+    }
+
+    private record RoundBookKey(String roundId, String ownBookId) {
     }
 
     private User findActiveUserById(String userPK) {

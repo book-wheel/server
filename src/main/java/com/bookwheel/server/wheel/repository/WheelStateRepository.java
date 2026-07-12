@@ -38,6 +38,32 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
     @Query("select w from WheelState w where w.wheelStateId = :wheelStateId")
     Optional<WheelState> findByWheelStateIdForUpdate(@Param("wheelStateId") String wheelStateId);
 
+    // 일정 조회에서 저장된 내 배정과 책 정보를 한 번에 조회한다.
+    @Query("""
+            select ws
+            from WheelState ws
+            join fetch ws.ownBook ownBook
+            join fetch ownBook.book
+            join fetch ownBook.owner
+            where ws.member.memberId = :memberId
+              and ws.roundId in :roundIds
+            """)
+    List<WheelState> findAllByMemberIdAndRoundIdInWithBook(
+            @Param("memberId") String memberId,
+            @Param("roundIds") Collection<String> roundIds
+    );
+
+    // 라운드별 책의 직전 독자를 계산할 수 있도록 일정에 포함된 전체 배정을 조회한다.
+    @Query("""
+            select ws
+            from WheelState ws
+            join fetch ws.member member
+            join fetch member.user
+            join fetch ws.ownBook ownBook
+            where ws.roundId in :roundIds
+            """)
+    List<WheelState> findAllByRoundIdInWithMemberAndBook(@Param("roundIds") Collection<String> roundIds);
+
     void deleteByRoundIdIn(Collection<String> roundIds);
 
     void deleteByRoundIdInAndWheelState(Collection<String> roundIds, WheelStatus wheelState);
