@@ -6,6 +6,7 @@ import com.bookwheel.server.common.exception.*;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.member.entity.Member;
+import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
@@ -44,8 +45,10 @@ public class WheelService {
         WheelState wheelState = wheelStateRepository.findByWheelStateIdForUpdate(wheelStateId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WHEEL_NOT_FOUND));
 
-        // 2. 이 사람이 인증할 권한이 있는 사람인지 확인
-        if (!wheelState.getMember().getUser().getId().equals(userPK)) {
+        // 2. 이 사람이 현재도 ACTIVE 상태로 인증할 권한이 있는지 확인
+        Member member = memberRepository.findByMemberIdForUpdate(wheelState.getMember().getMemberId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
+        if (!member.getUser().getId().equals(userPK) || member.getMemberStatus() != MemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
         }
 
@@ -62,7 +65,6 @@ public class WheelService {
 
         wheelState.complete(request.reviewText(), normalizedKeys);
 
-        Member member = wheelState.getMember();
         OwnBook ownBook = wheelState.getOwnBook();
         eventPublisher.publishEvent(new WheelCompletedEvent(
                 wheelState.getWheelStateId(),

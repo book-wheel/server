@@ -55,6 +55,12 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     // 특정 멤버의 '가입 번호(MemberId)'를 알고 있을 때, 그 멤버가 우리 그룹 소속이 맞는지 콕 집어 확인할 때 사용
     Optional<Member> findByMemberIdAndGroup_GroupId(String memberId, String groupId);
 
+    // 인증 처리 중 강퇴/탈퇴와 멤버 상태가 엇갈리지 않도록 대상 멤버를 잠근다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"user", "group"})
+    @Query("select m from Member m where m.memberId = :memberId")
+    Optional<Member> findByMemberIdForUpdate(@Param("memberId") String memberId);
+
     // 특정 그룹 내 특정 상태(ex. PENDING, ACTIVE)의 멤버 목록 조회
     @EntityGraph(attributePaths = "user")
     List<Member> findByGroup_GroupIdAndMemberStatus(String groupId, MemberStatus memberStatus);
