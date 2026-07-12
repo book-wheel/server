@@ -73,8 +73,12 @@ public class GroupService {
 
     @Transactional
     public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userPK) {
-        Group group = findGroupById(groupId);
+        Group group = findGroupByIdForUpdate(groupId);
         User user = findActiveUserById(userPK);
+
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
 
         validateJoinRequest(group, request);
 
