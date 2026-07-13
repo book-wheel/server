@@ -8,6 +8,7 @@ public record ReviewDetailResponse(
     Long reviewId,
     String isbn,
     String reviewerName,
+    String profileImageUrl,
     boolean isRecommended,
     String comment,
     boolean isHidden,
@@ -15,11 +16,12 @@ public record ReviewDetailResponse(
     boolean isLikedByMe,
     LocalDateTime createdAt
 ) {
-    public static ReviewDetailResponse of(BookReview review, boolean isLikedByMe) {
+    public static ReviewDetailResponse of(BookReview review, String profileImageUrl, boolean isLikedByMe) {
         return new ReviewDetailResponse(
             review.getReviewId(),
             review.getBookInfo().getIsbn(),
             review.getReviewer().getNickname(),
+            profileImageUrl,
             review.getIsRecommended(),
             review.getContent(),
             review.getIsHidden(),

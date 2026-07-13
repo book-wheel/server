@@ -5,6 +5,7 @@ import com.bookwheel.server.common.cursor.InterestCursor;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
@@ -25,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -43,6 +45,7 @@ public class BookService {
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
     private final AladinService aladinService;
+    private final S3Service s3Service;
 
     private static final int DEFAULT_GALLERY_SIZE = 18;
     private static final int DEFAULT_INTEREST_SIZE = 30;
@@ -150,9 +153,18 @@ public class BookService {
         return reviews.stream().map(review -> {
 
             boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
+            String profileImageUrl = getProfileImageUrl(review.getReviewer().getProfileImageKey());
 
-            return ReviewDetailResponse.of(review, isLikedByMe);
+            return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe);
         }).toList();
+    }
+
+    // 프로필 이미지 키를 조회용 Presigned URL로 변환한다. (키가 없으면 null)
+    private String getProfileImageUrl(String profileImageKey) {
+        if (!StringUtils.hasText(profileImageKey)) {
+            return null;
+        }
+        return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
 
