@@ -18,6 +18,8 @@ import com.bookwheel.server.community.entity.*;
 import com.bookwheel.server.community.event.PostCommentedEvent;
 import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.repository.*;
+import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class PostService {
     private final UserRepository userRepository;
     private final BookInfoRepository bookInfoRepository;
     private final BookRepository bookRepository;
+    private final GroupRepository groupRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
     private final PostReportRepository postReportRepository;
@@ -128,12 +131,15 @@ public class PostService {
         long commentCount = postCommentRepository.countByPost(post);
         boolean isLikedByMe = postLikeRepository.existsByPostAndUser(post, user);
 
+        // 모임에서 작성한 게시물이면 모임 이름, 개인 작성이면 null
+        String groupName = post.getGroup() != null ? post.getGroup().getGroupName() : null;
+
         return new PostDetailResponse(
             post.getPostId(),
             isbn,
             post.getUploader().getNickname(),
             profileImageUrl,
-            null, // groupName: Post에 그룹 연결이 없어 현재는 null
+            groupName,
             title,
             post.getContent(),
             imageUrls,
@@ -152,6 +158,15 @@ public class PostService {
         return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
+    // 작성 요청의 groupId로 모임을 조회한다. (모임 미지정이면 null, 지정했으나 없으면 예외)
+    private Group resolveGroup(String groupId) {
+        if (!StringUtils.hasText(groupId)) {
+            return null;
+        }
+        return groupRepository.findById(groupId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
     @Transactional
     public PostCreateResponse create(PostCreateRequest request, String userPK) {
         String isbn = request.isbn();
@@ -161,7 +176,9 @@ public class PostService {
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Post post = request.toEntity(bookInfo, user);
+        Group group = resolveGroup(request.groupId());
+
+        Post post = request.toEntity(bookInfo, user, group);
 
         if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
             for (String key : request.objectKeys()) {

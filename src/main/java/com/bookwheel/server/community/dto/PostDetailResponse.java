@@ -19,7 +19,7 @@ public record PostDetailResponse(
     @Schema(description = "작성자 프로필 이미지 URL (없으면 null)", nullable = true)
     String profileImageUrl,
 
-    @Schema(description = "모임 이름 (현재 미지원, null)", nullable = true)
+    @Schema(description = "모임 이름 (모임에서 작성한 글이면 모임명, 개인 작성이면 null)", nullable = true)
     String groupName,
 
     @Schema(description = "책 제목 (미등록 도서면 null)", nullable = true, example = "내 남편을 팝니다")

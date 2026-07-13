@@ -97,7 +97,7 @@ class PostControllerTest {
                 "9791161571188",
                 "문소희",
                 "https://cdn.example.com/profile.png",
-                null, // groupName
+                "소카모임", // groupName (모임에서 작성한 글)
                 "내 남편을 팝니다",
                 "게시글 내용",
                 List.of("https://cdn.example.com/1.jpg", "https://cdn.example.com/2.jpg"),
@@ -113,11 +113,11 @@ class PostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.postId").value(10L))
                 .andExpect(jsonPath("$.data.author").value("문소희"))
+                .andExpect(jsonPath("$.data.groupName").value("소카모임"))
                 .andExpect(jsonPath("$.data.title").value("내 남편을 팝니다"))
                 .andExpect(jsonPath("$.data.imageUrls.length()").value(2))
                 .andExpect(jsonPath("$.data.commentCount").value(3))
-                .andExpect(jsonPath("$.data.isLikedByMe").value(true))
-                .andExpect(jsonPath("$.data.groupName").isEmpty());
+                .andExpect(jsonPath("$.data.isLikedByMe").value(true));
     }
 
     @Test
