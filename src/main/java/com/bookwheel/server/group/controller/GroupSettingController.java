@@ -20,7 +20,10 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 public class GroupSettingController {
     private final GroupSettingService groupSettingService;
 
-    @Operation(summary = "멤버 강퇴", description = "리더가 그룹의 멤버를 강제 탈퇴시킵니다.")
+    @Operation(
+            summary = "멤버 강퇴",
+            description = "리더가 그룹의 멤버를 강제 탈퇴시킵니다. 모집 중에는 기존 일정이 무효화되고, 진행 중에는 완료·현재 라운드는 유지한 채 미래 라운드만 재배정합니다. 재배정할 수 없으면 GROUP_036 오류가 반환됩니다."
+    )
     @DeleteMapping("/members/{targetUserPK}")
     public ResponseEntity<ApiResponse<MemberKickResponse>> kickMember(
             @PathVariable String groupId,
@@ -54,7 +57,10 @@ public class GroupSettingController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "중도 하차", description = "멤버가 그룹에서 하차합니다.")
+    @Operation(
+            summary = "중도 하차",
+            description = "멤버가 그룹에서 하차합니다. 모집 중에는 기존 일정이 무효화되고, 진행 중에는 현재 라운드를 완독한 경우에만 미래 라운드를 재배정합니다. 재배정할 수 없으면 GROUP_036 오류가 반환됩니다."
+    )
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<MemberExitResponse>> exitGroup(
             @PathVariable String groupId,

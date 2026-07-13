@@ -56,6 +56,7 @@ public class WheelState {
     private LocalDateTime reviewedAt;
 
     // 독서 상태가 지워질 때 사진 데이터도 전부 지움
+    @Builder.Default
     @OneToMany(mappedBy = "wheelState", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WheelStateImage> authImages = new ArrayList<>();
 
@@ -63,10 +64,21 @@ public class WheelState {
         this.wheelState = wheelState;
     }
 
+    public void activate() {
+        // 미래 배정은 미리 조회하되, 실제 독서는 해당 라운드 시작일에만 열어 준다.
+        if (this.wheelState != WheelStatus.PLANNED) {
+            return;
+        }
+        this.wheelState = WheelStatus.READY;
+    }
+
     public void complete(String reviewText, List<String> objectKeys) {
         // 이미 정보가 존재한다면 실행 X
         if (this.isCompleted) {
             throw new BusinessException(ErrorCode.WHEEL_ALREADY_CERTIFIED);
+        }
+        if (this.wheelState != WheelStatus.READY) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         // 이미지 정보가 없다면 실행 X
         if (objectKeys == null || objectKeys.isEmpty()) {

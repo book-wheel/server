@@ -149,8 +149,9 @@ public class BookService {
     }
 
 
-    public BookDetailResponse getBookDetail(String isbn) {
-        return aladinService.getBookDetailByIsbn(isbn);
+    public BookDetailResponse getBookDetail(String isbn, String userPK) {
+        boolean isInterested = bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK);
+        return aladinService.getBookDetailByIsbn(isbn, isInterested);
     }
 
     @Transactional

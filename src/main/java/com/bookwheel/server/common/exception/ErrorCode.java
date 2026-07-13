@@ -73,6 +73,17 @@ public enum ErrorCode {
     LEADER_CANNOT_EXIT(HttpStatus.BAD_REQUEST, "GROUP_032", "그룹장/부그룹장은 권한을 위임하거나 해제한 뒤 중도하차할 수 있습니다."),
     READING_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "GROUP_033", "현재 라운드의 책을 완독 처리한 뒤 중도하차할 수 있습니다."),
     GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_034", "일정을 생성하려면 ACTIVE 멤버가 2명 이상이어야 합니다."),
+    GROUP_RECRUITING_STATE_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_035", "모집 중인 모임에서만 수행할 수 있습니다."),
+    WHEEL_REASSIGNMENT_IMPOSSIBLE(HttpStatus.BAD_REQUEST, "GROUP_036", "남은 멤버에게 미래 라운드의 책을 재배정할 수 없습니다."),
+    GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE(HttpStatus.INTERNAL_SERVER_ERROR, "GROUP_037", "기존 책바퀴 진행 상태가 있어 모집 일정 초기화를 중단했습니다."),
+    GROUP_FUTURE_SCHEDULE_RECRUITING_STATE_INVALID(HttpStatus.BAD_REQUEST, "GROUP_038", "모집 중인 모임은 전체 일정을 생성해야 합니다."),
+    GROUP_FUTURE_SCHEDULE_COMPLETE_STATE_INVALID(HttpStatus.BAD_REQUEST, "GROUP_039", "완료된 모임은 미래 일정을 재생성할 수 없습니다."),
+    GROUP_FUTURE_SCHEDULE_TOTAL_BELOW_PROTECTED(HttpStatus.BAD_REQUEST, "GROUP_040", "전체 라운드 수는 이미 시작된 라운드 수보다 작을 수 없습니다."),
+    GROUP_FUTURE_SCHEDULE_TOTAL_EXCEEDS_ACTIVE_LIMIT(HttpStatus.BAD_REQUEST, "GROUP_041", "전체 라운드 수가 남은 ACTIVE 멤버 기준 최대 라운드 수를 초과했습니다."),
+    GROUP_FUTURE_SCHEDULE_WHEEL_STATE_INVALID(HttpStatus.BAD_REQUEST, "GROUP_042", "진행 기록이 포함된 미래 일정은 자동으로 재생성할 수 없습니다."),
+
+    // 채팅 관련 에러
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
 
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),

@@ -26,7 +26,7 @@ public record DashboardResponse(
         @Schema(description = "종료일 또는 예정 시작일까지 남은 일수", example = "1")
         Integer dDay,
 
-        @Schema(description = "내가 읽을 책 정보. 시작 전에도 배정 계산이 가능하면 반환합니다.", nullable = true)
+        @Schema(description = "내가 읽을 책 정보. 시작 전에는 저장된 첫 라운드 배정을 반환합니다.", nullable = true)
         MyStepResponse myStep,
 
         @Schema(description = "내가 등록한 책의 전달 상태. 책 미등록이면 null입니다.", nullable = true)

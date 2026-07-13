@@ -1,5 +1,7 @@
 package com.bookwheel.server.group.service;
 
+import com.bookwheel.server.chat.entity.ChatRoom;
+import com.bookwheel.server.chat.repository.ChatRoomRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
@@ -7,14 +9,20 @@ import com.bookwheel.server.group.dto.member.*;
 import com.bookwheel.server.group.dto.search.*;
 import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.entity.*;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
 import com.bookwheel.server.group.event.GroupJoinRequestedEvent;
 import com.bookwheel.server.group.repository.*;
 import com.bookwheel.server.member.entity.*;
 import com.bookwheel.server.member.enums.*;
 import com.bookwheel.server.member.repository.*;
+import com.bookwheel.server.schedule.entity.Round;
+import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
+import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.enums.WheelStatus;
+import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -34,11 +42,14 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class GroupService {
     private final GroupRepository groupRepository;
+    private final ChatRoomRepository chatRoomRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
+    private final RoundRepository roundRepository;
+    private final WheelStateRepository wheelStateRepository;
 
     @Transactional
     public GroupCreateResponse createGroup(GroupCreateRequest request, String userPK) {
@@ -50,6 +61,9 @@ public class GroupService {
             group.updateGroupPassword(passwordEncoder.encode(group.getGroupPassword()));
         }
         Group savedGroup = groupRepository.save(group);
+        chatRoomRepository.save(ChatRoom.builder()
+                .group(savedGroup)
+                .build());
 
         Member leader = Member.builder()
                 .memberId(UUID.randomUUID().toString())
@@ -65,8 +79,12 @@ public class GroupService {
 
     @Transactional
     public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userPK) {
-        Group group = findGroupById(groupId);
+        Group group = findGroupByIdForUpdate(groupId);
         User user = findActiveUserById(userPK);
+
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
 
         validateJoinRequest(group, request);
 
@@ -154,9 +172,14 @@ public class GroupService {
         }
 
         if (status == MemberRequestStatus.APPROVED) {
+            if (group.getGroupState() != State.RECRUITING) {
+                throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+            }
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
+            // 승인으로 ACTIVE 멤버 수가 달라지므로, 기존 계획표는 승인 전에 폐기한다.
+            invalidateGeneratedScheduleIfPresent(group);
             targetMember.approve();
         } else {
             targetMember.reject();
@@ -170,6 +193,26 @@ public class GroupService {
         ));
 
         return MemberRequestStatusUpdateResponse.of(targetMember.getMemberId(), status);
+    }
+
+    private void invalidateGeneratedScheduleIfPresent(Group group) {
+        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
+        if (rounds.isEmpty()) {
+            return;
+        }
+
+        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
+        List<WheelState> wheelStates = wheelStateRepository.findByRoundIdIn(roundIds);
+        boolean hasStartedWheelState = wheelStates.stream()
+                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
+        if (hasStartedWheelState) {
+            // 진행 기록이 있으면 일정만 삭제해 데이터 연결이 끊기는 일을 막는다.
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
+        }
+
+        wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
+        roundRepository.deleteByGroup_GroupId(group.getGroupId());
+        group.invalidateSchedule();
     }
 
     private void validateGroupCreateRequest(GroupCreateRequest request) {
