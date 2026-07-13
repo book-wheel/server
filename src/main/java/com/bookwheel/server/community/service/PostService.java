@@ -4,9 +4,11 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
+import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostReportRequest;
 import com.bookwheel.server.community.entity.*;
 import com.bookwheel.server.community.event.PostCommentedEvent;
@@ -18,6 +20,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,10 +31,59 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BookInfoRepository bookInfoRepository;
+    private final BookRepository bookRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
     private final PostReportRepository postReportRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final S3Service s3Service;
+
+    public PostDetailResponse getPostDetail(Long postId, String userPK) {
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        User user = userRepository.findById(userPK)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        String isbn = post.getBookInfo().getIsbn();
+
+        // 책 제목은 별도 Book 테이블에서 조회한다. (미등록 도서면 null)
+        String title = bookRepository.findByIsbn(isbn)
+            .map(Book::getTitle)
+            .orElse(null);
+
+        String profileImageUrl = getProfileImageUrl(post.getUploader().getProfileImageKey());
+
+        List<String> imageUrls = post.getImages().stream()
+            .map(image -> s3Service.getPresignedGetUrl(image.getObjectKey()))
+            .toList();
+
+        long commentCount = postCommentRepository.countByPost(post);
+        boolean isLikedByMe = postLikeRepository.existsByPostAndUser(post, user);
+
+        return new PostDetailResponse(
+            post.getPostId(),
+            isbn,
+            post.getUploader().getNickname(),
+            profileImageUrl,
+            null, // groupName: Post에 그룹 연결이 없어 현재는 null
+            title,
+            post.getContent(),
+            imageUrls,
+            post.getLikeCount(),
+            commentCount,
+            isLikedByMe,
+            post.getCreatedAt()
+        );
+    }
+
+    // 프로필 이미지 키를 조회용 Presigned URL로 변환한다. (키가 없으면 null)
+    private String getProfileImageUrl(String profileImageKey) {
+        if (!StringUtils.hasText(profileImageKey)) {
+            return null;
+        }
+        return s3Service.getPresignedGetUrl(profileImageKey);
+    }
 
     @Transactional
     public PostCreateResponse create(PostCreateRequest request, String userPK) {

@@ -41,6 +41,16 @@ public class PostController {
     }
 
 
+    @Operation(summary = "게시물 상세 조회", description = "게시물 상세 정보(작성자, 이미지, 좋아요/댓글 수, 내 좋아요 여부 등)를 조회합니다.")
+    @GetMapping("/{postId}")
+    public ApiResponse<PostDetailResponse> getPostDetail(
+        @PathVariable("postId") Long postId,
+        @AuthenticationPrincipal Object principal) {
+
+        PostDetailResponse response = postService.getPostDetail(postId, getUserPK(principal));
+        return ApiResponse.success(response);
+    }
+
     @Operation(summary = "게시물 좋아요")
     @PostMapping("/{postId}/likes")
     public ApiResponse<String> togglePostLike(
