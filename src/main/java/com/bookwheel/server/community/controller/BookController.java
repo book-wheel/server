@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
+import static com.bookwheel.server.common.util.SecurityUtil.getUserPKOrNull;
 
 @RestController
 @RequestMapping("/api/v1/books")
@@ -116,10 +117,13 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "리뷰 추천/비추천 통계 조회", description = "특정 책의 전체 리뷰 중 추천/비추천 비율을 조회합니다.")
+    @Operation(summary = "리뷰 추천/비추천 통계 조회", description = "특정 책의 전체 리뷰 중 추천/비추천 비율과 로그인 사용자의 선택값(myVote)을 조회합니다.")
     @GetMapping("/{isbn}/reviews/stats")
-    public ApiResponse<ReviewStatsResponse> getReviewStats(@PathVariable("isbn") String isbn) {
-        ReviewStatsResponse response = bookService.getReviewStats(isbn);
+    public ApiResponse<ReviewStatsResponse> getReviewStats(
+        @PathVariable("isbn") String isbn,
+        @AuthenticationPrincipal Object principal
+    ) {
+        ReviewStatsResponse response = bookService.getReviewStats(isbn, getUserPKOrNull(principal));
         return ApiResponse.success(response);
     }
 

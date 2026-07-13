@@ -103,26 +103,38 @@ public class BookService {
             );
     }
 
-    public ReviewStatsResponse getReviewStats(String isbn) {
+    public ReviewStatsResponse getReviewStats(String isbn, String userPK) {
 
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
         if (bookInfo == null) {
-            return new ReviewStatsResponse(0, 0);
+            return new ReviewStatsResponse(0, 0, null);
         }
+
+        VoteType myVote = resolveMyVote(bookInfo, userPK);
 
         long recommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, true);
         long notRecommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, false);
         long totalCount = recommendedCount + notRecommendedCount;
 
         if (totalCount == 0) {
-            return new ReviewStatsResponse(0, 0); // 리뷰가 없을 때
+            return new ReviewStatsResponse(0, 0, myVote); // 리뷰가 없을 때
         }
 
         int recommendedRatio = (int) ((recommendedCount * 100) / totalCount);
         int notRecommendedRatio = 100 - recommendedRatio;
 
-        return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio);
+        return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio, myVote);
+    }
+
+    // 로그인 사용자가 해당 도서에 작성한 리뷰의 추천 여부를 myVote로 변환한다. (비로그인/미작성 시 null)
+    private VoteType resolveMyVote(BookInfo bookInfo, String userPK) {
+        if (userPK == null) {
+            return null;
+        }
+        return bookReviewRepository.findByBookInfoAndReviewer_Id(bookInfo, userPK)
+            .map(review -> VoteType.fromRecommended(review.getIsRecommended()))
+            .orElse(null);
     }
 
     public List<ReviewDetailResponse> getReviewList(String isbn, String userPK) {
