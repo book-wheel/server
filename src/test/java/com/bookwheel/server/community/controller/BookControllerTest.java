@@ -1,5 +1,7 @@
 package com.bookwheel.server.community.controller;
 
+import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
 import com.bookwheel.server.community.service.BookService;
@@ -113,5 +115,29 @@ class BookControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("Community Gallery: get gallery by isbn success")
+    void getGalleryByIsbn_Success() throws Exception {
+        String isbn = "9791161571188";
+        GalleryResponseDto item = new GalleryResponseDto(
+                10L,
+                3L,
+                isbn,
+                "https://cdn.example.com/thumb.jpg",
+                4,
+                LocalDateTime.of(2026, 6, 23, 12, 0)
+        );
+        CursorPageResponse<GalleryResponseDto> page =
+                CursorPageResponse.of(List.of(item), 18, 1L, false, null);
+        given(bookService.getGalleryByIsbn(eq(isbn), any(), any())).willReturn(page);
+
+        mockMvc.perform(get("/api/v1/books/{isbn}/gallery", isbn))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].postId").value(10L))
+                .andExpect(jsonPath("$.data.content[0].isbn").value(isbn));
     }
 }

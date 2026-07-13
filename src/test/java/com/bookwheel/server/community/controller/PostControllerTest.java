@@ -1,7 +1,10 @@
 package com.bookwheel.server.community.controller;
 
+import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
+import com.bookwheel.server.community.dto.PostCommentResponse;
+import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostImagePresignedRequest;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import com.bookwheel.server.community.service.PostService;
@@ -18,12 +21,14 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -80,6 +85,65 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.presignedUrls[0].objectKey").value("posts/1/abc.jpg"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("Community Gallery: get post detail success")
+    void getPostDetail_Success() throws Exception {
+        Long postId = 10L;
+        PostDetailResponse response = new PostDetailResponse(
+                postId,
+                "9791161571188",
+                "문소희",
+                "https://cdn.example.com/profile.png",
+                null, // groupName
+                "내 남편을 팝니다",
+                "게시글 내용",
+                List.of("https://cdn.example.com/1.jpg", "https://cdn.example.com/2.jpg"),
+                26,
+                3L,
+                true,
+                LocalDateTime.of(2026, 6, 23, 12, 0)
+        );
+        given(postService.getPostDetail(eq(postId), any())).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/posts/{postId}", postId))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.postId").value(10L))
+                .andExpect(jsonPath("$.data.author").value("문소희"))
+                .andExpect(jsonPath("$.data.title").value("내 남편을 팝니다"))
+                .andExpect(jsonPath("$.data.imageUrls.length()").value(2))
+                .andExpect(jsonPath("$.data.commentCount").value(3))
+                .andExpect(jsonPath("$.data.isLikedByMe").value(true))
+                .andExpect(jsonPath("$.data.groupName").isEmpty());
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("Community Gallery: get post comments success")
+    void getPostComments_Success() throws Exception {
+        Long postId = 10L;
+        PostCommentResponse comment = new PostCommentResponse(
+                1L,
+                postId,
+                "문소희",
+                "https://cdn.example.com/profile.png",
+                "댓글 내용",
+                true,
+                LocalDateTime.of(2026, 6, 23, 12, 0)
+        );
+        CursorPageResponse<PostCommentResponse> page =
+                CursorPageResponse.of(List.of(comment), 20, 1L, false, null);
+        given(postService.getPostComments(eq(postId), any(), any(), any())).willReturn(page);
+
+        mockMvc.perform(get("/api/v1/posts/{postId}/comments", postId))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].commentId").value(1L))
+                .andExpect(jsonPath("$.data.content[0].isMine").value(true))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
     }
 
     @Test
