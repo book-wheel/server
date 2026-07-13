@@ -7,8 +7,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record GalleryResponseDto(
-    Long galleryId,
+    Long postId,
     Long bookId,
+    String isbn,
     String thumbnailUrl,
     int imageCount,
     LocalDateTime createdAt
@@ -19,6 +20,7 @@ public record GalleryResponseDto(
         return new GalleryResponseDto(
             post.getPostId(),
             post.getBookInfo().getBookInfoId(),
+            post.getBookInfo().getIsbn(),
             getThumbnailUrl(images),
             images == null ? 0 : images.size(),
             post.getCreatedAt()
