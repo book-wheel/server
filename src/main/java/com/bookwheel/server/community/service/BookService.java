@@ -55,7 +55,7 @@ public class BookService {
 
 
     @Transactional
-    public ReviewCreateResponse createReview(ReviewCreateRequest request, String userPK) {
+    public ReviewDetailResponse createReview(ReviewCreateRequest request, String userPK) {
         String isbn = request.isbn();
 
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
@@ -74,7 +74,9 @@ public class BookService {
 
         BookReview savedReview = bookReviewRepository.save(review);
 
-        return ReviewCreateResponse.from(savedReview);
+        // 방금 작성한 리뷰이므로 공감 수는 0, 내 공감 여부는 false
+        String profileImageUrl = getProfileImageUrl(user.getProfileImageKey());
+        return ReviewDetailResponse.of(savedReview, profileImageUrl, false);
     }
 
     @Transactional
