@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -26,8 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPKOrNull;
@@ -107,13 +106,19 @@ public class BookController {
         return ApiResponse.success("리뷰 작성이 완료되었습니다.");
     }
 
-    @Operation(summary = "리뷰 목록 조회", description = "특정 책에 달린 모든 코멘트와 하트 개수, 내 공감 여부를 최신순으로 가져옵니다.")
+    @Operation(summary = "리뷰 목록 조회", description = "특정 책에 달린 리뷰를 정렬 기준(latest/popular)과 페이지네이션으로 조회합니다. 하트 개수와 내 공감 여부, 다음 페이지 존재 여부를 포함합니다.")
     @GetMapping("/{isbn}/reviews")
-    public ApiResponse<List<ReviewDetailResponse>> getReviewList(
+    public ApiResponse<Page<ReviewDetailResponse>> getReviewList(
         @PathVariable("isbn") String isbn,
+        @Parameter(description = "정렬 기준 (latest: 최신순, popular: 인기순)", example = "latest")
+        @RequestParam(required = false, defaultValue = "latest") String sort,
+        @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+        @RequestParam(required = false, defaultValue = "0") int page,
+        @Parameter(description = "페이지 당 리뷰 개수", example = "10")
+        @RequestParam(required = false, defaultValue = "10") int size,
         @AuthenticationPrincipal Object principal
     ) {
-        List<ReviewDetailResponse> response = bookService.getReviewList(isbn, getUserPK(principal));
+        Page<ReviewDetailResponse> response = bookService.getReviewList(isbn, sort, page, size, getUserPK(principal));
         return ApiResponse.success(response);
     }
 

@@ -25,7 +25,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -140,23 +143,37 @@ public class BookService {
             .orElse(null);
     }
 
-    public List<ReviewDetailResponse> getReviewList(String isbn, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+    public Page<ReviewDetailResponse> getReviewList(String isbn, String sort, int page, int size, String userPK) {
+        if (page < 0 || size <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
+        Pageable pageable = PageRequest.of(page, size, resolveReviewSort(sort));
 
-        List<BookReview> reviews = bookReviewRepository.findAllByBookInfoOrderByCreatedAtDesc(bookInfo);
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+        if (bookInfo == null) {
+            return Page.empty(pageable);
+        }
 
+        Page<BookReview> reviews = bookReviewRepository.findAllByBookInfo(bookInfo, pageable);
 
-        return reviews.stream().map(review -> {
-
+        return reviews.map(review -> {
             boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
             String profileImageUrl = getProfileImageUrl(review.getReviewer().getProfileImageKey());
 
             return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe);
-        }).toList();
+        });
+    }
+
+    // 정렬 기준을 Sort로 변환한다. popular=공감수 내림차순(동일 시 작성일 내림차순), 그 외 latest=작성일 내림차순
+    private Sort resolveReviewSort(String sort) {
+        if ("popular".equalsIgnoreCase(sort)) {
+            return Sort.by(Sort.Order.desc("likeCount"), Sort.Order.desc("createdAt"));
+        }
+        return Sort.by(Sort.Order.desc("createdAt"));
     }
 
     // 프로필 이미지 키를 조회용 Presigned URL로 변환한다. (키가 없으면 null)

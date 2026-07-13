@@ -2,6 +2,7 @@ package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.VoteType;
 import com.bookwheel.server.community.service.BookService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestWatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -72,6 +76,7 @@ class BookControllerTest {
                 1L,
                 isbn,
                 "reviewer",
+                "https://cdn.example.com/profile.png",
                 true,
                 "Great read",
                 false,
@@ -79,12 +84,13 @@ class BookControllerTest {
                 true,
                 LocalDateTime.of(2024, 1, 1, 10, 0)
         );
-        given(bookService.getReviewList(eq(isbn), any())).willReturn(List.of(detailResponse));
+        Page<ReviewDetailResponse> page = new PageImpl<>(List.of(detailResponse));
+        given(bookService.getReviewList(eq(isbn), any(), anyInt(), anyInt(), any())).willReturn(page);
 
         mockMvc.perform(get("/api/v1/books/{isbn}/reviews", isbn))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].reviewId").value(1L));
+                .andExpect(jsonPath("$.data.content[0].reviewId").value(1L));
     }
 
     @Test
@@ -92,14 +98,15 @@ class BookControllerTest {
     @DisplayName("Community Comment: get review stats success")
     void getReviewStats_Success() throws Exception {
         String isbn = "9788966263158";
-        ReviewStatsResponse response = new ReviewStatsResponse(70, 30);
-        given(bookService.getReviewStats(eq(isbn))).willReturn(response);
+        ReviewStatsResponse response = new ReviewStatsResponse(70, 30, VoteType.RECOMMEND);
+        given(bookService.getReviewStats(eq(isbn), any())).willReturn(response);
 
         mockMvc.perform(get("/api/v1/books/{isbn}/reviews/stats", isbn))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recommendedRatio").value(70))
-                .andExpect(jsonPath("$.data.notRecommendedRatio").value(30));
+                .andExpect(jsonPath("$.data.notRecommendedRatio").value(30))
+                .andExpect(jsonPath("$.data.myVote").value("RECOMMEND"));
     }
 
     @Test

@@ -3,9 +3,10 @@ package com.bookwheel.server.community.repository;
 import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface BookReviewRepository extends JpaRepository<BookReview, Long> {
@@ -14,5 +15,5 @@ public interface BookReviewRepository extends JpaRepository<BookReview, Long> {
 
     Optional<BookReview> findByBookInfoAndReviewer_Id(BookInfo bookInfo, String userPK);
 
-    List<BookReview> findAllByBookInfoOrderByCreatedAtDesc(BookInfo bookInfo);
+    Page<BookReview> findAllByBookInfo(BookInfo bookInfo, Pageable pageable);
 }
