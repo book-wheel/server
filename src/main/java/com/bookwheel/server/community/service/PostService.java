@@ -20,6 +20,8 @@ import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.repository.*;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class PostService {
     private final BookInfoRepository bookInfoRepository;
     private final BookRepository bookRepository;
     private final GroupRepository groupRepository;
+    private final MemberRepository memberRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
     private final PostReportRepository postReportRepository;
@@ -158,13 +161,23 @@ public class PostService {
         return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
-    // 작성 요청의 groupId로 모임을 조회한다. (모임 미지정이면 null, 지정했으나 없으면 예외)
-    private Group resolveGroup(String groupId) {
+    // 작성 요청의 groupId로 모임을 조회한다.
+    // 모임 미지정이면 null, 없는 모임이면 GROUP_NOT_FOUND, 작성자가 그 모임의 활성 멤버가 아니면 GROUP_MEMBER_ONLY
+    private Group resolveGroup(String groupId, String userPK) {
         if (!StringUtils.hasText(groupId)) {
             return null;
         }
-        return groupRepository.findById(groupId)
+
+        Group group = groupRepository.findById(groupId)
             .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        boolean isActiveMember = memberRepository
+            .existsByGroup_GroupIdAndUser_IdAndMemberStatus(groupId, userPK, MemberStatus.ACTIVE);
+        if (!isActiveMember) {
+            throw new BusinessException(ErrorCode.GROUP_MEMBER_ONLY);
+        }
+
+        return group;
     }
 
     @Transactional
@@ -176,7 +189,7 @@ public class PostService {
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Group group = resolveGroup(request.groupId());
+        Group group = resolveGroup(request.groupId(), userPK);
 
         Post post = request.toEntity(bookInfo, user, group);
 
