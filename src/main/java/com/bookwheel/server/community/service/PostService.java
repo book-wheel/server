@@ -4,8 +4,12 @@ import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.cursor.CommentCursor;
+import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.service.S3Service;
+import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
+import com.bookwheel.server.community.dto.PostCommentResponse;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
@@ -18,6 +22,7 @@ import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -37,6 +42,68 @@ public class PostService {
     private final PostReportRepository postReportRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
+    private final CursorUtils cursorUtils;
+
+    private static final int DEFAULT_COMMENT_SIZE = 20;
+
+    public CursorPageResponse<PostCommentResponse> getPostComments(Long postId, String cursor, Integer size, String userPK) {
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        if (!userRepository.existsById(userPK)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        int pageSize = resolveCommentPageSize(size);
+        CommentCursor commentCursor = cursorUtils.decode(cursor, CommentCursor.class);
+        validateCommentCursor(commentCursor);
+
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<PostComment> comments = (commentCursor == null)
+            ? postCommentRepository.findFirstCommentPage(post, pageRequest)
+            : postCommentRepository.findCommentPageAfterCursor(
+                post, commentCursor.createdAt(), commentCursor.commentId(), pageRequest);
+
+        boolean hasNext = comments.size() > pageSize;
+        List<PostComment> pageComments = hasNext ? comments.subList(0, pageSize) : comments;
+
+        List<PostCommentResponse> content = pageComments.stream()
+            .map(comment -> PostCommentResponse.of(
+                comment,
+                getProfileImageUrl(comment.getUser().getProfileImageKey()),
+                comment.getUser().getId().equals(userPK)
+            ))
+            .toList();
+
+        String nextCursor = hasNext ? createNextCommentCursor(pageComments) : null;
+        Long totalElements = commentCursor == null ? postCommentRepository.countByPost(post) : null;
+
+        return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
+    }
+
+    private int resolveCommentPageSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_COMMENT_SIZE;
+        }
+        if (size <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return size;
+    }
+
+    private void validateCommentCursor(CommentCursor cursor) {
+        if (cursor == null) {
+            return;
+        }
+        if (cursor.createdAt() == null || cursor.commentId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_CURSOR);
+        }
+    }
+
+    private String createNextCommentCursor(List<PostComment> comments) {
+        PostComment last = comments.get(comments.size() - 1);
+        return cursorUtils.encode(new CommentCursor(last.getCreatedAt(), last.getPostCommentId()));
+    }
 
     public PostDetailResponse getPostDetail(Long postId, String userPK) {
         Post post = postRepository.findById(postId)

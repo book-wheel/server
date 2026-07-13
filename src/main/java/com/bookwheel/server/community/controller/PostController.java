@@ -1,10 +1,12 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
+import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +61,21 @@ public class PostController {
 
         postService.togglePostLike(postId, getUserPK(principal));
         return ApiResponse.success("공감 상태가 변경되었습니다.");
+    }
+
+    @Operation(summary = "게시물 댓글 목록 조회", description = "게시물에 달린 댓글을 최신순 커서 페이징으로 조회합니다. 내가 작성한 댓글 여부(isMine)를 포함합니다.")
+    @GetMapping("/{postId}/comments")
+    public ApiResponse<CursorPageResponse<PostCommentResponse>> getPostComments(
+        @PathVariable("postId") Long postId,
+        @Parameter(description = "다음 페이지 조회용 커서")
+        @RequestParam(required = false) String cursor,
+        @Parameter(description = "한 번에 조회할 댓글 개수", example = "20")
+        @RequestParam(required = false, defaultValue = "20") Integer size,
+        @AuthenticationPrincipal Object principal) {
+
+        CursorPageResponse<PostCommentResponse> response =
+            postService.getPostComments(postId, cursor, size, getUserPK(principal));
+        return ApiResponse.success(response);
     }
 
     @Operation(summary = "게시물 댓글 작성")
