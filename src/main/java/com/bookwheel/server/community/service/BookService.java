@@ -212,6 +212,25 @@ public class BookService {
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }
 
+    public CursorPageResponse<GalleryResponseDto> getGalleryByIsbn(String isbn, String cursor, Integer size) {
+        int pageSize = resolveGalleryPageSize(size);
+        GalleryCursor galleryCursor = cursorUtils.decode(cursor, GalleryCursor.class);
+        validateGalleryCursor(galleryCursor);
+
+        List<Post> posts = postRepository.findGalleryPageByIsbn(isbn, galleryCursor, pageSize + 1);
+        boolean hasNext = posts.size() > pageSize;
+        List<Post> pagePosts = hasNext ? posts.subList(0, pageSize) : posts;
+
+        List<GalleryResponseDto> content = pagePosts.stream()
+            .map(GalleryResponseDto::from)
+            .toList();
+
+        String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
+        Long totalElements = galleryCursor == null ? postRepository.countGalleryPostsByIsbn(isbn) : null;
+
+        return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
+    }
+
     private int resolveGalleryPageSize(Integer size) {
         if (size == null) {
             return DEFAULT_GALLERY_SIZE;
