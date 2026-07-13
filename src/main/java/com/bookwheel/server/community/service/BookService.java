@@ -5,6 +5,7 @@ import com.bookwheel.server.common.cursor.InterestCursor;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
@@ -22,11 +23,17 @@ import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -43,13 +50,15 @@ public class BookService {
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
     private final AladinService aladinService;
+    private final S3Service s3Service;
 
     private static final int DEFAULT_GALLERY_SIZE = 18;
     private static final int DEFAULT_INTEREST_SIZE = 30;
+    private static final int MAX_REVIEW_PAGE_SIZE = 50;
 
 
     @Transactional
-    public ReviewCreateResponse createReview(ReviewCreateRequest request, String userPK) {
+    public ReviewDetailResponse createReview(ReviewCreateRequest request, String userPK) {
         String isbn = request.isbn();
 
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
@@ -66,81 +75,132 @@ public class BookService {
 
         BookReview review = request.toEntity(bookInfo, user);
 
-        BookReview savedReview = bookReviewRepository.save(review);
+        BookReview savedReview;
+        try {
+            savedReview = bookReviewRepository.save(review);
+        } catch (DataIntegrityViolationException e) {
+            // exists 검사와 save 사이 동시 요청으로 (book_info_id, user_id) 유니크 제약을 위반한 경우
+            throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
+        }
 
-        return ReviewCreateResponse.from(savedReview);
+        // 방금 작성한 리뷰이므로 공감 수는 0, 내 공감 여부는 false
+        String profileImageUrl = getProfileImageUrl(user.getProfileImageKey());
+        return ReviewDetailResponse.of(savedReview, profileImageUrl, false);
     }
 
     @Transactional
-    public void toggleReviewLike(Long reviewId, String userPK) {
+    public ReviewLikeResponse toggleReviewLike(Long reviewId, String userPK) {
         BookReview review = bookReviewRepository.findById(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        reviewLikeRepository.findByReviewAndUser(review, user)
-            .ifPresentOrElse(
+        boolean isLikedByMe = reviewLikeRepository.findByReviewAndUser(review, user)
+            .map(reviewLike -> {
                 // 이미 하트를 눌렀던 상태면 -> 좋아요 취소
-                reviewLike -> {
-                    reviewLikeRepository.delete(reviewLike);
-                    review.decreaseLikeCount();
-                },
+                reviewLikeRepository.delete(reviewLike);
+                review.decreaseLikeCount();
+                return false;
+            })
+            .orElseGet(() -> {
                 // 하트를 누르지 않은 상태면 -> 좋아요 추가
-                () -> {
-                    reviewLikeRepository.save(ReviewLike.create(review, user));
-                    review.increaseLikeCount();
-                    String reviewerUserPK = review.getReviewer().getId();
-                    if (!reviewerUserPK.equals(userPK)) {
-                        eventPublisher.publishEvent(new ReviewLikedEvent(
-                                review.getReviewId(),
-                                reviewerUserPK,
-                                userPK,
-                                user.getNickname()
-                        ));
-                    }
+                reviewLikeRepository.save(ReviewLike.create(review, user));
+                review.increaseLikeCount();
+                String reviewerUserPK = review.getReviewer().getId();
+                if (!reviewerUserPK.equals(userPK)) {
+                    eventPublisher.publishEvent(new ReviewLikedEvent(
+                            review.getReviewId(),
+                            reviewerUserPK,
+                            userPK,
+                            user.getNickname()
+                    ));
                 }
-            );
+                return true;
+            });
+
+        return ReviewLikeResponse.of(review.getReviewId(), isLikedByMe, review.getLikeCount());
     }
 
-    public ReviewStatsResponse getReviewStats(String isbn) {
+    public ReviewStatsResponse getReviewStats(String isbn, String userPK) {
 
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
         if (bookInfo == null) {
-            return new ReviewStatsResponse(0, 0);
+            return new ReviewStatsResponse(0, 0, null);
         }
+
+        VoteType myVote = resolveMyVote(bookInfo, userPK);
 
         long recommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, true);
         long notRecommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, false);
         long totalCount = recommendedCount + notRecommendedCount;
 
         if (totalCount == 0) {
-            return new ReviewStatsResponse(0, 0); // 리뷰가 없을 때
+            return new ReviewStatsResponse(0, 0, myVote); // 리뷰가 없을 때
         }
 
         int recommendedRatio = (int) ((recommendedCount * 100) / totalCount);
         int notRecommendedRatio = 100 - recommendedRatio;
 
-        return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio);
+        return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio, myVote);
     }
 
-    public List<ReviewDetailResponse> getReviewList(String isbn, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+    // 로그인 사용자가 해당 도서에 작성한 리뷰의 추천 여부를 myVote로 변환한다. (비로그인/미작성 시 null)
+    private VoteType resolveMyVote(BookInfo bookInfo, String userPK) {
+        if (userPK == null) {
+            return null;
+        }
+        return bookReviewRepository.findByBookInfoAndReviewer_Id(bookInfo, userPK)
+            .map(review -> VoteType.fromRecommended(review.getIsRecommended()))
+            .orElse(null);
+    }
+
+    public Page<ReviewDetailResponse> getReviewList(String isbn, String sort, int page, int size, String userPK) {
+        if (page < 0 || size <= 0 || size > MAX_REVIEW_PAGE_SIZE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
+        Pageable pageable = PageRequest.of(page, size, resolveReviewSort(sort));
 
-        List<BookReview> reviews = bookReviewRepository.findAllByBookInfoOrderByCreatedAtDesc(bookInfo);
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+        if (bookInfo == null) {
+            return Page.empty(pageable);
+        }
 
+        Page<BookReview> reviews = bookReviewRepository.findAllByBookInfo(bookInfo, pageable);
 
-        return reviews.stream().map(review -> {
+        // 현재 페이지 리뷰들에 대한 내 공감 여부를 한 번의 쿼리로 조회 (리뷰별 exists N+1 방지)
+        List<Long> reviewIds = reviews.stream().map(BookReview::getReviewId).toList();
+        Set<Long> likedReviewIds = reviewIds.isEmpty()
+            ? Set.of()
+            : Set.copyOf(reviewLikeRepository.findLikedReviewIds(user, reviewIds));
 
-            boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
+        return reviews.map(review -> {
+            boolean isLikedByMe = likedReviewIds.contains(review.getReviewId());
+            String profileImageUrl = getProfileImageUrl(review.getReviewer().getProfileImageKey());
 
-            return ReviewDetailResponse.of(review, isLikedByMe);
-        }).toList();
+            return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe);
+        });
+    }
+
+    // 정렬 기준을 Sort로 변환한다. popular=공감수 내림차순(동일 시 작성일 내림차순), 그 외 latest=작성일 내림차순
+    private Sort resolveReviewSort(String sort) {
+        if ("popular".equalsIgnoreCase(sort)) {
+            return Sort.by(Sort.Order.desc("likeCount"), Sort.Order.desc("createdAt"));
+        }
+        return Sort.by(Sort.Order.desc("createdAt"));
+    }
+
+    // 프로필 이미지 키를 조회용 Presigned URL로 변환한다. (키가 없으면 null)
+    private String getProfileImageUrl(String profileImageKey) {
+        if (!StringUtils.hasText(profileImageKey)) {
+            return null;
+        }
+        return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
 
