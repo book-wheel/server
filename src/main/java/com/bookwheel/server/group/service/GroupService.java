@@ -20,6 +20,8 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
+import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -77,8 +79,12 @@ public class GroupService {
 
     @Transactional
     public GroupJoinResponse joinGroup(String groupId, GroupJoinRequest request, String userPK) {
-        Group group = findGroupById(groupId);
+        Group group = findGroupByIdForUpdate(groupId);
         User user = findActiveUserById(userPK);
+
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
 
         validateJoinRequest(group, request);
 
@@ -196,11 +202,15 @@ public class GroupService {
         }
 
         List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
-        if (wheelStateRepository.existsByRoundIdIn(roundIds)) {
+        List<WheelState> wheelStates = wheelStateRepository.findByRoundIdIn(roundIds);
+        boolean hasStartedWheelState = wheelStates.stream()
+                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
+        if (hasStartedWheelState) {
             // 진행 기록이 있으면 일정만 삭제해 데이터 연결이 끊기는 일을 막는다.
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
         }
 
+        wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
         roundRepository.deleteByGroup_GroupId(group.getGroupId());
         group.invalidateSchedule();
     }

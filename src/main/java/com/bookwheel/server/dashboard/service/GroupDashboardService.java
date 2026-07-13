@@ -18,7 +18,6 @@ import com.bookwheel.server.user.repository.UserRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
-import com.bookwheel.server.wheel.service.WheelAssignmentService;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +39,6 @@ public class GroupDashboardService {
     private final OwnBookRepository ownBookRepository;
     private final WheelStateRepository wheelStateRepository;
     private final RoundRepository roundRepository;
-    private final WheelAssignmentService wheelAssignmentService;
 
     public DashboardResponse getDashboard(String groupId, String userPK) {
         // 1. 유저, 그룹, 멤버 권한 체크
@@ -61,21 +59,17 @@ public class GroupDashboardService {
                 dDay = (int) ChronoUnit.DAYS.between(LocalDate.now(), plannedStartDate);
             }
 
-            // 첫 라운드에서 읽게 될 예정 책 계산
-            MyStepResponse myStep = resolvePreStartMyStep(groupId, member);
+            Round firstRound = getFirstRound(groupId);
+
+            // 시작 전에도 재계산하지 않고 저장된 첫 라운드 배정을 그대로 보여 준다.
+            MyStepResponse myStep = firstRound == null ? null : resolvePreStartMyStep(firstRound, member);
 
             // 내가 등록한 책이 있으면 myBookStep 계산
             MyBookStepResponse myBookStep = null;
             Optional<OwnBook> myOwnBookOpt = ownBookRepository.findByGroup_GroupIdAndOwner_Id(groupId, user.getId());
             if (myOwnBookOpt.isPresent()) {
                 OwnBook myOwnBook = myOwnBookOpt.get();
-                myBookStep = MyBookStepResponse.of(
-                        myOwnBook.getBook().getBookId(),
-                        myOwnBook.getBook().getTitle(),
-                        null,
-                        WheelStatus.READY,
-                        null
-                );
+                myBookStep = firstRound == null ? null : resolvePreStartMyBookStep(firstRound, myOwnBook);
             }
 
             return DashboardResponse.of(
@@ -150,24 +144,34 @@ public class GroupDashboardService {
         );
     }
 
-    // 첫 라운드에 읽을 예정인 책을 계산
-    private MyStepResponse resolvePreStartMyStep(String groupId, Member member) {
-        Optional<OwnBook> assignedBookOpt = wheelAssignmentService.findAssignedBook(groupId, member, 1);
-        if (assignedBookOpt.isEmpty()) {
-            return null;
-        }
+    private MyStepResponse resolvePreStartMyStep(Round firstRound, Member member) {
+        return wheelStateRepository
+                .findFirstByRoundIdAndMember_MemberId(firstRound.getRoundId(), member.getMemberId())
+                .map(wheelState -> {
+                    Book book = wheelState.getOwnBook().getBook();
+                    return MyStepResponse.of(
+                            wheelState.getWheelStateId(),
+                            book.getBookId(),
+                            wheelState.getWheelState(),
+                            book.getTitle(),
+                            book.getCoverImage(),
+                            wheelState.getOwnBook().getOwner().getNickname()
+                    );
+                })
+                .orElse(null);
+    }
 
-        OwnBook assignedBook = assignedBookOpt.get();
-        Book book = assignedBook.getBook();
-
-        return MyStepResponse.of(
-                null,
-                book.getBookId(),
-                WheelStatus.READY,
-                book.getTitle(),
-                book.getCoverImage(),
-                assignedBook.getOwner().getNickname()
-        );
+    private MyBookStepResponse resolvePreStartMyBookStep(Round firstRound, OwnBook myOwnBook) {
+        return wheelStateRepository
+                .findFirstByRoundIdAndOwnBook_OwnBookId(firstRound.getRoundId(), myOwnBook.getOwnBookId())
+                .map(wheelState -> MyBookStepResponse.of(
+                        myOwnBook.getBook().getBookId(),
+                        myOwnBook.getBook().getTitle(),
+                        wheelState.getMember().getUser().getNickname(),
+                        wheelState.getWheelState(),
+                        null
+                ))
+                .orElse(null);
     }
 
     // 이전 전달자 닉네임 계산:
@@ -214,6 +218,13 @@ public class GroupDashboardService {
 
         // 3. 모두 종료되었다면 마지막 라운드 반환
         return rounds.get(rounds.size() - 1);
+    }
+
+    private Round getFirstRound(String groupId) {
+        return roundRepository.findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(groupId)
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private User findActiveUserById(String userPK) {

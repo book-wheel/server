@@ -6,6 +6,7 @@ import com.bookwheel.server.common.exception.*;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.member.entity.Member;
+import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
@@ -19,6 +20,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,17 +37,22 @@ public class WheelService {
     private final OwnBookRepository ownBookRepository;
     private final S3Service s3Service;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     @Transactional
     public WheelCompleteResponse completedReading(String userPK, String wheelStateId, WheelCompleteRequest request) {
         // 1. DB에서 해당 WheelState가 있는지 먼저 찾기
-        WheelState wheelState = wheelStateRepository.findById(wheelStateId)
+        WheelState wheelState = wheelStateRepository.findByWheelStateIdForUpdate(wheelStateId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WHEEL_NOT_FOUND));
 
-        // 2. 이 사람이 인증할 권한이 있는 사람인지 확인
-        if (!wheelState.getMember().getUser().getId().equals(userPK)) {
+        // 2. 이 사람이 현재도 ACTIVE 상태로 인증할 권한이 있는지 확인
+        Member member = memberRepository.findByMemberIdForUpdate(wheelState.getMember().getMemberId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
+        if (!member.getUser().getId().equals(userPK) || member.getMemberStatus() != MemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
         }
+
+        validateCompletableWheelState(wheelState);
 
         // TODO: 북 게시판 사진첩 연동 기능 추가 예정 (BookService 연동)
 
@@ -57,7 +65,6 @@ public class WheelService {
 
         wheelState.complete(request.reviewText(), normalizedKeys);
 
-        Member member = wheelState.getMember();
         OwnBook ownBook = wheelState.getOwnBook();
         eventPublisher.publishEvent(new WheelCompletedEvent(
                 wheelState.getWheelStateId(),
@@ -69,6 +76,22 @@ public class WheelService {
         ));
 
         return WheelCompleteResponse.of(wheelState.getWheelStateId(), wheelState.getIsCompleted(), wheelState.getWheelState());
+    }
+
+    private void validateCompletableWheelState(WheelState wheelState) {
+        if (Boolean.TRUE.equals(wheelState.getIsCompleted())) {
+            return;
+        }
+        if (wheelState.getWheelState() != WheelStatus.READY) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String groupId = wheelState.getMember().getGroup().getGroupId();
+        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
+        if (!currentRound.getRoundId().equals(wheelState.getRoundId())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
     }
 
     @Transactional(readOnly = true)
