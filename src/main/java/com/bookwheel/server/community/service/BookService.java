@@ -23,6 +23,7 @@ import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +54,7 @@ public class BookService {
 
     private static final int DEFAULT_GALLERY_SIZE = 18;
     private static final int DEFAULT_INTEREST_SIZE = 30;
+    private static final int MAX_REVIEW_PAGE_SIZE = 50;
 
 
     @Transactional
@@ -72,7 +75,13 @@ public class BookService {
 
         BookReview review = request.toEntity(bookInfo, user);
 
-        BookReview savedReview = bookReviewRepository.save(review);
+        BookReview savedReview;
+        try {
+            savedReview = bookReviewRepository.save(review);
+        } catch (DataIntegrityViolationException e) {
+            // exists 검사와 save 사이 동시 요청으로 (book_info_id, user_id) 유니크 제약을 위반한 경우
+            throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
+        }
 
         // 방금 작성한 리뷰이므로 공감 수는 0, 내 공감 여부는 false
         String profileImageUrl = getProfileImageUrl(user.getProfileImageKey());
@@ -148,7 +157,7 @@ public class BookService {
     }
 
     public Page<ReviewDetailResponse> getReviewList(String isbn, String sort, int page, int size, String userPK) {
-        if (page < 0 || size <= 0) {
+        if (page < 0 || size <= 0 || size > MAX_REVIEW_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
@@ -164,8 +173,14 @@ public class BookService {
 
         Page<BookReview> reviews = bookReviewRepository.findAllByBookInfo(bookInfo, pageable);
 
+        // 현재 페이지 리뷰들에 대한 내 공감 여부를 한 번의 쿼리로 조회 (리뷰별 exists N+1 방지)
+        List<Long> reviewIds = reviews.stream().map(BookReview::getReviewId).toList();
+        Set<Long> likedReviewIds = reviewIds.isEmpty()
+            ? Set.of()
+            : Set.copyOf(reviewLikeRepository.findLikedReviewIds(user, reviewIds));
+
         return reviews.map(review -> {
-            boolean isLikedByMe = reviewLikeRepository.existsByReviewAndUser(review, user);
+            boolean isLikedByMe = likedReviewIds.contains(review.getReviewId());
             String profileImageUrl = getProfileImageUrl(review.getReviewer().getProfileImageKey());
 
             return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe);
