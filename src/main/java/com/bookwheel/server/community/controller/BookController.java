@@ -15,6 +15,7 @@ import com.bookwheel.server.community.dto.ReviewStatsResponse;
 import com.bookwheel.server.community.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -115,7 +116,8 @@ public class BookController {
         @RequestParam(required = false, defaultValue = "latest") String sort,
         @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
         @RequestParam(required = false, defaultValue = "0") int page,
-        @Parameter(description = "페이지 당 리뷰 개수", example = "10")
+        @Parameter(description = "페이지 당 리뷰 개수 (1~50, 초과 시 400)", example = "10",
+            schema = @Schema(type = "integer", minimum = "1", maximum = "50", defaultValue = "10"))
         @RequestParam(required = false, defaultValue = "10") int size,
         @AuthenticationPrincipal Object principal
     ) {
