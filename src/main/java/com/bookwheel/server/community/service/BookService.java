@@ -80,35 +80,37 @@ public class BookService {
     }
 
     @Transactional
-    public void toggleReviewLike(Long reviewId, String userPK) {
+    public ReviewLikeResponse toggleReviewLike(Long reviewId, String userPK) {
         BookReview review = bookReviewRepository.findById(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        reviewLikeRepository.findByReviewAndUser(review, user)
-            .ifPresentOrElse(
+        boolean isLikedByMe = reviewLikeRepository.findByReviewAndUser(review, user)
+            .map(reviewLike -> {
                 // 이미 하트를 눌렀던 상태면 -> 좋아요 취소
-                reviewLike -> {
-                    reviewLikeRepository.delete(reviewLike);
-                    review.decreaseLikeCount();
-                },
+                reviewLikeRepository.delete(reviewLike);
+                review.decreaseLikeCount();
+                return false;
+            })
+            .orElseGet(() -> {
                 // 하트를 누르지 않은 상태면 -> 좋아요 추가
-                () -> {
-                    reviewLikeRepository.save(ReviewLike.create(review, user));
-                    review.increaseLikeCount();
-                    String reviewerUserPK = review.getReviewer().getId();
-                    if (!reviewerUserPK.equals(userPK)) {
-                        eventPublisher.publishEvent(new ReviewLikedEvent(
-                                review.getReviewId(),
-                                reviewerUserPK,
-                                userPK,
-                                user.getNickname()
-                        ));
-                    }
+                reviewLikeRepository.save(ReviewLike.create(review, user));
+                review.increaseLikeCount();
+                String reviewerUserPK = review.getReviewer().getId();
+                if (!reviewerUserPK.equals(userPK)) {
+                    eventPublisher.publishEvent(new ReviewLikedEvent(
+                            review.getReviewId(),
+                            reviewerUserPK,
+                            userPK,
+                            user.getNickname()
+                    ));
                 }
-            );
+                return true;
+            });
+
+        return ReviewLikeResponse.of(review.getReviewId(), isLikedByMe, review.getLikeCount());
     }
 
     public ReviewStatsResponse getReviewStats(String isbn, String userPK) {

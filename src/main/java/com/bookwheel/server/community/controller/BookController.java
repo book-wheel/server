@@ -10,6 +10,7 @@ import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.dto.ReviewCreateRequest;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
+import com.bookwheel.server.community.dto.ReviewLikeResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
 import com.bookwheel.server.community.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -132,13 +133,13 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "리뷰 추천/비추천 공감 누르기/취소")
+    @Operation(summary = "리뷰 추천/비추천 공감 누르기/취소", description = "공감 상태를 토글하고 변경된 공감 여부와 공감 수를 반환합니다.")
     @PostMapping("/reviews/{reviewId}/likes")
-    public ApiResponse<String> toggleReviewLike(
+    public ApiResponse<ReviewLikeResponse> toggleReviewLike(
         @PathVariable("reviewId") Long reviewId,
         @AuthenticationPrincipal Object principal
     ) {
-        bookService.toggleReviewLike(reviewId, getUserPK(principal));
-        return ApiResponse.success("공감 상태가 변경되었습니다.");
+        ReviewLikeResponse response = bookService.toggleReviewLike(reviewId, getUserPK(principal));
+        return ApiResponse.success(response);
     }
 }
