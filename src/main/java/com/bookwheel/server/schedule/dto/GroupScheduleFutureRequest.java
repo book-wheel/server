@@ -1,6 +1,7 @@
 package com.bookwheel.server.schedule.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
@@ -11,6 +12,12 @@ public record GroupScheduleFutureRequest(
         @Schema(description = "보호된 라운드를 포함한 최종 전체 라운드 수", example = "5")
         @NotNull(message = "전체 라운드 수를 입력해주세요.")
         Integer totalRoundCount,
+
+        // 진행 중 보호 라운드는 유지하고 새 미래 라운드에만 적용할 기간이다.
+        @Schema(description = "새로 생성할 미래 라운드의 독서 기간(일)", example = "7")
+        @NotNull(message = "독서 기간을 입력해주세요.")
+        @Min(value = 1, message = "독서 기간은 최소 1일 이상이어야 합니다.")
+        Integer readingPeriod,
 
         @Schema(description = "미래 일정의 최대 종료일 제한. 선택값이며 없으면 제한 없이 계산합니다.", example = "2026-07-31", nullable = true)
         LocalDate endDate,

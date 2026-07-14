@@ -85,6 +85,7 @@ public enum ErrorCode {
     GROUP_MAX_MEMBERS_BELOW_CURRENT_MEMBERS(HttpStatus.BAD_REQUEST, "GROUP_043", "현재 참여 인원보다 적게 최대 인원을 설정할 수 없습니다."),
     GROUP_PUBLIC_PASSWORD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "GROUP_046", "공개 모임에는 비밀번호를 설정할 수 없습니다."),
     GROUP_REGION_NOT_ALLOWED_FOR_ONLINE(HttpStatus.BAD_REQUEST, "GROUP_047", "온라인 모임에는 지역을 설정할 수 없습니다."),
+    GROUP_SCHEDULE_START_DATE_IN_PAST(HttpStatus.BAD_REQUEST, "GROUP_048", "일정 시작일은 오늘보다 이전일 수 없습니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

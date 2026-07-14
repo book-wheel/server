@@ -80,6 +80,11 @@ public class Group {
         this.groupPassword = groupPassword;
     }
 
+    // 독서 기간은 모임 기본 정보가 아니라 일정 생성·재생성 API에서만 변경한다.
+    public void updateReadingPeriod(Integer readingPeriod) {
+        this.readingPeriod = readingPeriod;
+    }
+
     // 일정 필드를 건드리지 않고 화면의 기본 모임 정보만 변경한다.
     public void updateGroupInfo(
             String groupName,
