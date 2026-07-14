@@ -124,4 +124,8 @@ public interface MemberRepository extends JpaRepository<Member, String> {
             @Param("userPK") String userPK,
             @Param("status") MemberStatus status
     );
+
+    @Modifying
+    @Query("delete from Member m where m.group.groupId = :groupId")
+    void deleteAllByGroupId(@Param("groupId") String groupId);
 }

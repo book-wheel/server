@@ -37,6 +37,20 @@ public class GroupSettingController {
     }
 
     @Operation(
+            summary = "모임 삭제",
+            description = "리더가 모집 중(RECRUITING) 또는 완료(COMPLETE) 모임을 관련 데이터와 함께 삭제합니다. 진행 중(IN_PROGRESS) 모임은 삭제할 수 없습니다."
+    )
+    @DeleteMapping
+    // 서비스에서 상태·리더 권한·연관 데이터 삭제를 검증한 뒤 응답한다.
+    public ResponseEntity<ApiResponse<Void>> deleteGroup(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal Object principal
+    ) {
+        groupSettingService.deleteGroup(groupId, getUserPK(principal));
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(
             summary = "멤버 강퇴",
             description = "리더가 그룹의 멤버를 강제 탈퇴시킵니다. 모집 중에는 기존 일정이 무효화되고, 진행 중에는 완료·현재 라운드는 유지한 채 미래 라운드만 재배정합니다. 재배정할 수 없으면 GROUP_036 오류가 반환됩니다."
     )

@@ -9,12 +9,18 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Collection;
 
 public interface PostCommentRepository extends JpaRepository<PostComment, Long> {
 
     List<PostComment> findAllByPost(Post post);
 
     long countByPost(Post post);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("delete from PostComment comment where comment.post.postId in :postIds")
+    // 게시물 삭제 전에 댓글이 참조하는 게시물을 먼저 제거한다.
+    void deleteAllByPostIds(@Param("postIds") Collection<Long> postIds);
 
     // 최신순 첫 페이지 (작성일 내림차순, 동일 시 댓글 ID 내림차순)
     @Query("""

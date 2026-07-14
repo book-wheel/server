@@ -86,7 +86,10 @@ public class ChatService {
 
     @Transactional
     public ChatRoomReadResponse updateReadState(String groupId, String userPK, Long lastReadMessageId) {
-        ChatRoom chatRoom = findAccessibleChatRoom(groupId, userPK);
+        // 읽음 상태가 삭제 중인 채팅방에 새로 연결되지 않도록 그룹 행을 먼저 잠근다.
+        Group group = findGroupForUpdate(groupId);
+        ChatRoom chatRoom = chatRoomRepository.findByGroup_GroupId(group.getGroupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
         Member member = validateActiveMember(groupId, userPK);
 
         ChatMessage lastReadMessage = chatMessageRepository.findByChatMessageIdAndChatRoom(lastReadMessageId, chatRoom)
@@ -116,6 +119,12 @@ public class ChatService {
 
     private Group findGroup(String groupId) {
         return groupRepository.findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
+    // 읽음 상태를 저장할 때 삭제 중인 그룹을 다시 사용하지 않도록 잠긴 행을 조회한다.
+    private Group findGroupForUpdate(String groupId) {
+        return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 

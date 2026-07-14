@@ -101,6 +101,31 @@ public class GroupSettingService {
         return GroupDetailResponse.from(group, GroupDetailButtonType.LEADER_SETTING);
     }
 
+    @Transactional
+    public void deleteGroup(String groupId, String leaderUserPK) {
+        // 삭제 중 신규 멤버·도서·일정이 추가되지 않도록 삭제 전체 과정에서 모임 행 잠금을 유지한다.
+        Group group = groupRepository.findByGroupIdForUpdate(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        memberPermissionValidator.validateLeader(groupId, leaderUserPK);
+        validateDeletableGroup(group);
+
+        Set<String> objectKeys = new LinkedHashSet<>();
+
+        // 그룹 알림은 비동기 저장 경로와도 같은 그룹 잠금을 사용하므로 먼저 정리한다.
+        notificationService.deleteByGroupId(groupId);
+        // 외래 키 의존성이 있는 자식 데이터부터 삭제하면서 S3 키를 먼저 수집한다.
+        objectKeys.addAll(deleteCommunityData(groupId));
+        objectKeys.addAll(deleteChatData(groupId));
+        objectKeys.addAll(deleteScheduleData(groupId));
+        ownBookRepository.deleteAllByGroupId(groupId);
+        memberRepository.deleteAllByGroupId(groupId);
+
+        // 벌크 삭제 후 영속성 컨텍스트에 남은 멤버·자식 엔티티가 삭제된 그룹을 참조하지 않도록 정리한다.
+        entityManager.flush();
+        entityManager.clear();
+        groupRepository.delete(group);
+        registerPostCommitImageCleanup(objectKeys);
+    }
 
     @Transactional
     public MemberKickResponse kickMember(String groupId, String targetUserPK, String leaderUserPK) {
@@ -239,6 +264,17 @@ public class GroupSettingService {
         return MemberExitResponse.of(groupId, userPK, member.getMemberStatus());
     }
 
+    private void validateDeletableGroup(Group group) {
+        // 진행 중인 모임은 현재·과거 독서 기록을 보존해야 하므로 하드 삭제를 허용하지 않는다.
+        if (group.getGroupState() == State.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.GROUP_DELETE_IN_PROGRESS_NOT_ALLOWED);
+        }
+        // 모집 중 또는 완료된 모임만 모든 연관 데이터를 함께 삭제할 수 있다.
+        if (group.getGroupState() != State.RECRUITING && group.getGroupState() != State.COMPLETE) {
+            throw new BusinessException(ErrorCode.GROUP_DELETE_STATE_INVALID);
+        }
+    }
+
     private void validateGroupUpdate(Group group, GroupUpdateRequest request) {
         // 모임 이름은 다른 모임과 중복될 수 없지만 자기 자신의 기존 이름은 허용한다.
         if (!group.getGroupName().equals(request.groupName())
@@ -284,6 +320,92 @@ public class GroupSettingService {
         }
 
         throw new IllegalStateException("비공개 모임은 검증된 비밀번호가 필요합니다.");
+    }
+
+    // 모임 게시물과 댓글·좋아요·신고를 삭제하고, 게시물 이미지 키를 반환한다.
+    private List<String> deleteCommunityData(String groupId) {
+        List<Post> posts = postRepository.findByGroup_GroupId(groupId);
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> postIds = posts.stream().map(Post::getPostId).toList();
+        Set<String> objectKeys = new LinkedHashSet<>();
+        posts.stream()
+                .flatMap(post -> post.getImages().stream())
+                .map(image -> image.getObjectKey())
+                .filter(StringUtils::hasText)
+                .forEach(objectKeys::add);
+
+        // 게시물의 좋아요·댓글·신고가 게시물을 참조하므로 연관 행을 먼저 삭제한다.
+        postLikeRepository.deleteAllByPostIds(postIds);
+        postCommentRepository.deleteAllByPostIds(postIds);
+        postReportRepository.deleteAllByPostIds(postIds);
+        postRepository.deleteAll(posts);
+        postRepository.flush();
+        return new ArrayList<>(objectKeys);
+    }
+
+    // 채팅 데이터를 삭제하고 DB에서 확인된 채팅 이미지 키만 반환한다.
+    private List<String> deleteChatData(String groupId) {
+        List<String> objectKeys = new ArrayList<>();
+        chatRoomRepository.findByGroup_GroupId(groupId).ifPresent(chatRoom -> {
+            List<ChatMessage> messages = chatMessageRepository.findByChatRoom(chatRoom);
+            messages.stream()
+                    .map(ChatMessage::getImageKey)
+                    .filter(StringUtils::hasText)
+                    .forEach(objectKeys::add);
+
+            // 채팅방을 참조하는 읽음 상태와 메시지를 먼저 제거해야 채팅방 삭제가 가능하다.
+            chatRoomReadStateRepository.deleteAllByChatRoom(chatRoom);
+            chatMessageRepository.deleteAllByChatRoom(chatRoom);
+            chatRoomRepository.delete(chatRoom);
+            chatRoomRepository.flush();
+        });
+        return objectKeys;
+    }
+
+    // 라운드·책바퀴 기록을 FK 순서대로 삭제하고 인증 이미지 키를 반환한다.
+    private List<String> deleteScheduleData(String groupId) {
+        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        if (rounds.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> roundIds = rounds.stream()
+                .map(Round::getRoundId)
+                .toList();
+        List<WheelState> wheelStates = wheelStateRepository.findByRoundIdIn(roundIds);
+        List<String> objectKeys = wheelStates.stream()
+                .flatMap(wheelState -> wheelState.getAuthImages().stream())
+                .map(image -> image.getObjectKey())
+                .filter(StringUtils::hasText)
+                .toList();
+
+        // WheelState를 먼저 삭제하면 라운드와 인증 이미지 사이의 외래 키 의존성도 함께 정리된다.
+        wheelStateRepository.deleteAll(wheelStates);
+        wheelStateRepository.flush();
+        roundRepository.deleteAll(rounds);
+        roundRepository.flush();
+        return objectKeys;
+    }
+
+    // 트랜잭션이 실제 커밋된 뒤 수집된 S3 객체만 best-effort로 삭제한다.
+    private void registerPostCommitImageCleanup(Set<String> objectKeys) {
+        if (objectKeys.isEmpty()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("모임 이미지 정리는 트랜잭션 커밋 이후에만 실행할 수 있습니다.");
+        }
+
+        // DB가 롤백되면 이미지도 남겨야 하므로 커밋이 성공한 뒤에만 S3 삭제를 시작한다.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                objectKeys.forEach(s3Service::deleteObject);
+            }
+        });
     }
 
     private LockedActiveMembers lockedActiveMembers(String groupId) {

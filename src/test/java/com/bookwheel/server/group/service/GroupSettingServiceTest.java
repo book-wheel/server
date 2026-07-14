@@ -237,6 +237,104 @@ class GroupSettingServiceTest {
                 .isEqualTo(ErrorCode.GROUP_PASSWORD_REQUIRED);
     }
 
+    @Test
+    @DisplayName("진행 중인 모임은 삭제할 수 없다")
+    void deleteGroup_RejectsInProgressWithoutSideEffects() {
+        Group group = Group.builder()
+                .groupId("group-1")
+                .groupName("진행 중 모임")
+                .groupState(State.IN_PROGRESS)
+                .build();
+        given(groupRepository.findByGroupIdForUpdate("group-1")).willReturn(Optional.of(group));
+
+        assertThatThrownBy(() -> groupSettingService.deleteGroup("group-1", "leader-user-pk"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_DELETE_IN_PROGRESS_NOT_ALLOWED);
+
+        then(notificationService).shouldHaveNoInteractions();
+        then(groupRepository).should(never()).delete(group);
+    }
+
+    @Test
+    @DisplayName("모임 이미지 삭제는 DB 커밋 이후에 실행한다")
+    void deleteGroup_DeletesImagesAfterCommit() {
+        String groupId = "group-1";
+        Group group = recruitingGroup(groupId);
+        ChatRoom chatRoom = ChatRoom.builder()
+                .chatRoomId("chat-room-1")
+                .group(group)
+                .build();
+        ChatMessage message = ChatMessage.builder()
+                .chatRoom(chatRoom)
+                .imageKey("chat/group-1/image.png")
+                .build();
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(chatRoomRepository.findByGroup_GroupId(groupId)).willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByChatRoom(chatRoom)).willReturn(List.of(message));
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            groupSettingService.deleteGroup(groupId, "leader-user-pk");
+
+            then(s3Service).shouldHaveNoInteractions();
+            TransactionSynchronizationManager.getSynchronizations().forEach(synchronization -> synchronization.afterCommit());
+            then(s3Service).should().deleteObject("chat/group-1/image.png");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("모집 중인 모임 삭제 시 하위 데이터를 먼저 삭제한다")
+    void deleteGroup_DeletesRelatedDataBeforeGroup() {
+        String groupId = "group-1";
+        Group group = recruitingGroup(groupId);
+        ChatRoom chatRoom = ChatRoom.builder()
+                .chatRoomId("chat-room-1")
+                .group(group)
+                .build();
+        Round round = Round.builder()
+                .roundId("round-1")
+                .group(group)
+                .roundNumber(1)
+                .startDate(LocalDate.of(2026, 7, 20))
+                .endDate(LocalDate.of(2026, 7, 26))
+                .build();
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(chatRoomRepository.findByGroup_GroupId(groupId)).willReturn(Optional.of(chatRoom));
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of(round));
+        given(wheelStateRepository.findByRoundIdIn(List.of(round.getRoundId()))).willReturn(List.of());
+
+        groupSettingService.deleteGroup(groupId, "leader-user-pk");
+
+        InOrder deletionOrder = inOrder(
+                chatRoomReadStateRepository,
+                chatMessageRepository,
+                chatRoomRepository,
+                wheelStateRepository,
+                roundRepository,
+                ownBookRepository,
+                memberRepository,
+                entityManager,
+                groupRepository
+        );
+        deletionOrder.verify(chatRoomReadStateRepository).deleteAllByChatRoom(chatRoom);
+        deletionOrder.verify(chatMessageRepository).deleteAllByChatRoom(chatRoom);
+        deletionOrder.verify(chatRoomRepository).delete(chatRoom);
+        deletionOrder.verify(chatRoomRepository).flush();
+        deletionOrder.verify(wheelStateRepository).deleteAll(List.of());
+        deletionOrder.verify(wheelStateRepository).flush();
+        deletionOrder.verify(roundRepository).deleteAll(List.of(round));
+        deletionOrder.verify(roundRepository).flush();
+        deletionOrder.verify(ownBookRepository).deleteAllByGroupId(groupId);
+        deletionOrder.verify(memberRepository).deleteAllByGroupId(groupId);
+        deletionOrder.verify(entityManager).flush();
+        deletionOrder.verify(entityManager).clear();
+        deletionOrder.verify(groupRepository).delete(group);
+    }
+
     private Group recruitingGroup(String groupId) {
         return Group.builder()
                 .groupId(groupId)

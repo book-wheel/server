@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
         name = "notification",
         indexes = {
                 @Index(name = "idx_notification_recipient", columnList = "recipient_user_pk, created_at"),
-                @Index(name = "idx_notification_recipient_unread", columnList = "recipient_user_pk, is_read")
+                @Index(name = "idx_notification_recipient_unread", columnList = "recipient_user_pk, is_read"),
+                @Index(name = "idx_notification_group_id", columnList = "group_id")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -29,6 +30,10 @@ public class Notification {
 
     @Column(name = "recipient_user_pk", length = 50, nullable = false)
     private String recipientUserPK;
+
+    // 계정·커뮤니티 알림은 null이고, 모임에서 발생한 알림만 그룹 ID를 가진다.
+    @Column(name = "group_id", length = 50)
+    private String groupId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type", length = 50, nullable = false)
@@ -67,5 +72,10 @@ public class Notification {
         }
         this.isRead = true;
         this.readAt = LocalDateTime.now();
+    }
+
+    public void assignGroupId(String groupId) {
+        // 기존 payload 알림을 점진적으로 backfill할 때 모임 식별자를 채운다.
+        this.groupId = groupId;
     }
 }

@@ -33,7 +33,8 @@ public class GroupBookService {
 
     @Transactional
     public OwnBookRegisterResponse registerOwnBook(String groupId, OwnBookRegisterRequest request, String userPK) {
-        Group group = findGroupById(groupId);
+        // 모임 삭제와 도서 등록이 동시에 실행되지 않도록 같은 행 잠금을 사용한다.
+        Group group = findGroupByIdForUpdate(groupId);
         User user = findActiveUserById(userPK);
         Member member = findMember(groupId, userPK);
 
@@ -76,8 +77,9 @@ public class GroupBookService {
         return OwnBookRegisterResponse.of(savedOwnBook.getOwnBookId());
     }
 
-    private Group findGroupById(String groupId) {
-        return groupRepository.findById(groupId)
+    // 도서 등록과 모임 삭제가 동시에 실행되지 않도록 잠긴 모임을 조회한다.
+    private Group findGroupByIdForUpdate(String groupId) {
+        return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 

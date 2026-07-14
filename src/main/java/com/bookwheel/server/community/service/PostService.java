@@ -169,9 +169,11 @@ public class PostService {
             return null;
         }
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        // 모임 게시물 생성과 하드 삭제가 같은 group_id를 동시에 사용하지 않도록 그룹을 잠근다.
+        Group group = groupRepository.findByGroupIdForUpdate(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
+        // 잠금 이후 ACTIVE 멤버인지 확인해 삭제와 게시물 생성을 같은 순서로 직렬화한다.
         boolean isActiveMember = memberRepository
             .existsByGroup_GroupIdAndUser_IdAndMemberStatus(groupId, userPK, MemberStatus.ACTIVE);
         if (!isActiveMember) {

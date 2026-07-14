@@ -105,4 +105,18 @@ class GroupSettingControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @WithMockUser
+    @DisplayName("모임 삭제 API 성공")
+    void deleteGroup_Success() throws Exception {
+        String groupId = "group-1";
+
+        mockMvc.perform(delete("/api/v1/groups/{groupId}", groupId).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        then(groupSettingService).should().deleteGroup(groupId, "user");
+    }
+
 }
