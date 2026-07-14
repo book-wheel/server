@@ -10,4 +10,8 @@ public interface PostRepositoryCustom {
     List<Post> findGalleryPage(GalleryCursor cursor, int limit);
 
     long countGalleryPosts();
+
+    List<Post> findGalleryPageByIsbn(String isbn, GalleryCursor cursor, int limit);
+
+    long countGalleryPostsByIsbn(String isbn);
 }

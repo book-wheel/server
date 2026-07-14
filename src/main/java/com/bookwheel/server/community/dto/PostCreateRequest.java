@@ -2,6 +2,7 @@ package com.bookwheel.server.community.dto;
 
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
+import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.user.entity.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -21,13 +22,17 @@ public record PostCreateRequest(
 
     @Schema(description = "S3에 업로드 완료된 이미지 객체 키 목록 (최대 5개)", example = "[\"posts/105/abcd_image.jpg\"]")
     @Size(max = 5, message = "사진은 최대 5장까지만 업로드할 수 있습니다.")
-    List<String> objectKeys
+    List<String> objectKeys,
+
+    @Schema(description = "작성한 모임 ID (모임 화면에서 작성 시 전달, 개인 작성이면 생략)", nullable = true)
+    String groupId
 ) {
 
-    public Post toEntity(BookInfo bookInfo, User uploader) {
+    public Post toEntity(BookInfo bookInfo, User uploader, Group group) {
         return Post.builder()
             .bookInfo(bookInfo)
             .uploader(uploader)
+            .group(group)
             .content(this.content)
             .build();
     }

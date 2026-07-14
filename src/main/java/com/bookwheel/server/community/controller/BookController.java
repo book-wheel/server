@@ -53,10 +53,23 @@ public class BookController {
     public ApiResponse<CursorPageResponse<GalleryResponseDto>> getGallery(
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "한 번에 조회할 갤러리 개수", example = "18")
+        @Parameter(description = "한 번에 조회할 갤러리 개수 (1~50, 초과 시 400)", example = "18")
         @RequestParam(required = false, defaultValue = "18") Integer size
     ) {
         CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(cursor, size);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "특정 책 갤러리 목록 조회", description = "특정 책(ISBN)에 업로드된 게시물 대표 이미지를 최신순 커서 페이징으로 조회합니다.")
+    @GetMapping("/{isbn}/gallery")
+    public ApiResponse<CursorPageResponse<GalleryResponseDto>> getGalleryByIsbn(
+        @PathVariable("isbn") String isbn,
+        @Parameter(description = "다음 페이지 조회용 커서")
+        @RequestParam(required = false) String cursor,
+        @Parameter(description = "한 번에 조회할 갤러리 개수 (1~50, 초과 시 400)", example = "18")
+        @RequestParam(required = false, defaultValue = "18") Integer size
+    ) {
+        CursorPageResponse<GalleryResponseDto> response = bookService.getGalleryByIsbn(isbn, cursor, size);
         return ApiResponse.success(response);
     }
 
@@ -65,7 +78,7 @@ public class BookController {
     public ApiResponse<CursorPageResponse<InterestBookResponseDto>> getInterestBooks(
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "한 번에 조회할 관심 도서 개수", example = "30")
+        @Parameter(description = "한 번에 조회할 관심 도서 개수 (1~50, 초과 시 400)", example = "30")
         @RequestParam(required = false, defaultValue = "30") Integer size,
         @AuthenticationPrincipal Object principal
     ) {
