@@ -12,7 +12,13 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @Builder
-@Table(name = "book_review")
+@Table(
+    name = "book_review",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_book_review_book_user",
+        columnNames = {"book_info_id", "user_id"}
+    )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)

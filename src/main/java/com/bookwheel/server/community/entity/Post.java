@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.entity;
 
 import com.bookwheel.server.book.entity.Book;
+import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -31,6 +32,11 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private User uploader;
+
+    // 모임에서 작성한 게시물이면 해당 모임, 개인적으로 작성했으면 null
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    private Group group;
 
     @Column(nullable = false, columnDefinition = "TEXT", length = 1000)
     private String content;
