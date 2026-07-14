@@ -81,6 +81,10 @@ public enum ErrorCode {
     GROUP_FUTURE_SCHEDULE_TOTAL_BELOW_PROTECTED(HttpStatus.BAD_REQUEST, "GROUP_040", "전체 라운드 수는 이미 시작된 라운드 수보다 작을 수 없습니다."),
     GROUP_FUTURE_SCHEDULE_TOTAL_EXCEEDS_ACTIVE_LIMIT(HttpStatus.BAD_REQUEST, "GROUP_041", "전체 라운드 수가 남은 ACTIVE 멤버 기준 최대 라운드 수를 초과했습니다."),
     GROUP_FUTURE_SCHEDULE_WHEEL_STATE_INVALID(HttpStatus.BAD_REQUEST, "GROUP_042", "진행 기록이 포함된 미래 일정은 자동으로 재생성할 수 없습니다."),
+    // 모임 설정·삭제와 일정 입력을 구분해 클라이언트가 실패 원인을 알 수 있도록 한다.
+    GROUP_MAX_MEMBERS_BELOW_CURRENT_MEMBERS(HttpStatus.BAD_REQUEST, "GROUP_043", "현재 참여 인원보다 적게 최대 인원을 설정할 수 없습니다."),
+    GROUP_PUBLIC_PASSWORD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "GROUP_046", "공개 모임에는 비밀번호를 설정할 수 없습니다."),
+    GROUP_REGION_NOT_ALLOWED_FOR_ONLINE(HttpStatus.BAD_REQUEST, "GROUP_047", "온라인 모임에는 지역을 설정할 수 없습니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

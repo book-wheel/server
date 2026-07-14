@@ -80,6 +80,27 @@ public class Group {
         this.groupPassword = groupPassword;
     }
 
+    // 일정 필드를 건드리지 않고 화면의 기본 모임 정보만 변경한다.
+    public void updateGroupInfo(
+            String groupName,
+            String groupComment,
+            String groupRule,
+            boolean groupPublic,
+            String groupPassword,
+            boolean groupOffline,
+            Region groupRegion,
+            Integer maxMembers
+    ) {
+        this.groupName = groupName;
+        this.groupComment = groupComment;
+        this.groupRule = groupRule;
+        this.groupPublic = groupPublic;
+        this.groupPassword = groupPassword;
+        this.groupOffline = groupOffline;
+        this.groupRegion = groupRegion;
+        this.maxMembers = maxMembers;
+    }
+
     @PrePersist
     private void prePersist() {
         if (groupState == null) {

@@ -1,6 +1,7 @@
 package com.bookwheel.server.group.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
+import com.bookwheel.server.group.dto.GroupDetailResponse;
 import com.bookwheel.server.group.dto.setting.*;
 import com.bookwheel.server.group.service.GroupSettingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,21 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 @RequestMapping("/api/v1/groups/{groupId}")
 public class GroupSettingController {
     private final GroupSettingService groupSettingService;
+
+    @Operation(
+            summary = "모임 정보 수정",
+            description = "리더가 모집 중(RECRUITING), 진행 중(IN_PROGRESS), 완료(COMPLETE) 모임의 기본 정보를 수정합니다. 시작일과 독서 기간은 일정 API에서 관리합니다."
+    )
+    @PatchMapping
+    // 일정 변경과 분리된 기본 정보 수정 요청을 서비스에 위임한다.
+    public ResponseEntity<ApiResponse<GroupDetailResponse>> updateGroup(
+            @PathVariable String groupId,
+            @RequestBody @Valid GroupUpdateRequest request,
+            @AuthenticationPrincipal Object principal
+    ) {
+        GroupDetailResponse response = groupSettingService.updateGroup(groupId, getUserPK(principal), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
     @Operation(
             summary = "멤버 강퇴",

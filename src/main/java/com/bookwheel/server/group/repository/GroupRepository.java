@@ -14,8 +14,12 @@ import java.util.Optional;
 public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecificationExecutor<Group> {
     boolean existsByGroupName(String groupName);
 
+    // 이름 수정 시 자기 자신을 제외한 다른 모임과의 중복만 확인한다.
+    boolean existsByGroupNameAndGroupIdNot(String groupName, String groupId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from Group g where g.groupId = :groupId")
+    // 삭제·일정 변경·그룹 소유 데이터 등록을 같은 그룹 단위로 직렬화한다.
     Optional<Group> findByGroupIdForUpdate(@Param("groupId") String groupId);
 
     // 모집 중인 그룹 중 시작일이 지났고 책 등록이 완료된 그룹을 진행 중으로 변경
