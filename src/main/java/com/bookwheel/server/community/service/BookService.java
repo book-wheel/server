@@ -205,6 +205,15 @@ public class BookService {
         return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
+    // 갤러리 대표 이미지 objectKey를 조회용 Presigned URL로 변환한다. (이미지가 없으면 null)
+    private GalleryResponseDto toGalleryResponse(Post post) {
+        String thumbnailObjectKey = GalleryResponseDto.thumbnailObjectKey(post);
+        String thumbnailUrl = StringUtils.hasText(thumbnailObjectKey)
+            ? s3Service.getPresignedGetUrl(thumbnailObjectKey)
+            : null;
+        return GalleryResponseDto.from(post, thumbnailUrl);
+    }
+
 
     public BookSearchListResponse searchBooks(BookSearchRequest request) {
         return kaKaoService.searchBooks(request);
@@ -265,7 +274,7 @@ public class BookService {
         List<Post> pagePosts = hasNext ? posts.subList(0, pageSize) : posts;
 
         List<GalleryResponseDto> content = pagePosts.stream()
-            .map(GalleryResponseDto::from)
+            .map(this::toGalleryResponse)
             .toList();
 
         String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
@@ -284,7 +293,7 @@ public class BookService {
         List<Post> pagePosts = hasNext ? posts.subList(0, pageSize) : posts;
 
         List<GalleryResponseDto> content = pagePosts.stream()
-            .map(GalleryResponseDto::from)
+            .map(this::toGalleryResponse)
             .toList();
 
         String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
