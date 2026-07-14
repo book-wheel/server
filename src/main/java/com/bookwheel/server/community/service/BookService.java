@@ -55,6 +55,8 @@ public class BookService {
     private static final int DEFAULT_GALLERY_SIZE = 18;
     private static final int DEFAULT_INTEREST_SIZE = 30;
     private static final int MAX_REVIEW_PAGE_SIZE = 50;
+    private static final int MAX_GALLERY_PAGE_SIZE = 50;
+    private static final int MAX_INTEREST_PAGE_SIZE = 50;
 
 
     @Transactional
@@ -296,7 +298,7 @@ public class BookService {
             return DEFAULT_GALLERY_SIZE;
         }
 
-        if (size <= 0) {
+        if (size <= 0 || size > MAX_GALLERY_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
@@ -308,7 +310,7 @@ public class BookService {
             return DEFAULT_INTEREST_SIZE;
         }
 
-        if (size <= 0) {
+        if (size <= 0 || size > MAX_INTEREST_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 

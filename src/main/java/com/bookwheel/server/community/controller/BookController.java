@@ -53,7 +53,7 @@ public class BookController {
     public ApiResponse<CursorPageResponse<GalleryResponseDto>> getGallery(
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "한 번에 조회할 갤러리 개수", example = "18")
+        @Parameter(description = "한 번에 조회할 갤러리 개수 (1~50, 초과 시 400)", example = "18")
         @RequestParam(required = false, defaultValue = "18") Integer size
     ) {
         CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(cursor, size);
@@ -66,7 +66,7 @@ public class BookController {
         @PathVariable("isbn") String isbn,
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "한 번에 조회할 갤러리 개수", example = "18")
+        @Parameter(description = "한 번에 조회할 갤러리 개수 (1~50, 초과 시 400)", example = "18")
         @RequestParam(required = false, defaultValue = "18") Integer size
     ) {
         CursorPageResponse<GalleryResponseDto> response = bookService.getGalleryByIsbn(isbn, cursor, size);
@@ -78,7 +78,7 @@ public class BookController {
     public ApiResponse<CursorPageResponse<InterestBookResponseDto>> getInterestBooks(
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "한 번에 조회할 관심 도서 개수", example = "30")
+        @Parameter(description = "한 번에 조회할 관심 도서 개수 (1~50, 초과 시 400)", example = "30")
         @RequestParam(required = false, defaultValue = "30") Integer size,
         @AuthenticationPrincipal Object principal
     ) {

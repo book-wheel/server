@@ -69,7 +69,7 @@ public class PostController {
         @PathVariable("postId") Long postId,
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
-        @Parameter(description = "한 번에 조회할 댓글 개수", example = "20")
+        @Parameter(description = "한 번에 조회할 댓글 개수 (1~50, 초과 시 400)", example = "20")
         @RequestParam(required = false, defaultValue = "20") Integer size,
         @AuthenticationPrincipal Object principal) {
 

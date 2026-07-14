@@ -51,6 +51,7 @@ public class PostService {
     private final CursorUtils cursorUtils;
 
     private static final int DEFAULT_COMMENT_SIZE = 20;
+    private static final int MAX_COMMENT_PAGE_SIZE = 50;
 
     public CursorPageResponse<PostCommentResponse> getPostComments(Long postId, String cursor, Integer size, String userPK) {
         Post post = postRepository.findById(postId)
@@ -91,7 +92,7 @@ public class PostService {
         if (size == null) {
             return DEFAULT_COMMENT_SIZE;
         }
-        if (size <= 0) {
+        if (size <= 0 || size > MAX_COMMENT_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         return size;
