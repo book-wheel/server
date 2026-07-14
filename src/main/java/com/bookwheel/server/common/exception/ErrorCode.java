@@ -82,9 +82,6 @@ public enum ErrorCode {
     GROUP_FUTURE_SCHEDULE_TOTAL_EXCEEDS_ACTIVE_LIMIT(HttpStatus.BAD_REQUEST, "GROUP_041", "전체 라운드 수가 남은 ACTIVE 멤버 기준 최대 라운드 수를 초과했습니다."),
     GROUP_FUTURE_SCHEDULE_WHEEL_STATE_INVALID(HttpStatus.BAD_REQUEST, "GROUP_042", "진행 기록이 포함된 미래 일정은 자동으로 재생성할 수 없습니다."),
 
-    // 채팅 관련 에러
-    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
-
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),
