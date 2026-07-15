@@ -9,11 +9,6 @@ import com.bookwheel.server.chat.repository.ChatRoomRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
-import com.bookwheel.server.community.entity.Post;
-import com.bookwheel.server.community.repository.PostCommentRepository;
-import com.bookwheel.server.community.repository.PostLikeRepository;
-import com.bookwheel.server.community.repository.PostReportRepository;
-import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.group.dto.GroupDetailButtonType;
 import com.bookwheel.server.group.dto.GroupDetailResponse;
 import com.bookwheel.server.group.dto.setting.GroupUpdateRequest;
@@ -66,10 +61,6 @@ public class GroupSettingService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatRoomReadStateRepository chatRoomReadStateRepository;
-    private final PostRepository postRepository;
-    private final PostLikeRepository postLikeRepository;
-    private final PostReportRepository postReportRepository;
-    private final PostCommentRepository postCommentRepository;
     private final NotificationService notificationService;
     private final S3Service s3Service;
     private final WheelReassignmentService wheelReassignmentService;
@@ -83,6 +74,7 @@ public class GroupSettingService {
         // 설정 변경 중 다른 요청이 같은 모임의 멤버·일정 상태를 바꾸지 못하도록 모임 행을 먼저 잠근다.
         Group group = groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        validateGroupEditable(group);
         memberPermissionValidator.validateLeader(groupId, leaderUserPK);
         // 일정 진행 여부와 관계없이 일정 필드를 제외한 모임 정보는 리더가 수정할 수 있다.
         validateGroupUpdate(group, request);
@@ -106,24 +98,24 @@ public class GroupSettingService {
         // 삭제 중 신규 멤버·도서·일정이 추가되지 않도록 삭제 전체 과정에서 모임 행 잠금을 유지한다.
         Group group = groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
-        memberPermissionValidator.validateLeader(groupId, leaderUserPK);
         validateDeletableGroup(group);
+        memberPermissionValidator.validateLeader(groupId, leaderUserPK);
 
         Set<String> objectKeys = new LinkedHashSet<>();
 
         // 그룹 알림은 비동기 저장 경로와도 같은 그룹 잠금을 사용하므로 먼저 정리한다.
         notificationService.deleteByGroupId(groupId);
-        // 외래 키 의존성이 있는 자식 데이터부터 삭제하면서 S3 키를 먼저 수집한다.
-        objectKeys.addAll(deleteCommunityData(groupId));
+        // 게시물·댓글·좋아요·신고는 모임의 기록이므로 삭제하지 않고 보존한다.
+        // 외래 키 의존성이 있는 운영 데이터부터 삭제하면서 S3 키를 먼저 수집한다.
         objectKeys.addAll(deleteChatData(groupId));
         objectKeys.addAll(deleteScheduleData(groupId));
         ownBookRepository.deleteAllByGroupId(groupId);
         memberRepository.deleteAllByGroupId(groupId);
 
-        // 벌크 삭제 후 영속성 컨텍스트에 남은 멤버·자식 엔티티가 삭제된 그룹을 참조하지 않도록 정리한다.
+        // 그룹 행은 삭제하지 않고 DELETED 상태로 바꿔 게시물과 모임 기록의 참조를 유지한다.
+        group.markDeleted();
         entityManager.flush();
         entityManager.clear();
-        groupRepository.delete(group);
         registerPostCommitImageCleanup(objectKeys);
     }
 
@@ -265,13 +257,24 @@ public class GroupSettingService {
     }
 
     private void validateDeletableGroup(Group group) {
-        // 진행 중인 모임은 현재·과거 독서 기록을 보존해야 하므로 하드 삭제를 허용하지 않는다.
+        // 이미 비활성화된 모임은 중복 삭제할 수 없다.
+        if (group.getGroupState() == State.DELETED) {
+            throw new BusinessException(ErrorCode.GROUP_DELETED);
+        }
+        // 진행 중인 모임은 현재·과거 독서 기록을 보존해야 하므로 삭제를 허용하지 않는다.
         if (group.getGroupState() == State.IN_PROGRESS) {
             throw new BusinessException(ErrorCode.GROUP_DELETE_IN_PROGRESS_NOT_ALLOWED);
         }
-        // 모집 중 또는 완료된 모임만 모든 연관 데이터를 함께 삭제할 수 있다.
+        // 모집 중 또는 완료된 모임만 운영 데이터를 정리하고 비활성화할 수 있다.
         if (group.getGroupState() != State.RECRUITING && group.getGroupState() != State.COMPLETE) {
             throw new BusinessException(ErrorCode.GROUP_DELETE_STATE_INVALID);
+        }
+    }
+
+    private void validateGroupEditable(Group group) {
+        // 삭제된 모임은 기록 보존을 위해 조회만 허용하고 설정 변경은 막는다.
+        if (group.getGroupState() == State.DELETED) {
+            throw new BusinessException(ErrorCode.GROUP_DELETED);
         }
     }
 
@@ -320,30 +323,6 @@ public class GroupSettingService {
         }
 
         throw new IllegalStateException("비공개 모임은 검증된 비밀번호가 필요합니다.");
-    }
-
-    // 모임 게시물과 댓글·좋아요·신고를 삭제하고, 게시물 이미지 키를 반환한다.
-    private List<String> deleteCommunityData(String groupId) {
-        List<Post> posts = postRepository.findByGroup_GroupId(groupId);
-        if (posts.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> postIds = posts.stream().map(Post::getPostId).toList();
-        Set<String> objectKeys = new LinkedHashSet<>();
-        posts.stream()
-                .flatMap(post -> post.getImages().stream())
-                .map(image -> image.getObjectKey())
-                .filter(StringUtils::hasText)
-                .forEach(objectKeys::add);
-
-        // 게시물의 좋아요·댓글·신고가 게시물을 참조하므로 연관 행을 먼저 삭제한다.
-        postLikeRepository.deleteAllByPostIds(postIds);
-        postCommentRepository.deleteAllByPostIds(postIds);
-        postReportRepository.deleteAllByPostIds(postIds);
-        postRepository.deleteAll(posts);
-        postRepository.flush();
-        return new ArrayList<>(objectKeys);
     }
 
     // 채팅 데이터를 삭제하고 DB에서 확인된 채팅 이미지 키만 반환한다.
@@ -457,6 +436,7 @@ public class GroupSettingService {
                 return () -> {
                 };
             }
+            case DELETED -> throw new BusinessException(ErrorCode.GROUP_DELETED);
         }
         throw new IllegalStateException("Unsupported group state: " + group.getGroupState());
     }

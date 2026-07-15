@@ -184,7 +184,7 @@ class GroupSettingServiceTest {
         given(memberRepository.countByGroup_GroupIdAndMemberStatus("group-1", MemberStatus.ACTIVE)).willReturn(2L);
         given(groupRepository.existsByGroupNameAndGroupIdNot(request.groupName(), "group-1")).willReturn(false);
 
-        for (State state : State.values()) {
+        for (State state : List.of(State.RECRUITING, State.IN_PROGRESS, State.COMPLETE)) {
             Group group = Group.builder()
                     .groupId("group-1")
                     .groupName("기존 모임")
@@ -203,6 +203,31 @@ class GroupSettingServiceTest {
             assertThat(response.groupState()).isEqualTo(state);
             assertThat(group.getGroupName()).isEqualTo("새 모임 이름");
         }
+    }
+
+    @Test
+    @DisplayName("삭제된 모임은 정보를 수정할 수 없다")
+    void updateGroup_RejectsDeletedGroup() {
+        Group group = recruitingGroup("group-1");
+        group.markDeleted();
+        GroupUpdateRequest request = new GroupUpdateRequest(
+                "새 모임 이름",
+                "새 한줄소개",
+                "새 규칙",
+                true,
+                null,
+                false,
+                null,
+                5
+        );
+        given(groupRepository.findByGroupIdForUpdate("group-1")).willReturn(Optional.of(group));
+
+        assertThatThrownBy(() -> groupSettingService.updateGroup("group-1", "leader-user-pk", request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_DELETED);
+
+        then(memberPermissionValidator).shouldHaveNoInteractions();
     }
 
     @Test
@@ -287,8 +312,8 @@ class GroupSettingServiceTest {
     }
 
     @Test
-    @DisplayName("모집 중인 모임 삭제 시 하위 데이터를 먼저 삭제한다")
-    void deleteGroup_DeletesRelatedDataBeforeGroup() {
+    @DisplayName("모집 중인 모임 삭제 시 운영 데이터를 정리하고 모임은 DELETED로 남긴다")
+    void deleteGroup_DeletesOperationalDataAndPreservesGroup() {
         String groupId = "group-1";
         Group group = recruitingGroup(groupId);
         ChatRoom chatRoom = ChatRoom.builder()
@@ -317,8 +342,7 @@ class GroupSettingServiceTest {
                 roundRepository,
                 ownBookRepository,
                 memberRepository,
-                entityManager,
-                groupRepository
+                entityManager
         );
         deletionOrder.verify(chatRoomReadStateRepository).deleteAllByChatRoom(chatRoom);
         deletionOrder.verify(chatMessageRepository).deleteAllByChatRoom(chatRoom);
@@ -332,7 +356,25 @@ class GroupSettingServiceTest {
         deletionOrder.verify(memberRepository).deleteAllByGroupId(groupId);
         deletionOrder.verify(entityManager).flush();
         deletionOrder.verify(entityManager).clear();
-        deletionOrder.verify(groupRepository).delete(group);
+        assertThat(group.getGroupState()).isEqualTo(State.DELETED);
+        then(groupRepository).should(never()).delete(group);
+    }
+
+    @Test
+    @DisplayName("모임 삭제 시 게시물과 커뮤니티 데이터는 보존한다")
+    void deleteGroup_PreservesCommunityData() {
+        String groupId = "group-1";
+        Group group = recruitingGroup(groupId);
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of());
+
+        groupSettingService.deleteGroup(groupId, "leader-user-pk");
+
+        assertThat(group.getGroupState()).isEqualTo(State.DELETED);
+        then(postRepository).shouldHaveNoInteractions();
+        then(postLikeRepository).shouldHaveNoInteractions();
+        then(postCommentRepository).shouldHaveNoInteractions();
+        then(postReportRepository).shouldHaveNoInteractions();
     }
 
     private Group recruitingGroup(String groupId) {

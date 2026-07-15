@@ -3,6 +3,7 @@ package com.bookwheel.server.notification.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.notification.dto.NotificationResponse;
 import com.bookwheel.server.notification.dto.UnreadCountResponse;
 import com.bookwheel.server.notification.entity.Notification;
@@ -221,7 +222,10 @@ public class NotificationService {
         }
 
         // 삭제 트랜잭션과 같은 그룹 행을 잠가 삭제 전 저장은 정리되고 삭제 후 저장은 건너뛰게 한다.
-        return groupRepository.findByGroupIdForUpdate(groupId).isPresent();
+        // 삭제가 완료된 모임의 비동기 알림은 보존할 운영 데이터가 아니므로 저장하지 않는다.
+        return groupRepository.findByGroupIdForUpdate(groupId)
+                .filter(group -> group.getGroupState() != State.DELETED)
+                .isPresent();
     }
 
     private String extractGroupId(String payload) {

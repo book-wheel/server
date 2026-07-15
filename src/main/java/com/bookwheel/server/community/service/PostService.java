@@ -169,7 +169,7 @@ public class PostService {
             return null;
         }
 
-        // 모임 게시물 생성과 하드 삭제가 같은 group_id를 동시에 사용하지 않도록 그룹을 잠근다.
+        // 모임 게시물 생성과 모임 비활성화가 같은 group_id를 동시에 사용하지 않도록 그룹을 잠근다.
         Group group = groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 

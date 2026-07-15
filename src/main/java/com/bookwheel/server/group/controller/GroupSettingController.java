@@ -38,7 +38,7 @@ public class GroupSettingController {
 
     @Operation(
             summary = "모임 삭제",
-            description = "리더가 모집 중(RECRUITING) 또는 완료(COMPLETE) 모임을 관련 데이터와 함께 삭제합니다. 진행 중(IN_PROGRESS) 모임은 삭제할 수 없습니다."
+            description = "리더가 모집 중(RECRUITING) 또는 완료(COMPLETE) 모임을 DELETED 상태로 전환합니다. 멤버·채팅·일정·알림은 정리하지만 게시물과 게시물 이미지는 보존합니다. 진행 중(IN_PROGRESS) 모임은 삭제할 수 없습니다."
     )
     @DeleteMapping
     // 서비스에서 상태·리더 권한·연관 데이터 삭제를 검증한 뒤 응답한다.

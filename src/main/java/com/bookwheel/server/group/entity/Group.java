@@ -106,6 +106,11 @@ public class Group {
         this.maxMembers = maxMembers;
     }
 
+    // 게시물 등 모임의 기록을 보존한 채 운영 상태만 비활성화한다.
+    public void markDeleted() {
+        this.groupState = State.DELETED;
+    }
+
     @PrePersist
     private void prePersist() {
         if (groupState == null) {

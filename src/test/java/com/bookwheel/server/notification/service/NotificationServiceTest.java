@@ -1,6 +1,7 @@
 package com.bookwheel.server.notification.service;
 
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.notification.entity.Notification;
 import com.bookwheel.server.notification.entity.NotificationPreference;
@@ -74,7 +75,9 @@ class NotificationServiceTest {
     @Test
     @DisplayName("삭제된 모임의 비동기 알림은 저장하지 않는다")
     void createSkipsNotificationWhenGroupDeleted() {
-        given(groupRepository.findByGroupIdForUpdate("group-1")).willReturn(Optional.empty());
+        Group deletedGroup = org.mockito.Mockito.mock(Group.class);
+        given(deletedGroup.getGroupState()).willReturn(State.DELETED);
+        given(groupRepository.findByGroupIdForUpdate("group-1")).willReturn(Optional.of(deletedGroup));
 
         Notification notification = notificationService.create(NotificationEvent.builder()
                 .recipientUserPK("userPK")
