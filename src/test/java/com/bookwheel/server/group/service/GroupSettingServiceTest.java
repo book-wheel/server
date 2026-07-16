@@ -131,7 +131,9 @@ class GroupSettingServiceTest {
         );
         given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
         given(memberRepository.countByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE)).willReturn(2L);
-        given(groupRepository.existsByGroupNameAndGroupIdNot(request.groupName(), groupId)).willReturn(false);
+        given(groupRepository.existsNotDeletedByGroupNameAndGroupIdNot(
+                request.groupName(), groupId, State.DELETED
+        )).willReturn(false);
         given(passwordEncoder.encode(request.groupPassword())).willReturn("encoded-password");
 
         GroupDetailResponse response = groupSettingService.updateGroup(groupId, leaderUserPK, request);
@@ -182,7 +184,9 @@ class GroupSettingServiceTest {
                 5
         );
         given(memberRepository.countByGroup_GroupIdAndMemberStatus("group-1", MemberStatus.ACTIVE)).willReturn(2L);
-        given(groupRepository.existsByGroupNameAndGroupIdNot(request.groupName(), "group-1")).willReturn(false);
+        given(groupRepository.existsNotDeletedByGroupNameAndGroupIdNot(
+                request.groupName(), "group-1", State.DELETED
+        )).willReturn(false);
 
         for (State state : List.of(State.RECRUITING, State.IN_PROGRESS, State.COMPLETE)) {
             Group group = Group.builder()
@@ -228,6 +232,35 @@ class GroupSettingServiceTest {
                 .isEqualTo(ErrorCode.GROUP_DELETED);
 
         then(memberPermissionValidator).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("삭제된 모임과 같은 이름으로 모임 정보를 수정할 수 있다")
+    void updateGroup_AllowsDeletedGroupName() {
+        String groupId = "group-1";
+        Group group = recruitingGroup(groupId);
+        GroupUpdateRequest request = new GroupUpdateRequest(
+                "삭제된 모임 이름",
+                "수정된 한줄소개",
+                "수정된 규칙",
+                true,
+                null,
+                false,
+                null,
+                5
+        );
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(groupRepository.existsNotDeletedByGroupNameAndGroupIdNot(
+                request.groupName(), groupId, State.DELETED
+        )).willReturn(false);
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE)).willReturn(1L);
+
+        GroupDetailResponse response = groupSettingService.updateGroup(groupId, "leader-user-pk", request);
+
+        assertThat(response.groupName()).isEqualTo("삭제된 모임 이름");
+        then(groupRepository).should().existsNotDeletedByGroupNameAndGroupIdNot(
+                request.groupName(), groupId, State.DELETED
+        );
     }
 
     @Test

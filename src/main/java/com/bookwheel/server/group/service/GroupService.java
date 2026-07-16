@@ -32,6 +32,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +52,7 @@ public class GroupService {
     private final GroupMemberPermissionValidator memberPermissionValidator;
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
+    private final Clock clock;
 
     @Transactional
     public GroupCreateResponse createGroup(GroupCreateRequest request, String userPK) {
@@ -216,8 +219,13 @@ public class GroupService {
     }
 
     private void validateGroupCreateRequest(GroupCreateRequest request) {
-        if (groupRepository.existsByGroupName(request.groupName())) {
+        if (groupRepository.existsNotDeletedByGroupName(request.groupName(), State.DELETED)) {
             throw new BusinessException(ErrorCode.DUPLICATE_GROUP_NAME);
+        }
+
+        // 자정 스케줄러가 시작 처리를 담당하므로 최초 생성도 내일부터 시작하도록 제한한다.
+        if (request.startDate() == null || !request.startDate().isAfter(LocalDate.now(clock))) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
         }
 
         if (!request.groupPublic() && !StringUtils.hasText(request.groupPassword())) {

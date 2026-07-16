@@ -281,7 +281,11 @@ public class GroupSettingService {
     private void validateGroupUpdate(Group group, GroupUpdateRequest request) {
         // 모임 이름은 다른 모임과 중복될 수 없지만 자기 자신의 기존 이름은 허용한다.
         if (!group.getGroupName().equals(request.groupName())
-                && groupRepository.existsByGroupNameAndGroupIdNot(request.groupName(), group.getGroupId())) {
+                && groupRepository.existsNotDeletedByGroupNameAndGroupIdNot(
+                        request.groupName(),
+                        group.getGroupId(),
+                        State.DELETED
+                )) {
             throw new BusinessException(ErrorCode.DUPLICATE_GROUP_NAME);
         }
 

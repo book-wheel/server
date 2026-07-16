@@ -71,6 +71,12 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
         }
 
+        LocalDate startDate = request.startDate();
+        // 시작 처리는 자정 스케줄러가 담당하므로 당일 생성은 시작 시점을 놓칠 수 있다.
+        if (!startDate.isAfter(LocalDate.now(clock))) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
+        }
+
         // ACTIVE 멤버 수를 기준으로 총 라운드 수를 결정
         List<Member> activeMembers = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE);
         int activeMemberCount = activeMembers.size();
@@ -88,11 +94,6 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
 
-        LocalDate startDate = request.startDate();
-        // 오늘보다 이전인 시작일은 생성 직후 이미 진행 상태가 되는 상황을 막는다.
-        if (startDate.isBefore(LocalDate.now(clock))) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_IN_PAST);
-        }
         LocalDate requestedEndDate = request.endDate();
         if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);

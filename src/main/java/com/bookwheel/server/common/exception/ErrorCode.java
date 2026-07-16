@@ -86,7 +86,7 @@ public enum ErrorCode {
     GROUP_DELETE_STATE_INVALID(HttpStatus.BAD_REQUEST, "GROUP_045", "현재 모임 상태에서는 삭제할 수 없습니다."),
     GROUP_PUBLIC_PASSWORD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "GROUP_046", "공개 모임에는 비밀번호를 설정할 수 없습니다."),
     GROUP_REGION_NOT_ALLOWED_FOR_ONLINE(HttpStatus.BAD_REQUEST, "GROUP_047", "온라인 모임에는 지역을 설정할 수 없습니다."),
-    GROUP_SCHEDULE_START_DATE_IN_PAST(HttpStatus.BAD_REQUEST, "GROUP_048", "일정 시작일은 오늘보다 이전일 수 없습니다."),
+    GROUP_SCHEDULE_START_DATE_NOT_FUTURE(HttpStatus.BAD_REQUEST, "GROUP_048", "일정 시작일은 내일부터 설정할 수 있습니다."),
     GROUP_DELETED(HttpStatus.BAD_REQUEST, "GROUP_049", "삭제된 모임입니다."),
 
     // 채팅 관련 에러
