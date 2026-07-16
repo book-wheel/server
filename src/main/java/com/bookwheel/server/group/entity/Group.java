@@ -56,7 +56,8 @@ public class Group {
     @Column(name = "group_round_count")
     private int groupRoundCount = 1;
 
-    @Column(name = "group_state")
+    // enum 스키마 갱신 대상임을 명확히 해 소프트 삭제 상태를 저장할 수 있게 한다.
+    @Column(name = "group_state", length = 20)
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private State groupState = State.RECRUITING;
