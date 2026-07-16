@@ -19,6 +19,8 @@ public record BulkNotificationEvent(
         String title,
         String body,
         String deepLink,
+        // 여러 수신자에게 보내는 모임 알림도 동일한 그룹 범위를 가진다.
+        String groupId,
         Map<String, Object> payload
 ) {
 }

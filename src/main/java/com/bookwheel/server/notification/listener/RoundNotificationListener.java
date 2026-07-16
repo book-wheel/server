@@ -99,6 +99,7 @@ public class RoundNotificationListener {
             String body,
             Map<String, Object> payload
     ) {
+        // 라운드 알림의 수신자와 저장 범위를 같은 그룹에서 계산한다.
         List<String> recipients = memberRepository
                 .findAllWithUserByGroupIdAndStatus(groupId, MemberStatus.ACTIVE)
                 .stream()
@@ -113,6 +114,7 @@ public class RoundNotificationListener {
                 .title(title)
                 .body(body)
                 .deepLink("/groups/" + groupId)
+                .groupId(groupId)
                 .payload(payload)
                 .build());
     }

@@ -2,6 +2,8 @@ package com.bookwheel.server.notification.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.notification.dto.NotificationResponse;
 import com.bookwheel.server.notification.dto.UnreadCountResponse;
 import com.bookwheel.server.notification.entity.Notification;
@@ -12,6 +14,7 @@ import com.bookwheel.server.notification.event.NotificationEvent;
 import com.bookwheel.server.notification.push.FcmSender;
 import com.bookwheel.server.notification.repository.NotificationRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +35,7 @@ import java.util.Map;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final GroupRepository groupRepository;
     private final NotificationPreferenceService preferenceService;
     private final FcmSender fcmSender;
     private final ObjectMapper objectMapper;
@@ -43,6 +47,10 @@ public class NotificationService {
     @Transactional
     public Notification create(NotificationEvent event) {
         if (event.recipientUserPK() == null || event.recipientUserPK().isBlank()) {
+            return null;
+        }
+
+        if (!lockGroupIfPresent(event.groupId())) {
             return null;
         }
 
@@ -59,6 +67,7 @@ public class NotificationService {
                 .title(event.title())
                 .body(event.body())
                 .deepLink(event.deepLink())
+                .groupId(event.groupId())
                 .payload(serializePayload(event.payload()))
                 .build();
 
@@ -91,6 +100,10 @@ public class NotificationService {
             return List.of();
         }
 
+        if (!lockGroupIfPresent(event.groupId())) {
+            return List.of();
+        }
+
         List<String> recipients = new ArrayList<>(new LinkedHashSet<>(
                 event.recipientUserPKs().stream()
                         .filter(pk -> pk != null && !pk.isBlank())
@@ -117,6 +130,7 @@ public class NotificationService {
                     .title(event.title())
                     .body(event.body())
                     .deepLink(event.deepLink())
+                    .groupId(event.groupId())
                     .payload(serializedPayload)
                     .build());
         }
@@ -173,6 +187,65 @@ public class NotificationService {
     @Transactional
     public int markAllRead(String userPK) {
         return notificationRepository.markAllRead(userPK);
+    }
+
+    @Transactional
+    public void deleteByGroupId(String groupId) {
+        // 새 group_id와 기존 payload 기반 알림을 함께 정리해 삭제 범위를 누락하지 않는다.
+        notificationRepository.deleteAllByGroupId(groupId);
+
+        // 스키마 변경 전 payload만으로 저장된 알림도 정확히 같은 groupId인 경우 함께 제거한다.
+        notificationRepository.findByGroupIdIsNull().stream()
+                .filter(notification -> groupId.equals(extractGroupId(notification.getPayload())))
+                .forEach(notificationRepository::delete);
+    }
+
+    @Transactional
+    public int backfillGroupIds() {
+        // 기존 알림 중 실제로 존재하는 모임을 가리키는 행만 안전하게 새 컬럼에 채운다.
+        int updated = 0;
+        for (Notification notification : notificationRepository.findByGroupIdIsNull()) {
+            String groupId = extractGroupId(notification.getPayload());
+            if (groupId == null || groupRepository.findByGroupIdForUpdate(groupId).isEmpty()) {
+                continue;
+            }
+            notification.assignGroupId(groupId);
+            updated++;
+        }
+        return updated;
+    }
+
+    private boolean lockGroupIfPresent(String groupId) {
+        // 일반 계정 알림은 잠그지 않고, 모임 알림만 삭제와 같은 행 잠금으로 직렬화한다.
+        if (groupId == null || groupId.isBlank()) {
+            return true;
+        }
+
+        // 삭제 트랜잭션과 같은 그룹 행을 잠가 삭제 전 저장은 정리되고 삭제 후 저장은 건너뛰게 한다.
+        // 삭제가 완료된 모임의 비동기 알림은 보존할 운영 데이터가 아니므로 저장하지 않는다.
+        return groupRepository.findByGroupIdForUpdate(groupId)
+                .filter(group -> group.getGroupState() != State.DELETED)
+                .isPresent();
+    }
+
+    private String extractGroupId(String payload) {
+        // deep link가 아닌 payload의 정확한 문자열 필드만 그룹 식별자로 인정한다.
+        if (payload == null || payload.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode payloadNode = objectMapper.readTree(payload);
+            if (payloadNode == null) {
+                return null;
+            }
+            JsonNode groupIdNode = payloadNode.get("groupId");
+            return groupIdNode != null && groupIdNode.isTextual() && !groupIdNode.asText().isBlank()
+                    ? groupIdNode.asText()
+                    : null;
+        } catch (JsonProcessingException exception) {
+            log.warn("기존 알림 groupId 해석 실패: reason={}", exception.getMessage());
+            return null;
+        }
     }
 
     private String serializePayload(Map<String, Object> payload) {

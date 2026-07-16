@@ -66,6 +66,7 @@ public record GroupSearchResponse(
             case RECRUITING -> "scheduled";
             case IN_PROGRESS -> "active";
             case COMPLETE -> "done";
+            case DELETED -> "deleted";
         };
     }
 
@@ -74,6 +75,7 @@ public record GroupSearchResponse(
             case RECRUITING -> "시작전";
             case IN_PROGRESS -> "진행중";
             case COMPLETE -> "끝";
+            case DELETED -> "삭제됨";
         };
     }
 

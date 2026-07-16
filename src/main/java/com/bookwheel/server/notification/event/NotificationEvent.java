@@ -16,6 +16,8 @@ public record NotificationEvent(
         String title,
         String body,
         String deepLink,
+        // 모임 알림 삭제와 비동기 저장 경합을 제어하기 위한 선택적 그룹 식별자다.
+        String groupId,
         Map<String, Object> payload
 ) {
 }

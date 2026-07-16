@@ -48,7 +48,7 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "모집 중(RECRUITING)인 모임에서만 ACTIVE 멤버 수 기준으로 라운드를 생성하거나 재생성합니다. endDate는 선택값이며, 책 등록 전에도 일정 생성이 가능합니다. 진행 중 또는 완료된 모임에서는 GROUP_035 오류가 반환됩니다."
+            description = "모집 중(RECRUITING)인 모임에서만 시작일과 독서 기간을 기준으로 라운드를 생성하거나 재생성합니다. endDate는 선택값이며, 시작일과 독서 기간은 이 API에서 함께 관리합니다."
     )
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(
@@ -66,7 +66,7 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "미래 독서 일정 재생성",
-            description = "진행 중(IN_PROGRESS)인 모임에서 이미 시작된 라운드는 보존하고, 미래 라운드만 최종 전체 라운드 수에 맞춰 재생성합니다."
+            description = "진행 중(IN_PROGRESS)인 모임에서 이미 시작된 라운드는 보존하고, 요청한 독서 기간으로 미래 라운드만 재생성합니다. 완료된 라운드의 기록과 시작일은 변경하지 않습니다."
     )
     @PostMapping("/{groupId}/schedule/future")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> regenerateFutureSchedule(

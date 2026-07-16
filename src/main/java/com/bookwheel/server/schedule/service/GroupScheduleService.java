@@ -71,6 +71,12 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
         }
 
+        LocalDate startDate = request.startDate();
+        // 시작 처리는 자정 스케줄러가 담당하므로 당일 생성은 시작 시점을 놓칠 수 있다.
+        if (!startDate.isAfter(LocalDate.now(clock))) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
+        }
+
         // ACTIVE 멤버 수를 기준으로 총 라운드 수를 결정
         List<Member> activeMembers = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE);
         int activeMemberCount = activeMembers.size();
@@ -83,12 +89,11 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_OWN_BOOK_REQUIRED);
         }
 
-        Integer readingPeriod = group.getReadingPeriod();
+        Integer readingPeriod = request.readingPeriod();
         if (readingPeriod == null || readingPeriod < 1) {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
 
-        LocalDate startDate = request.startDate();
         LocalDate requestedEndDate = request.endDate();
         if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
@@ -135,6 +140,8 @@ public class GroupScheduleService {
 
         // 기존 스케줄 초기화
         deleteReplaceableRecruitingSchedule(group);
+        // 독서 기간은 일정 생성 API에서 함께 변경하며, 계산된 라운드와 같은 트랜잭션으로 저장한다.
+        group.updateReadingPeriod(readingPeriod);
         group.updateScheduleInfo(startDate, roundCount);
 
         // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
