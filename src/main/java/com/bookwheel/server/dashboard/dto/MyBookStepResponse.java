@@ -19,7 +19,7 @@ public record MyBookStepResponse(
         @Schema(description = "저장된 상태값. 배정 전이면 null이고 시작 전 배정은 PLANNED입니다.", example = "PLANNED", nullable = true)
         WheelStatus status,
 
-        @Schema(description = "오프라인 그룹의 책 위치. 온라인이거나 시작 전이면 null입니다.", example = "서울특별시", nullable = true)
+        @Schema(description = "오프라인 그룹의 책 위치. 온라인이거나 시작/배정 전이면 null입니다.", example = "서울특별시", nullable = true)
         String location
 ) {
     public static MyBookStepResponse of(
