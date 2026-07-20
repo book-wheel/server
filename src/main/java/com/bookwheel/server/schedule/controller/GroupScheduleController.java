@@ -48,7 +48,7 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "모집 중(RECRUITING)인 모임에서만 시작일과 독서 기간을 기준으로 라운드를 생성하거나 재생성합니다. endDate는 선택값이며, 시작일과 독서 기간은 이 API에서 함께 관리합니다."
+            description = "모집 중(RECRUITING)인 모임의 일정 설정과 라운드 날짜를 저장합니다. 멤버가 1명이면 설정만 저장하고 빈 라운드 목록을 반환합니다. 책바퀴 배정은 모임 시작 시점의 최종 멤버와 도서를 기준으로 생성합니다."
     )
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(
