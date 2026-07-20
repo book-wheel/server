@@ -36,12 +36,20 @@ public record GroupScheduleAssignmentResponse(
         @Schema(description = "책을 보낼 사람 닉네임", example = "책벌레", nullable = true)
         String senderNickname
 ) {
+    public static GroupScheduleAssignmentResponse withoutAssignment(
+            int roundNumber,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        return new GroupScheduleAssignmentResponse(
+                roundNumber, startDate, endDate,
+                null, null, null, null, null, null
+        );
+    }
+
     public static GroupScheduleAssignmentResponse of(Round round, WheelState wheelState, String senderNickname) {
         if (wheelState == null) {
-            return new GroupScheduleAssignmentResponse(
-                    round.getRoundNumber(), round.getStartDate(), round.getEndDate(),
-                    null, null, null, null, null, null
-            );
+            return withoutAssignment(round.getRoundNumber(), round.getStartDate(), round.getEndDate());
         }
 
         return new GroupScheduleAssignmentResponse(

@@ -2,8 +2,8 @@ package com.bookwheel.server.schedule.controller;
 
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
-import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.service.GroupScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,14 +32,14 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "내 독서 일정 조회",
-            description = "라운드별 날짜와 저장된 내 책 배정, 책바퀴 상태를 조회합니다. 시작 전 미래 배정은 PLANNED 상태로 반환됩니다."
+            description = "저장된 일정 설정과 상태, 라운드별 날짜 및 내 책 배정을 조회합니다. 일정만 설정된 경우에도 설정값과 CONFIGURED 상태를 반환하며, 예정일을 놓치면 RESCHEDULE_REQUIRED를 반환합니다."
     )
     @GetMapping("/{groupId}/schedule")
-    public ResponseEntity<ApiResponse<List<GroupScheduleAssignmentResponse>>> getSchedule(
+    public ResponseEntity<ApiResponse<GroupScheduleResponse>> getSchedule(
             @PathVariable String groupId,
             @AuthenticationPrincipal Object principal
     ) {
-        List<GroupScheduleAssignmentResponse> response = groupScheduleService.getSchedule(
+        GroupScheduleResponse response = groupScheduleService.getSchedule(
                 groupId,
                 getUserPK(principal)
         );
@@ -48,15 +48,15 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "모집 중(RECRUITING)인 모임의 일정 설정과 라운드 날짜를 저장합니다. 멤버가 1명이면 설정만 저장하고 빈 라운드 목록을 반환합니다. 책바퀴 배정은 모임 시작 시점의 최종 멤버와 도서를 기준으로 생성합니다."
+            description = "모집 중(RECRUITING)인 모임의 일정 설정과 라운드 날짜를 저장하고 전체 설정 상태를 반환합니다. 멤버가 1명이면 CONFIGURED, 라운드 날짜까지 생성되면 READY 상태입니다. 예정 시작일 당일에 조건을 충족하면 최종 멤버와 도서로 책바퀴를 자동 생성합니다. 당일에 조건을 충족하지 못하면 리더가 새로운 미래 시작일을 설정해야 합니다."
     )
     @PostMapping("/{groupId}/schedule")
-    public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> createSchedule(
+    public ResponseEntity<ApiResponse<GroupScheduleResponse>> createSchedule(
             @PathVariable String groupId,
             @RequestBody @Valid GroupScheduleCreateRequest request,
             @AuthenticationPrincipal Object principal
     ) {
-        List<GroupScheduleRoundResponse> response = groupScheduleService.createSchedule(
+        GroupScheduleResponse response = groupScheduleService.createSchedule(
                 groupId,
                 request,
                 getUserPK(principal)

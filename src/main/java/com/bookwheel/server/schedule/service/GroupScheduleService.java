@@ -15,7 +15,9 @@ import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
 import com.bookwheel.server.schedule.dto.ExcludedDateRange;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
+import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.event.GroupCompletedEvent;
 import com.bookwheel.server.schedule.event.GroupStartedEvent;
@@ -37,7 +39,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,7 +61,7 @@ public class GroupScheduleService {
     private final Clock clock;
 
     @Transactional
-    public List<GroupScheduleRoundResponse> createSchedule(
+    public GroupScheduleResponse createSchedule(
             String groupId,
             GroupScheduleCreateRequest request,
             String userPK
@@ -113,7 +114,7 @@ public class GroupScheduleService {
         );
 
         if (roundCount == 0) {
-            return List.of();
+            return buildScheduleResponse(group, List.of());
         }
 
         long requiredUsableDays = (long) roundCount * readingPeriod;
@@ -161,7 +162,12 @@ public class GroupScheduleService {
         // JPA의 saveAll()을 사용하여 한 번에 저장
         roundRepository.saveAll(roundEntities);
 
-        return rounds;
+        List<GroupScheduleAssignmentResponse> roundResponses = rounds.stream()
+                .map(round -> GroupScheduleAssignmentResponse.withoutAssignment(
+                        round.roundNumber(), round.startDate(), round.endDate()
+                ))
+                .toList();
+        return buildScheduleResponse(group, roundResponses);
     }
 
     @Transactional
@@ -173,15 +179,15 @@ public class GroupScheduleService {
         return futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
     }
 
-    public List<GroupScheduleAssignmentResponse> getSchedule(String groupId, String userPK) {
-        findGroupById(groupId);
+    public GroupScheduleResponse getSchedule(String groupId, String userPK) {
+        Group group = findGroupById(groupId);
         findActiveUserById(userPK);
         Member member = findActiveMember(groupId, userPK);
 
         // 저장된 배정이 없는 과거 일정도 날짜 정보는 함께 반환한다.
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
         if (rounds.isEmpty()) {
-            return List.of();
+            return buildScheduleResponse(group, List.of());
         }
 
         List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
@@ -201,7 +207,7 @@ public class GroupScheduleService {
                         wheelState -> wheelState.getMember().getUser().getNickname()
                 ));
 
-        return rounds.stream()
+        List<GroupScheduleAssignmentResponse> roundResponses = rounds.stream()
                 .map(round -> {
                     WheelState wheelState = wheelStateByRoundId.get(round.getRoundId());
                     return GroupScheduleAssignmentResponse.of(
@@ -211,6 +217,42 @@ public class GroupScheduleService {
                     );
                 })
                 .toList();
+        return buildScheduleResponse(group, roundResponses);
+    }
+
+    private GroupScheduleResponse buildScheduleResponse(
+            Group group,
+            List<GroupScheduleAssignmentResponse> rounds
+    ) {
+        return new GroupScheduleResponse(
+                group.getStartDate(),
+                group.getReadingPeriod(),
+                group.getScheduleEndDate(),
+                deserializeExcludedDates(group.getScheduleExcludedDates()),
+                deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
+                resolveScheduleStatus(group, rounds),
+                rounds
+        );
+    }
+
+    private GroupScheduleStatus resolveScheduleStatus(
+            Group group,
+            List<GroupScheduleAssignmentResponse> rounds
+    ) {
+        if (group.getStartDate() == null || group.getReadingPeriod() == null) {
+            return GroupScheduleStatus.NOT_CONFIGURED;
+        }
+        if (group.getGroupState() == State.RECRUITING
+                && !group.getStartDate().isAfter(LocalDate.now(clock))) {
+            return GroupScheduleStatus.RESCHEDULE_REQUIRED;
+        }
+        if (group.getGroupState() == State.IN_PROGRESS) {
+            return GroupScheduleStatus.IN_PROGRESS;
+        }
+        if (group.getGroupState() == State.COMPLETE) {
+            return GroupScheduleStatus.COMPLETE;
+        }
+        return rounds.isEmpty() ? GroupScheduleStatus.CONFIGURED : GroupScheduleStatus.READY;
     }
 
     private String resolveSenderNickname(
@@ -282,13 +324,14 @@ public class GroupScheduleService {
         roundRepository.deleteByGroup_GroupId(group.getGroupId());
     }
 
-    // 오늘부터 독서를 시작해야하는 그룹을 찾아서 진행중으로 변경
+    // 오늘이 예정 시작일인 그룹만 진행 중으로 변경한다.
+    // 당일에 조건을 충족하지 못한 그룹은 리더가 새 시작일을 설정할 때까지 RECRUITING을 유지한다.
     @Transactional
     public int updateStartedGroupsToInProgress() {
         LocalDate localDate = LocalDate.now(clock);
 
         // 알림 대상 그룹을 먼저 조회 (벌크 업데이트 후에는 식별이 어려움)
-        List<Group> startingGroups = groupRepository.findByGroupStateAndStartDateLessThanEqual(
+        List<Group> startingGroups = groupRepository.findByGroupStateAndStartDate(
                 State.RECRUITING, localDate
         );
 
@@ -301,7 +344,10 @@ public class GroupScheduleService {
             }
 
             Group group = lockedGroup.get();
-            if (group.getGroupState() == State.RECRUITING && prepareStartableSchedule(group, localDate)) {
+            boolean startsToday = localDate.equals(group.getStartDate());
+            if (group.getGroupState() == State.RECRUITING
+                    && startsToday
+                    && prepareStartableSchedule(group, localDate)) {
                 startableGroups.add(group);
             }
         }
@@ -371,11 +417,8 @@ public class GroupScheduleService {
         }
 
         Round firstRound = rounds.get(0);
-        if (firstRound.getStartDate().isAfter(startDate)) {
+        if (!firstRound.getStartDate().equals(startDate)) {
             return false;
-        }
-        if (firstRound.getStartDate().isBefore(startDate)) {
-            shiftRoundsFromStartDate(group, rounds, startDate, readingPeriod);
         }
 
         // 일정 API는 날짜만 저장한다. 모임을 실제로 시작하기 직전에
@@ -519,28 +562,6 @@ public class GroupScheduleService {
                 .map(serializedRange -> serializedRange.split(":"))
                 .map(parts -> new ExcludedDateRange(LocalDate.parse(parts[0]), LocalDate.parse(parts[1])))
                 .toList();
-    }
-
-    private void shiftRoundsFromStartDate(
-            Group group,
-            List<Round> rounds,
-            LocalDate startDate,
-            int readingPeriod
-    ) {
-        LocalDate currentStart = startDate;
-
-        for (Round round : rounds) {
-            long roundDays = readingPeriod - 1L;
-            if (round.getEndDate() != null) {
-                roundDays = ChronoUnit.DAYS.between(round.getStartDate(), round.getEndDate());
-            }
-
-            LocalDate endDate = currentStart.plusDays(Math.max(roundDays, 0L));
-            round.updateSchedule(currentStart, endDate);
-            currentStart = endDate.plusDays(1);
-        }
-
-        group.updateScheduleInfo(startDate, group.getGroupRoundCount());
     }
 
     // 끝난 라운드를 종료시키는 로직
