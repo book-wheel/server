@@ -368,6 +368,6 @@ public class BookService {
 
     private String createNextInterestCursor(List<InterestBookResponseDto> books) {
         InterestBookResponseDto lastBook = books.get(books.size() - 1);
-        return cursorUtils.encode(new InterestCursor(lastBook.interestedAt(), lastBook.bookId()));
+        return cursorUtils.encode(new InterestCursor(lastBook.interestedAt(), lastBook.bookInfoId()));
     }
 }
