@@ -45,7 +45,10 @@ public class ChatController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "채팅방 읽음 상태 저장", description = "사용자별 채팅방 마지막 읽은 메시지 ID를 저장합니다.")
+    @Operation(
+            summary = "채팅방 읽음 상태 저장",
+            description = "사용자별 채팅방 마지막 읽은 메시지 ID를 저장합니다. 기존 읽음 위치보다 이전이거나 동일한 메시지 ID는 무시합니다."
+    )
     @PatchMapping("/read")
     public ApiResponse<ChatRoomReadResponse> updateReadState(
             @PathVariable String groupId,
