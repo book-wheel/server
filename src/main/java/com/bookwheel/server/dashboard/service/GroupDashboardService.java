@@ -69,7 +69,7 @@ public class GroupDashboardService {
             Optional<OwnBook> myOwnBookOpt = ownBookRepository.findByGroup_GroupIdAndOwner_Id(groupId, user.getId());
             if (myOwnBookOpt.isPresent()) {
                 OwnBook myOwnBook = myOwnBookOpt.get();
-                myBookStep = firstRound == null ? null : resolvePreStartMyBookStep(firstRound, myOwnBook);
+                myBookStep = resolvePreStartMyBookStep(firstRound, myOwnBook);
             }
 
             return DashboardResponse.of(
@@ -116,6 +116,7 @@ public class GroupDashboardService {
         // 내 책이 존재하면 정보 가져오기
         if (myOwnBookOpt.isPresent()) {
             OwnBook myOwnBook = myOwnBookOpt.get();
+            myBookStep = resolveUnassignedMyBookStep(myOwnBook);
             Optional<WheelState> bookWheelStateOpt = wheelStateRepository
                     .findFirstByRoundIdAndOwnBook_OwnBookId(currentRound.getRoundId(), myOwnBook.getOwnBookId());
 
@@ -162,6 +163,10 @@ public class GroupDashboardService {
     }
 
     private MyBookStepResponse resolvePreStartMyBookStep(Round firstRound, OwnBook myOwnBook) {
+        if (firstRound == null) {
+            return resolveUnassignedMyBookStep(myOwnBook);
+        }
+
         return wheelStateRepository
                 .findFirstByRoundIdAndOwnBook_OwnBookId(firstRound.getRoundId(), myOwnBook.getOwnBookId())
                 .map(wheelState -> MyBookStepResponse.of(
@@ -171,7 +176,17 @@ public class GroupDashboardService {
                         wheelState.getWheelState(),
                         null
                 ))
-                .orElse(null);
+                .orElseGet(() -> resolveUnassignedMyBookStep(myOwnBook));
+    }
+
+    private MyBookStepResponse resolveUnassignedMyBookStep(OwnBook myOwnBook) {
+        return MyBookStepResponse.of(
+                myOwnBook.getBook().getBookId(),
+                myOwnBook.getBook().getTitle(),
+                null,
+                null,
+                null
+        );
     }
 
     // 이전 전달자 닉네임 계산:
