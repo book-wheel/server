@@ -13,6 +13,12 @@ public record MyBookStepResponse(
         @Schema(description = "내가 등록한 책 제목", example = "채식주의자")
         String bookTitle,
 
+        @Schema(description = "표지 이미지 URL", example = "https://image.aladin.co.kr/...")
+        String coverImage,
+
+        @Schema(description = "작가", example = "한강")
+        String author,
+
         @Schema(description = "현재 또는 시작 전 배정된 책 독자 닉네임. 배정 전이면 null입니다.", example = "홍길동", nullable = true)
         String holderNickname,
 
@@ -25,6 +31,8 @@ public record MyBookStepResponse(
     public static MyBookStepResponse of(
             String bookId,
             String bookTitle,
+            String coverImage,
+            String author,
             String holderNickname,
             WheelStatus status,
             String location
@@ -32,6 +40,8 @@ public record MyBookStepResponse(
         return MyBookStepResponse.builder()
                 .bookId(bookId)
                 .bookTitle(bookTitle)
+                .coverImage(coverImage)
+                .author(author)
                 .holderNickname(holderNickname)
                 .status(status)
                 .location(location)
