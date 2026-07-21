@@ -49,6 +49,15 @@ public class Group {
     @Column(name = "start_date")
     private LocalDate startDate;
 
+    @Column(name = "schedule_end_date")
+    private LocalDate scheduleEndDate;
+
+    @Column(name = "schedule_excluded_dates", columnDefinition = "TEXT")
+    private String scheduleExcludedDates;
+
+    @Column(name = "schedule_excluded_date_ranges", columnDefinition = "TEXT")
+    private String scheduleExcludedDateRanges;
+
     @Column(name = "max_members")
     private Integer maxMembers;
 
@@ -71,9 +80,19 @@ public class Group {
         this.groupRoundCount = groupRoundCount;
     }
 
-    // 멤버 구성이 바뀌면 기존 라운드 계획은 더 이상 유효하지 않다.
+    public void updateScheduleConstraints(
+            LocalDate scheduleEndDate,
+            String scheduleExcludedDates,
+            String scheduleExcludedDateRanges
+    ) {
+        this.scheduleEndDate = scheduleEndDate;
+        this.scheduleExcludedDates = scheduleExcludedDates;
+        this.scheduleExcludedDateRanges = scheduleExcludedDateRanges;
+    }
+
+    // 멤버 구성이 바뀌면 라운드 계획만 무효화한다.
+    // 예정 시작일은 유지해야 시작일에 스케줄러가 일정을 자동 생성할 수 있다.
     public void invalidateSchedule() {
-        this.startDate = null;
         this.groupRoundCount = 0;
     }
 
