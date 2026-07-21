@@ -26,7 +26,7 @@ public class GroupBookController {
 
     @Operation(
             summary = "참여 도서 등록",
-            description = "그룹에 내가 읽힐 책을 등록합니다. isbn, title, totalPage는 필수이며 totalPage는 1 이상이어야 합니다."
+            description = "그룹에 내가 읽힐 책을 등록합니다. isbn, title은 필수입니다. totalPage는 선택값이며, 입력할 경우 1 이상이어야 합니다."
     )
     @PostMapping("/{groupId}/books")
     public ResponseEntity<ApiResponse<OwnBookRegisterResponse>> registerOwnBook(
