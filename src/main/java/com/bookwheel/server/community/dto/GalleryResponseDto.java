@@ -8,7 +8,6 @@ import java.util.List;
 
 public record GalleryResponseDto(
     Long postId,
-    Long bookId,
     String isbn,
     String thumbnailUrl,
     int imageCount,
@@ -19,7 +18,6 @@ public record GalleryResponseDto(
 
         return new GalleryResponseDto(
             post.getPostId(),
-            post.getBookInfo().getBookInfoId(),
             post.getBookInfo().getIsbn(),
             thumbnailUrl,
             images == null ? 0 : images.size(),

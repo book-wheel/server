@@ -23,6 +23,7 @@ public class OrderNotificationListener {
         if (event.orderedUserPKs() == null || event.orderedUserPKs().isEmpty()) {
             return;
         }
+        // 읽기 순서 알림 전체를 하나의 모임 범위로 저장한다.
         String group = NotificationText.safe(event.groupName(), 30);
         eventPublisher.publishEvent(BulkNotificationEvent.builder()
                 .recipientUserPKs(event.orderedUserPKs())
@@ -30,6 +31,7 @@ public class OrderNotificationListener {
                 .title("독서 순서 확정")
                 .body("'" + group + "' 그룹의 독서 순서가 정해졌어요.")
                 .deepLink("/groups/" + event.groupId() + "/order")
+                .groupId(event.groupId())
                 .payload(Map.of("groupId", event.groupId()))
                 .build());
     }

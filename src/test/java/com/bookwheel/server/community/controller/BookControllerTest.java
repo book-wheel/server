@@ -209,7 +209,6 @@ class BookControllerTest {
         String isbn = "9791161571188";
         GalleryResponseDto item = new GalleryResponseDto(
                 10L,
-                3L,
                 isbn,
                 "https://cdn.example.com/thumb.jpg",
                 4,

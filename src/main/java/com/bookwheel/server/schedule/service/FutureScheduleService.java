@@ -62,7 +62,7 @@ public class FutureScheduleService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        Integer readingPeriod = group.getReadingPeriod();
+        Integer readingPeriod = request.readingPeriod();
         if (readingPeriod == null || readingPeriod < 1) {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
@@ -128,6 +128,8 @@ public class FutureScheduleService {
             roundRepository.saveAll(newFutureRounds);
             wheelReassignmentService.savePlannedAssignments(futureAssignmentPlan, activeMembers, books);
         }
+        // 진행 중에는 보호된 라운드를 건드리지 않고, 이후 생성될 일정의 기본 기간만 갱신한다.
+        group.updateReadingPeriod(readingPeriod);
         group.updateScheduleInfo(group.getStartDate(), totalRoundCount);
 
         return response(protectedRounds, newFutureRounds, totalRoundCount);

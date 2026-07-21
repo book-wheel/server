@@ -14,6 +14,12 @@ public class GroupSpecification {
 
         Specification<Group> spec = (root, query, builder) -> builder.conjunction();
 
+        // 삭제된 모임은 게시물 보존과 별개로 일반 모임 탐색 결과에는 노출하지 않는다.
+        spec = spec.and((root, query, builder) -> builder.or(
+                builder.isNull(root.get("groupState")),
+                builder.notEqual(root.get("groupState"), State.DELETED)
+        ));
+
         if (condition == null) {
             return spec;
         }

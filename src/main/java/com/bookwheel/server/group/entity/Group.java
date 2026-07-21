@@ -56,7 +56,8 @@ public class Group {
     @Column(name = "group_round_count")
     private int groupRoundCount = 1;
 
-    @Column(name = "group_state")
+    // enum 스키마 갱신 대상임을 명확히 해 소프트 삭제 상태를 저장할 수 있게 한다.
+    @Column(name = "group_state", length = 20)
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private State groupState = State.RECRUITING;
@@ -78,6 +79,37 @@ public class Group {
 
     public void updateGroupPassword(String groupPassword) {
         this.groupPassword = groupPassword;
+    }
+
+    // 독서 기간은 모임 기본 정보가 아니라 일정 생성·재생성 API에서만 변경한다.
+    public void updateReadingPeriod(Integer readingPeriod) {
+        this.readingPeriod = readingPeriod;
+    }
+
+    // 일정 필드를 건드리지 않고 화면의 기본 모임 정보만 변경한다.
+    public void updateGroupInfo(
+            String groupName,
+            String groupComment,
+            String groupRule,
+            boolean groupPublic,
+            String groupPassword,
+            boolean groupOffline,
+            Region groupRegion,
+            Integer maxMembers
+    ) {
+        this.groupName = groupName;
+        this.groupComment = groupComment;
+        this.groupRule = groupRule;
+        this.groupPublic = groupPublic;
+        this.groupPassword = groupPassword;
+        this.groupOffline = groupOffline;
+        this.groupRegion = groupRegion;
+        this.maxMembers = maxMembers;
+    }
+
+    // 게시물 등 모임의 기록을 보존한 채 운영 상태만 비활성화한다.
+    public void markDeleted() {
+        this.groupState = State.DELETED;
     }
 
     @PrePersist

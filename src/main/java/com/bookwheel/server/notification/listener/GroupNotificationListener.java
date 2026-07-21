@@ -31,6 +31,7 @@ public class GroupNotificationListener {
     public void onJoinRequested(GroupJoinRequestedEvent event) {
         String nick = NotificationText.safe(event.applicantNickname(), 30);
         String group = NotificationText.safe(event.groupName(), 30);
+        // 가입 요청 알림은 요청된 모임의 리더에게만 전달한다.
         memberRepository.findFirstByGroup_GroupIdAndMemberRoleAndMemberStatus(
                 event.groupId(), MemberRole.LEADER, MemberStatus.ACTIVE
         ).ifPresent(leader -> eventPublisher.publishEvent(NotificationEvent.builder()
@@ -39,6 +40,7 @@ public class GroupNotificationListener {
                 .title("새 가입 요청")
                 .body(nick + "님이 '" + group + "' 그룹에 가입을 신청했어요.")
                 .deepLink("/groups/" + event.groupId() + "/members/requests")
+                .groupId(event.groupId())
                 .payload(Map.of(
                         "groupId", event.groupId(),
                         "applicantUserPK", event.applicantUserPK()
@@ -48,6 +50,7 @@ public class GroupNotificationListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onJoinDecided(GroupJoinDecidedEvent event) {
+        // 승인·거절 결과도 원래 모임에 귀속해 삭제 범위가 유지되도록 한다.
         boolean approved = event.status() == MemberRequestStatus.APPROVED;
         String group = NotificationText.safe(event.groupName(), 30);
         eventPublisher.publishEvent(NotificationEvent.builder()
@@ -58,6 +61,7 @@ public class GroupNotificationListener {
                         ? "'" + group + "' 그룹의 가입이 승인되었어요."
                         : "'" + group + "' 그룹의 가입이 거절되었어요.")
                 .deepLink("/groups/" + event.groupId())
+                .groupId(event.groupId())
                 .payload(Map.of(
                         "groupId", event.groupId(),
                         "status", event.status().name()

@@ -27,6 +27,8 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     // 특정 그룹에 특정 사용자가 특정 상태(ex. ACTIVE)로 소속되어 있는지 확인
     boolean existsByGroup_GroupIdAndUser_IdAndMemberStatus(String groupId, String userPK, MemberStatus memberStatus);
 
+    long countByGroup_GroupIdAndMemberStatus(String groupId, MemberStatus memberStatus);
+
     // 특정 사용자가 그룹에 소속되어 있는지 확인
     // 회원 탈퇴 시, 그룹에 소속되어있는지 확인하는 용도
     boolean existsByUser_IdAndMemberStatus(String userPK, MemberStatus memberStatus);
@@ -122,4 +124,8 @@ public interface MemberRepository extends JpaRepository<Member, String> {
             @Param("userPK") String userPK,
             @Param("status") MemberStatus status
     );
+
+    @Modifying
+    @Query("delete from Member m where m.group.groupId = :groupId")
+    void deleteAllByGroupId(@Param("groupId") String groupId);
 }

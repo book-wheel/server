@@ -1,6 +1,7 @@
 package com.bookwheel.server.schedule.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
@@ -11,6 +12,12 @@ public record GroupScheduleCreateRequest(
         @Schema(description = "일정 시작일", example = "2026-02-01")
         @NotNull(message = "시작 일을 입력해주세요.")
         LocalDate startDate,
+
+        // 모집 중 전체 일정의 라운드 계산에 사용할 독서 기간이다.
+        @Schema(description = "라운드별 독서 기간(일)", example = "7")
+        @NotNull(message = "독서 기간을 입력해주세요.")
+        @Min(value = 1, message = "독서 기간은 최소 1일 이상이어야 합니다.")
+        Integer readingPeriod,
 
         @Schema(description = "최대 종료일 제한. 선택값이며 없으면 제한 없이 계산합니다.", example = "2026-07-31", nullable = true)
         LocalDate endDate,

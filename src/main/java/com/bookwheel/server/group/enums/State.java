@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum State {
     RECRUITING("모집중"),
     IN_PROGRESS("진행중"),
-    COMPLETE("완료");
+    COMPLETE("완료"),
+    DELETED("삭제됨");
 
     private final String description;
 }

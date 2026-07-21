@@ -27,6 +27,7 @@ public class WheelNotificationListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onWheelCompleted(WheelCompletedEvent event) {
+        // 완독 인증을 올린 본인을 제외한 같은 모임의 ACTIVE 멤버에게 알림을 보낸다.
         List<String> recipients = memberRepository
                 .findAllWithUserByGroupIdAndStatus(event.groupId(), MemberStatus.ACTIVE)
                 .stream()
@@ -48,6 +49,7 @@ public class WheelNotificationListener {
                 .title("완독 인증")
                 .body(body)
                 .deepLink("/groups/" + event.groupId() + "/wheels/" + event.wheelStateId())
+                .groupId(event.groupId())
                 .payload(Map.of(
                         "groupId", event.groupId(),
                         "wheelStateId", event.wheelStateId(),

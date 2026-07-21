@@ -34,7 +34,8 @@ public record GroupCreateRequest(
         Integer readingPeriod,
 
         @NotNull(message = "시작일은 필수 입력값입니다.")
-        @FutureOrPresent(message = "시작일은 과거일 수 없습니다.")
+        // 자정 스케줄러를 놓치지 않도록 최초 모임 생성도 내일부터 시작하게 한다.
+        @Future(message = "시작일은 내일부터 설정할 수 있습니다.")
         LocalDate startDate,
 
         @NotNull(message = "최대 인원은 필수 입력값입니다.")

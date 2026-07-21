@@ -102,7 +102,6 @@ class BookServiceTest {
         given(image.getObjectKey()).willReturn(objectKey);
 
         BookInfo bookInfo = mock(BookInfo.class);
-        given(bookInfo.getBookInfoId()).willReturn(1L);
         given(bookInfo.getIsbn()).willReturn("9788934972464");
 
         Post post = mock(Post.class);

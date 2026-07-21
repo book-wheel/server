@@ -42,7 +42,8 @@ public class GroupMemberOrderService {
             MemberReadOrderRequest request,
             String userPK
     ) {
-        Group group = findGroupById(groupId);
+        // 읽기 순서 저장과 모임 삭제가 같은 그룹의 자식 행을 동시에 변경하지 않도록 직렬화한다.
+        Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
         validateManagerPermission(groupId, userPK);
         validateRequestShape(request);
@@ -136,8 +137,9 @@ public class GroupMemberOrderService {
         }
     }
 
-    private Group findGroupById(String groupId) {
-        return groupRepository.findById(groupId)
+    // 순서 저장 전에 그룹을 잠가 삭제와 자식 행 변경의 순서를 고정한다.
+    private Group findGroupByIdForUpdate(String groupId) {
+        return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
