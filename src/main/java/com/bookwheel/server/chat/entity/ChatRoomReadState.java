@@ -44,7 +44,13 @@ public class ChatRoomReadState {
     @Column(name = "last_read_at")
     private LocalDateTime lastReadAt;
 
-    public void updateLastReadMessage(ChatMessage lastReadMessage) {
-        this.lastReadMessage = lastReadMessage;
+    public boolean advanceLastReadMessage(ChatMessage candidateMessage) {
+        if (lastReadMessage != null
+                && candidateMessage.getChatMessageId() <= lastReadMessage.getChatMessageId()) {
+            return false;
+        }
+
+        this.lastReadMessage = candidateMessage;
+        return true;
     }
 }

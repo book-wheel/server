@@ -101,12 +101,13 @@ public class ChatService {
                         .user(member.getUser())
                         .build());
 
-        readState.updateLastReadMessage(lastReadMessage);
-        chatRoomReadStateRepository.save(readState);
+        if (readState.advanceLastReadMessage(lastReadMessage)) {
+            chatRoomReadStateRepository.save(readState);
+        }
 
         return ChatRoomReadResponse.builder()
                 .chatRoomId(chatRoom.getChatRoomId())
-                .lastReadMessageId(lastReadMessage.getChatMessageId())
+                .lastReadMessageId(readState.getLastReadMessage().getChatMessageId())
                 .build();
     }
 
