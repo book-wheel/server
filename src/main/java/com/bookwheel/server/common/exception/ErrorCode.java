@@ -89,6 +89,9 @@ public enum ErrorCode {
     GROUP_SCHEDULE_START_DATE_NOT_FUTURE(HttpStatus.BAD_REQUEST, "GROUP_048", "일정 시작일은 내일부터 설정할 수 있습니다."),
     GROUP_DELETED(HttpStatus.BAD_REQUEST, "GROUP_049", "삭제된 모임입니다."),
 
+    // 채팅 관련 에러
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
+
     // 책바퀴 비즈니스 에러
     BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_001", "해당 도서를 찾을 수 없습니다."),
     ALREADY_BORROWED(HttpStatus.BAD_REQUEST, "BOOK_002", "이미 대여 중인 도서입니다."),
