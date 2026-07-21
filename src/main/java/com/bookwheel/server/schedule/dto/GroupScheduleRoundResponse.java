@@ -6,7 +6,7 @@ import lombok.Builder;
 import java.time.LocalDate;
 
 @Builder
-@Schema(description = "생성된 라운드 일정")
+@Schema(description = "생성된 라운드 일정. 멤버가 1명이면 일정 설정만 저장되고 빈 목록을 반환합니다.")
 public record GroupScheduleRoundResponse(
         @Schema(description = "라운드 번호", example = "1")
         int roundNumber,
