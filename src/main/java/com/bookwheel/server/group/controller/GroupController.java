@@ -109,7 +109,7 @@ public class GroupController {
 
     @Operation(
             summary = "가입 요청 처리",
-            description = "모집 중(RECRUITING)인 모임에서만 리더가 가입 요청을 승인 또는 거절합니다. 승인으로 ACTIVE 멤버 구성이 바뀌면 기존 독서 일정은 무효화되며, 이후 일정을 다시 생성해야 합니다. 무효화 여부는 그룹 상세 조회의 startDate와 groupRoundCount로 확인합니다. 진행 중 또는 완료된 모임에서는 GROUP_035 오류가 반환됩니다."
+            description = "모집 중(RECRUITING)인 모임에서만 리더가 가입 요청을 승인 또는 거절합니다. 승인으로 ACTIVE 멤버 구성이 바뀌면 기존 라운드는 무효화되지만 예정 시작일은 유지되며, 시작일에 최종 멤버 기준으로 자동 생성됩니다. 무효화 여부는 groupRoundCount로 확인합니다. 진행 중 또는 완료된 모임에서는 GROUP_035 오류가 반환됩니다."
     )
     @PatchMapping("/{groupId}/members/{memberId}/status")
     public ResponseEntity<ApiResponse<MemberRequestStatusUpdateResponse>> updateMemberRequestStatus(

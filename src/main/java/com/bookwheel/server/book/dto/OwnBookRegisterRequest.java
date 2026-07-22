@@ -3,7 +3,6 @@ package com.bookwheel.server.book.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 
@@ -37,9 +36,8 @@ public record OwnBookRegisterRequest(
         @Size(max = 255)
         String coverImage,
 
-        @Schema(description = "총 페이지 수. 필수값이며 1 이상이어야 합니다.", example = "250")
-        @NotNull(message = "총 페이지 수를 등록해주세요.")
-        @Min(value = 1)
+        @Schema(description = "총 페이지 수. 선택값이며, 입력할 경우 1 이상이어야 합니다. 외부 도서 API가 페이지 수를 제공하지 않으면 생략(null)할 수 있습니다.", example = "250")
+        @Min(value = 1, message = "총 페이지 수는 1 이상이어야 합니다.")
         Integer totalPage,
 
         @Schema(description = "책 상태 메모", example = "이번에 새로 구매한 책입니다. 아주 깨끗해요")

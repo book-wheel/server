@@ -14,10 +14,6 @@ import java.util.Objects;
 
 @Service
 class ScheduleCalendarService {
-    ExcludedCalendar emptyCalendar() {
-        return new ExcludedCalendar(List.of());
-    }
-
     LocalDate calculateRoundEndDate(
             LocalDate currentStart,
             int readingPeriod,

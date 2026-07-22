@@ -125,6 +125,8 @@ public class GroupDashboardService {
                 myBookStep = MyBookStepResponse.of(
                         myOwnBook.getBook().getBookId(),
                         myOwnBook.getBook().getTitle(),
+                        myOwnBook.getBook().getCoverImage(),
+                        myOwnBook.getBook().getAuthor(),
                         ws.getMember().getUser().getNickname(),
                         ws.getWheelState(),
                         group.isGroupOffline() ? group.getGroupRegion().getDescription() : null
@@ -172,6 +174,8 @@ public class GroupDashboardService {
                 .map(wheelState -> MyBookStepResponse.of(
                         myOwnBook.getBook().getBookId(),
                         myOwnBook.getBook().getTitle(),
+                        myOwnBook.getBook().getCoverImage(),
+                        myOwnBook.getBook().getAuthor(),
                         wheelState.getMember().getUser().getNickname(),
                         wheelState.getWheelState(),
                         null
@@ -183,6 +187,8 @@ public class GroupDashboardService {
         return MyBookStepResponse.of(
                 myOwnBook.getBook().getBookId(),
                 myOwnBook.getBook().getTitle(),
+                myOwnBook.getBook().getCoverImage(),
+                myOwnBook.getBook().getAuthor(),
                 null,
                 null,
                 null

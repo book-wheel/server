@@ -43,7 +43,7 @@ public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecif
     // 삭제·일정 변경·그룹 소유 데이터 등록을 같은 그룹 단위로 직렬화한다.
     Optional<Group> findByGroupIdForUpdate(@Param("groupId") String groupId);
 
-    // 모집 중인 그룹 중 시작일이 지났고 책 등록이 완료된 그룹을 진행 중으로 변경
+    // 예정 시작일 당일에 시작 조건을 충족한 그룹만 진행 중으로 변경
     @Modifying
     @Query("UPDATE Group g SET g.groupState = :inProcess " +
             "WHERE g.groupState = :recruiting AND g.groupId IN :groupIds")
@@ -67,8 +67,8 @@ public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecif
             @Param("today") LocalDate today
     );
 
-    // 오늘 시작해야 하는데 아직 모집중인 그룹들 (알림 대상 후보)
-    List<Group> findByGroupStateAndStartDateLessThanEqual(State state, LocalDate today);
+    // 오늘이 예정 시작일이면서 아직 모집 중인 그룹들
+    List<Group> findByGroupStateAndStartDate(State state, LocalDate today);
 
     // 마지막 라운드 종료일이 today 이전인, IN_PROGRESS 그룹들 (종료 알림 대상)
     @Query("SELECT g FROM Group g WHERE g.groupState = :inProgress AND g.groupId IN (" +

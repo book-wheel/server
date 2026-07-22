@@ -1,5 +1,6 @@
 package com.bookwheel.server.schedule.service;
 
+import com.bookwheel.server.book.entity.OwnBook;
 import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -7,8 +8,12 @@ import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
+import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
+import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
+import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -30,9 +35,13 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class GroupScheduleServiceTest {
@@ -125,6 +134,224 @@ class GroupScheduleServiceTest {
 
         then(memberPermissionValidator).should().validateLeader(groupId, "leader-user-pk");
         then(memberRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("멤버가 1명이어도 도서 검증 없이 일정 설정을 저장한다")
+    void createSchedule_SavesSettingsWithOneMember() {
+        String groupId = "group-1";
+        LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                startDate,
+                5,
+                startDate.plusDays(30),
+                List.of(),
+                List.of()
+        );
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar = mock(ScheduleCalendarService.ExcludedCalendar.class);
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, com.bookwheel.server.member.enums.MemberStatus.ACTIVE))
+                .willReturn(List.of(mock(Member.class)));
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of())).willReturn(excludedCalendar);
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of());
+
+        GroupScheduleResponse response =
+                groupScheduleService.createSchedule(groupId, request, "leader-user-pk");
+
+        assertThat(response.startDate()).isEqualTo(startDate);
+        assertThat(response.readingPeriod()).isEqualTo(5);
+        assertThat(response.endDate()).isEqualTo(startDate.plusDays(30));
+        assertThat(response.excludedDates()).isEmpty();
+        assertThat(response.excludedDateRanges()).isEmpty();
+        assertThat(response.scheduleStatus()).isEqualTo(GroupScheduleStatus.CONFIGURED);
+        assertThat(response.rounds()).isEmpty();
+        assertThat(group.getStartDate()).isEqualTo(startDate);
+        assertThat(group.getReadingPeriod()).isEqualTo(5);
+        assertThat(group.getGroupRoundCount()).isZero();
+        assertThat(group.getScheduleEndDate()).isEqualTo(startDate.plusDays(30));
+        then(roundRepository).should(never()).saveAll(anyList());
+        then(ownBookRepository).shouldHaveNoInteractions();
+        then(wheelAssignmentService).shouldHaveNoInteractions();
+        then(wheelReassignmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("일정 API는 라운드 날짜만 저장하고 책바퀴를 배정하지 않는다")
+    void createSchedule_CreatesRoundsWithoutWheelAssignments() {
+        String groupId = "group-1";
+        LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
+        LocalDate endDate = startDate.plusDays(6);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                startDate,
+                7,
+                null,
+                List.of(),
+                List.of()
+        );
+        List<Member> members = List.of(mock(Member.class), mock(Member.class));
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar = mock(ScheduleCalendarService.ExcludedCalendar.class);
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, com.bookwheel.server.member.enums.MemberStatus.ACTIVE))
+                .willReturn(members);
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of())).willReturn(excludedCalendar);
+        given(scheduleCalendarService.calculateRoundEndDate(startDate, 7, excludedCalendar)).willReturn(endDate);
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of());
+
+        GroupScheduleResponse response =
+                groupScheduleService.createSchedule(groupId, request, "leader-user-pk");
+
+        assertThat(response.scheduleStatus()).isEqualTo(GroupScheduleStatus.READY);
+        assertThat(response.rounds()).singleElement().satisfies(round -> {
+            assertThat(round.roundNumber()).isEqualTo(1);
+            assertThat(round.startDate()).isEqualTo(startDate);
+            assertThat(round.endDate()).isEqualTo(endDate);
+            assertThat(round.wheelStateId()).isNull();
+        });
+        then(roundRepository).should().saveAll(anyList());
+        then(ownBookRepository).shouldHaveNoInteractions();
+        then(wheelAssignmentService).shouldHaveNoInteractions();
+        then(wheelReassignmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("예정 시작일을 놓친 모집 중 일정은 재설정 필요 상태와 설정값을 반환한다")
+    void getSchedule_ReturnsRescheduleRequiredWithSavedSettings() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .startDate(today.minusDays(1))
+                .readingPeriod(5)
+                .scheduleEndDate(today.plusDays(30))
+                .scheduleExcludedDates(today.plusDays(2).toString())
+                .scheduleExcludedDateRanges(today.plusDays(4) + ":" + today.plusDays(6))
+                .build();
+        Member member = mock(Member.class);
+        given(member.getMemberStatus()).willReturn(com.bookwheel.server.member.enums.MemberStatus.ACTIVE);
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, "leader-user-pk"))
+                .willReturn(Optional.of(member));
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of());
+
+        GroupScheduleResponse response = groupScheduleService.getSchedule(groupId, "leader-user-pk");
+
+        assertThat(response.startDate()).isEqualTo(today.minusDays(1));
+        assertThat(response.readingPeriod()).isEqualTo(5);
+        assertThat(response.endDate()).isEqualTo(today.plusDays(30));
+        assertThat(response.excludedDates()).containsExactly(today.plusDays(2));
+        assertThat(response.excludedDateRanges()).singleElement().satisfies(range -> {
+            assertThat(range.startDate()).isEqualTo(today.plusDays(4));
+            assertThat(range.endDate()).isEqualTo(today.plusDays(6));
+        });
+        assertThat(response.scheduleStatus()).isEqualTo(GroupScheduleStatus.RESCHEDULE_REQUIRED);
+        assertThat(response.rounds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("시작일에 일정이 없으면 자동 생성하고 최종 멤버와 도서로 배정한다")
+    void updateStartedGroups_CreatesMissingScheduleAndAssignments() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .startDate(today)
+                .readingPeriod(7)
+                .build();
+        Member firstMember = mock(Member.class);
+        Member secondMember = mock(Member.class);
+        OwnBook firstBook = mock(OwnBook.class);
+        OwnBook secondBook = mock(OwnBook.class);
+        List<Member> members = List.of(firstMember, secondMember);
+        List<OwnBook> books = List.of(firstBook, secondBook);
+        given(firstMember.getMemberId()).willReturn("member-1");
+        given(secondMember.getMemberId()).willReturn("member-2");
+        given(firstBook.getOwnBookId()).willReturn("book-1");
+        given(secondBook.getOwnBookId()).willReturn("book-2");
+        given(groupRepository.findByGroupStateAndStartDate(State.RECRUITING, today))
+                .willReturn(List.of(group));
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroupIdAndMemberStatusForUpdate(
+                groupId,
+                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+        )).willReturn(members);
+        given(ownBookRepository.findByGroup_GroupIdIn(List.of(groupId))).willReturn(books);
+        given(wheelAssignmentService.findMembersWithoutBook(members, books)).willReturn(List.of());
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId)).willReturn(List.of());
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
+                .willReturn(mock(ScheduleCalendarService.ExcludedCalendar.class));
+        given(scheduleCalendarService.calculateRoundEndDate(
+                org.mockito.ArgumentMatchers.eq(today),
+                org.mockito.ArgumentMatchers.eq(7),
+                org.mockito.ArgumentMatchers.any(ScheduleCalendarService.ExcludedCalendar.class)
+        )).willReturn(today.plusDays(6));
+        given(roundRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+        given(wheelStateRepository.findByRoundIdIn(anyList())).willReturn(List.of());
+        given(wheelAssignmentService.assignBooks(members, books, 1)).willReturn(List.of(
+                new WheelAssignmentService.WheelAssignment(firstMember, secondBook),
+                new WheelAssignmentService.WheelAssignment(secondMember, firstBook)
+        ));
+        given(groupRepository.updateGroupStateToInProcessByGroupIds(
+                State.IN_PROGRESS,
+                State.RECRUITING,
+                List.of(groupId)
+        )).willReturn(1);
+
+        int updated = groupScheduleService.updateStartedGroupsToInProgress();
+
+        assertThat(updated).isEqualTo(1);
+        assertThat(group.getGroupRoundCount()).isEqualTo(1);
+        then(roundRepository).should().saveAll(anyList());
+        then(wheelReassignmentService).should().savePlannedAssignments(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(members),
+                org.mockito.ArgumentMatchers.eq(books)
+        );
+    }
+
+    @Test
+    @DisplayName("예정 시작일이 지난 모임은 조건이 충족돼도 자동 시작하지 않는다")
+    void updateStartedGroups_DoesNotStartAfterScheduledDate() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .startDate(today.minusDays(1))
+                .readingPeriod(7)
+                .build();
+        // 조회 후 시작일이 변경되는 경쟁 상황까지 방어하는지 확인한다.
+        given(groupRepository.findByGroupStateAndStartDate(State.RECRUITING, today))
+                .willReturn(List.of(group));
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+
+        int updated = groupScheduleService.updateStartedGroupsToInProgress();
+
+        assertThat(updated).isZero();
+        then(memberRepository).shouldHaveNoInteractions();
+        then(ownBookRepository).shouldHaveNoInteractions();
+        then(groupRepository).should(never()).updateGroupStateToInProcessByGroupIds(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                anyList()
+        );
     }
 
     private User activeUser() {

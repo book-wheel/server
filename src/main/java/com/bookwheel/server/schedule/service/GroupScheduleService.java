@@ -13,8 +13,11 @@ import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
+import com.bookwheel.server.schedule.dto.ExcludedDateRange;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
+import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
+import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.event.GroupCompletedEvent;
 import com.bookwheel.server.schedule.event.GroupStartedEvent;
@@ -36,7 +39,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -59,7 +61,7 @@ public class GroupScheduleService {
     private final Clock clock;
 
     @Transactional
-    public List<GroupScheduleRoundResponse> createSchedule(
+    public GroupScheduleResponse createSchedule(
             String groupId,
             GroupScheduleCreateRequest request,
             String userPK
@@ -77,17 +79,10 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
         }
 
-        // ACTIVE 멤버 수를 기준으로 총 라운드 수를 결정
+        // 일정 확정 시점의 ACTIVE 멤버 수를 기준으로 라운드 수를 결정한다.
+        // 모임 생성 직후처럼 멤버가 1명이어도 일정 설정은 저장할 수 있다.
         List<Member> activeMembers = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE);
         int activeMemberCount = activeMembers.size();
-        if (activeMemberCount < 2) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_ACTIVE_MEMBER_REQUIRED);
-        }
-
-        List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(groupId));
-        if (!wheelAssignmentService.findMembersWithoutBook(activeMembers, books).isEmpty()) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_OWN_BOOK_REQUIRED);
-        }
 
         Integer readingPeriod = request.readingPeriod();
         if (readingPeriod == null || readingPeriod < 1) {
@@ -99,14 +94,29 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
         }
 
-        // ACTIVE 멤버 수보다 1 적게 라운드 돌기
-        int roundCount = activeMemberCount - 1;
+        // ACTIVE 멤버 수보다 1 적게 라운드 돌기. 1명일 때는 설정만 저장한다.
+        int roundCount = Math.max(activeMemberCount - 1, 0);
 
         // 제외할 날짜(단일/범위)들을 병합하여 탐색에 최적화된 달력 객체 생성
         ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.normalizeExcludedCalendar(
                 request.excludedDates(),
                 request.excludedDateRanges()
         );
+
+        // 기존 일정은 새 설정으로 교체하되, 미래 책바퀴 배정은 다시 만들지 않는다.
+        deleteReplaceableRecruitingSchedule(group);
+        group.updateReadingPeriod(readingPeriod);
+        group.updateScheduleInfo(startDate, roundCount);
+        group.updateScheduleConstraints(
+                requestedEndDate,
+                serializeExcludedDates(request.excludedDates()),
+                serializeExcludedDateRanges(request.excludedDateRanges())
+        );
+
+        if (roundCount == 0) {
+            return buildScheduleResponse(group, List.of());
+        }
+
         long requiredUsableDays = (long) roundCount * readingPeriod;
 
         if (requestedEndDate != null) {
@@ -138,12 +148,6 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
         }
 
-        // 기존 스케줄 초기화
-        deleteReplaceableRecruitingSchedule(group);
-        // 독서 기간은 일정 생성 API에서 함께 변경하며, 계산된 라운드와 같은 트랜잭션으로 저장한다.
-        group.updateReadingPeriod(readingPeriod);
-        group.updateScheduleInfo(startDate, roundCount);
-
         // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
         List<Round> roundEntities = rounds.stream()
                 .map(round -> Round.builder()
@@ -157,10 +161,13 @@ public class GroupScheduleService {
 
         // JPA의 saveAll()을 사용하여 한 번에 저장
         roundRepository.saveAll(roundEntities);
-        WheelAssignmentPlan assignmentPlan = planInitialAssignments(roundEntities, activeMembers, books);
-        wheelReassignmentService.savePlannedAssignments(assignmentPlan, activeMembers, books);
 
-        return rounds;
+        List<GroupScheduleAssignmentResponse> roundResponses = rounds.stream()
+                .map(round -> GroupScheduleAssignmentResponse.withoutAssignment(
+                        round.roundNumber(), round.startDate(), round.endDate()
+                ))
+                .toList();
+        return buildScheduleResponse(group, roundResponses);
     }
 
     @Transactional
@@ -172,15 +179,15 @@ public class GroupScheduleService {
         return futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
     }
 
-    public List<GroupScheduleAssignmentResponse> getSchedule(String groupId, String userPK) {
-        findGroupById(groupId);
+    public GroupScheduleResponse getSchedule(String groupId, String userPK) {
+        Group group = findGroupById(groupId);
         findActiveUserById(userPK);
         Member member = findActiveMember(groupId, userPK);
 
         // 저장된 배정이 없는 과거 일정도 날짜 정보는 함께 반환한다.
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
         if (rounds.isEmpty()) {
-            return List.of();
+            return buildScheduleResponse(group, List.of());
         }
 
         List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
@@ -200,7 +207,7 @@ public class GroupScheduleService {
                         wheelState -> wheelState.getMember().getUser().getNickname()
                 ));
 
-        return rounds.stream()
+        List<GroupScheduleAssignmentResponse> roundResponses = rounds.stream()
                 .map(round -> {
                     WheelState wheelState = wheelStateByRoundId.get(round.getRoundId());
                     return GroupScheduleAssignmentResponse.of(
@@ -210,6 +217,42 @@ public class GroupScheduleService {
                     );
                 })
                 .toList();
+        return buildScheduleResponse(group, roundResponses);
+    }
+
+    private GroupScheduleResponse buildScheduleResponse(
+            Group group,
+            List<GroupScheduleAssignmentResponse> rounds
+    ) {
+        return new GroupScheduleResponse(
+                group.getStartDate(),
+                group.getReadingPeriod(),
+                group.getScheduleEndDate(),
+                deserializeExcludedDates(group.getScheduleExcludedDates()),
+                deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
+                resolveScheduleStatus(group, rounds),
+                rounds
+        );
+    }
+
+    private GroupScheduleStatus resolveScheduleStatus(
+            Group group,
+            List<GroupScheduleAssignmentResponse> rounds
+    ) {
+        if (group.getStartDate() == null || group.getReadingPeriod() == null) {
+            return GroupScheduleStatus.NOT_CONFIGURED;
+        }
+        if (group.getGroupState() == State.RECRUITING
+                && !group.getStartDate().isAfter(LocalDate.now(clock))) {
+            return GroupScheduleStatus.RESCHEDULE_REQUIRED;
+        }
+        if (group.getGroupState() == State.IN_PROGRESS) {
+            return GroupScheduleStatus.IN_PROGRESS;
+        }
+        if (group.getGroupState() == State.COMPLETE) {
+            return GroupScheduleStatus.COMPLETE;
+        }
+        return rounds.isEmpty() ? GroupScheduleStatus.CONFIGURED : GroupScheduleStatus.READY;
     }
 
     private String resolveSenderNickname(
@@ -281,13 +324,14 @@ public class GroupScheduleService {
         roundRepository.deleteByGroup_GroupId(group.getGroupId());
     }
 
-    // 오늘부터 독서를 시작해야하는 그룹을 찾아서 진행중으로 변경
+    // 오늘이 예정 시작일인 그룹만 진행 중으로 변경한다.
+    // 당일에 조건을 충족하지 못한 그룹은 리더가 새 시작일을 설정할 때까지 RECRUITING을 유지한다.
     @Transactional
     public int updateStartedGroupsToInProgress() {
-        LocalDate localDate = LocalDate.now();
+        LocalDate localDate = LocalDate.now(clock);
 
         // 알림 대상 그룹을 먼저 조회 (벌크 업데이트 후에는 식별이 어려움)
-        List<Group> startingGroups = groupRepository.findByGroupStateAndStartDateLessThanEqual(
+        List<Group> startingGroups = groupRepository.findByGroupStateAndStartDate(
                 State.RECRUITING, localDate
         );
 
@@ -300,7 +344,10 @@ public class GroupScheduleService {
             }
 
             Group group = lockedGroup.get();
-            if (group.getGroupState() == State.RECRUITING && prepareStartableSchedule(group, localDate)) {
+            boolean startsToday = localDate.equals(group.getStartDate());
+            if (group.getGroupState() == State.RECRUITING
+                    && startsToday
+                    && prepareStartableSchedule(group, localDate)) {
                 startableGroups.add(group);
             }
         }
@@ -347,29 +394,58 @@ public class GroupScheduleService {
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
         int expectedRoundCount = activeMembers.size() - 1;
 
-        if (rounds.isEmpty()) {
-            List<Round> defaultRounds = createDefaultRounds(group, expectedRoundCount, startDate, readingPeriod);
-            // 자동 시작으로 생성한 일정도 수동 생성과 동일하게 모든 미래 배정을 PLANNED로 저장한다.
-            WheelAssignmentPlan assignmentPlan = planInitialAssignments(defaultRounds, activeMembers, books);
-            wheelReassignmentService.savePlannedAssignments(assignmentPlan, activeMembers, books);
+        if (rounds.isEmpty() || !hasValidExistingRoundShape(rounds, expectedRoundCount)) {
+            // 미리 일정을 만들지 않았거나 멤버 구성이 바뀐 경우
+            // 시작 시점의 최종 ACTIVE 멤버 수와 저장된 설정으로 일정을 다시 만든다.
+            deleteReplaceableRecruitingSchedule(group);
+            group.invalidateSchedule();
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.normalizeExcludedCalendar(
+                    deserializeExcludedDates(group.getScheduleExcludedDates()),
+                    deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges())
+            );
+            if (!canFitSchedule(
+                    startDate,
+                    group.getScheduleEndDate(),
+                    expectedRoundCount,
+                    readingPeriod,
+                    excludedCalendar
+            )) {
+                return false;
+            }
+            rounds = createRounds(group, expectedRoundCount, startDate, readingPeriod, excludedCalendar);
             group.updateScheduleInfo(startDate, expectedRoundCount);
-            return true;
-        }
-
-        // 저장된 계획이 현재 ACTIVE 멤버 수와 맞지 않으면 자동 시작하지 않는다.
-        if (!hasValidExistingRoundShape(rounds, expectedRoundCount)) {
-            return false;
         }
 
         Round firstRound = rounds.get(0);
-        if (firstRound.getStartDate().isAfter(startDate)) {
+        if (!firstRound.getStartDate().equals(startDate)) {
             return false;
         }
-        if (firstRound.getStartDate().isBefore(startDate)) {
-            shiftRoundsFromStartDate(group, rounds, startDate, readingPeriod);
+
+        // 일정 API는 날짜만 저장한다. 모임을 실제로 시작하기 직전에
+        // 최종 멤버와 도서를 기준으로 전체 라운드 배정을 PLANNED로 생성한다.
+        replaceInitialPlannedAssignments(rounds, activeMembers, books);
+        return true;
+    }
+
+    private void replaceInitialPlannedAssignments(
+            List<Round> rounds,
+            List<Member> activeMembers,
+            List<OwnBook> books
+    ) {
+        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
+        List<WheelState> existingStates = wheelStateRepository.findByRoundIdIn(roundIds);
+        boolean hasStartedState = existingStates.stream()
+                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
+        if (hasStartedState) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
+        }
+        if (!existingStates.isEmpty()) {
+            wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
+            wheelStateRepository.flush();
         }
 
-        return true;
+        WheelAssignmentPlan assignmentPlan = planInitialAssignments(rounds, activeMembers, books);
+        wheelReassignmentService.savePlannedAssignments(assignmentPlan, activeMembers, books);
     }
 
     private boolean hasValidExistingRoundShape(List<Round> rounds, int expectedRoundCount) {
@@ -400,8 +476,13 @@ public class GroupScheduleService {
         return true;
     }
 
-    private List<Round> createDefaultRounds(Group group, int roundCount, LocalDate startDate, int readingPeriod) {
-        ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.emptyCalendar();
+    private List<Round> createRounds(
+            Group group,
+            int roundCount,
+            LocalDate startDate,
+            int readingPeriod,
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar
+    ) {
         List<Round> rounds = new ArrayList<>(roundCount);
         LocalDate currentStart = startDate;
 
@@ -424,26 +505,63 @@ public class GroupScheduleService {
         return roundRepository.saveAll(rounds);
     }
 
-    private void shiftRoundsFromStartDate(
-            Group group,
-            List<Round> rounds,
+    private boolean canFitSchedule(
             LocalDate startDate,
-            int readingPeriod
+            LocalDate requestedEndDate,
+            int roundCount,
+            int readingPeriod,
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar
     ) {
-        LocalDate currentStart = startDate;
-
-        for (Round round : rounds) {
-            long roundDays = readingPeriod - 1L;
-            if (round.getEndDate() != null) {
-                roundDays = ChronoUnit.DAYS.between(round.getStartDate(), round.getEndDate());
-            }
-
-            LocalDate endDate = currentStart.plusDays(Math.max(roundDays, 0L));
-            round.updateSchedule(currentStart, endDate);
-            currentStart = endDate.plusDays(1);
+        if (requestedEndDate == null) {
+            return true;
         }
+        if (requestedEndDate.isBefore(startDate)) {
+            return false;
+        }
+        long usableDays = scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                requestedEndDate,
+                excludedCalendar
+        );
+        return usableDays >= (long) roundCount * readingPeriod;
+    }
 
-        group.updateScheduleInfo(startDate, group.getGroupRoundCount());
+    private String serializeExcludedDates(List<LocalDate> excludedDates) {
+        if (excludedDates == null || excludedDates.isEmpty()) {
+            return null;
+        }
+        return excludedDates.stream()
+                .sorted()
+                .map(LocalDate::toString)
+                .collect(Collectors.joining(","));
+    }
+
+    private List<LocalDate> deserializeExcludedDates(String serializedDates) {
+        if (serializedDates == null || serializedDates.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(serializedDates.split(","))
+                .map(LocalDate::parse)
+                .toList();
+    }
+
+    private String serializeExcludedDateRanges(List<ExcludedDateRange> excludedDateRanges) {
+        if (excludedDateRanges == null || excludedDateRanges.isEmpty()) {
+            return null;
+        }
+        return excludedDateRanges.stream()
+                .map(range -> range.startDate() + ":" + range.endDate())
+                .collect(Collectors.joining(","));
+    }
+
+    private List<ExcludedDateRange> deserializeExcludedDateRanges(String serializedRanges) {
+        if (serializedRanges == null || serializedRanges.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(serializedRanges.split(","))
+                .map(serializedRange -> serializedRange.split(":"))
+                .map(parts -> new ExcludedDateRange(LocalDate.parse(parts[0]), LocalDate.parse(parts[1])))
+                .toList();
     }
 
     // 끝난 라운드를 종료시키는 로직
