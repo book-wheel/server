@@ -123,6 +123,7 @@ public enum ErrorCode {
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "해당 리뷰를 찾을 수 없습니다."),
     ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "REVIEW_002", "이미 이 책에 리뷰를 작성했습니다."),
     UNAUTHORIZED_REVIEW(HttpStatus.FORBIDDEN, "REVIEW_003", "책을 읽은 참여자만 리뷰를 작성할 수 있습니다."),
+    REVIEW_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "REVIEW_004", "본인이 작성한 리뷰만 삭제할 수 있습니다."),
 
     //알림 관련 에러
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTI_001", "해당 알림을 찾을 수 없습니다."),

@@ -130,6 +130,20 @@ public class BookService {
         return ReviewLikeResponse.of(review.getReviewId(), isLikedByMe, review.getLikeCount());
     }
 
+    // 리뷰(코멘트) 삭제. 작성자 본인만 삭제할 수 있으며, 연결된 공감(하트)을 먼저 제거한 뒤 리뷰를 삭제한다.
+    @Transactional
+    public void deleteReview(Long reviewId, String userPK) {
+        BookReview review = bookReviewRepository.findById(reviewId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+
+        if (!review.getReviewer().getId().equals(userPK)) {
+            throw new BusinessException(ErrorCode.REVIEW_DELETE_FORBIDDEN);
+        }
+
+        reviewLikeRepository.deleteByReview(review);
+        bookReviewRepository.delete(review);
+    }
+
     // 추천/비추천 등록·변경. 기존 투표가 없으면 등록, 있으면 값 변경(같은 값이면 그대로 유지)한다.
     @Transactional
     public ReviewVoteResponse upsertVote(String isbn, boolean isRecommended, String userPK) {

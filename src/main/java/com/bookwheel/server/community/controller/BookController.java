@@ -182,4 +182,14 @@ public class BookController {
         ReviewLikeResponse response = bookService.toggleReviewLike(reviewId, getUserPK(principal));
         return ApiResponse.success(response);
     }
+
+    @Operation(summary = "리뷰(코멘트) 삭제", description = "작성자 본인이 자신의 리뷰를 삭제합니다. 연결된 공감(하트)도 함께 제거됩니다.")
+    @DeleteMapping("/reviews/{reviewId}")
+    public ApiResponse<Void> deleteReview(
+        @PathVariable("reviewId") Long reviewId,
+        @AuthenticationPrincipal Object principal
+    ) {
+        bookService.deleteReview(reviewId, getUserPK(principal));
+        return ApiResponse.success(null);
+    }
 }
