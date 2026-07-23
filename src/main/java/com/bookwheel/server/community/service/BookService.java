@@ -35,7 +35,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -63,9 +65,7 @@ public class BookService {
 
 
     @Transactional
-    public ReviewDetailResponse createReview(ReviewCreateRequest request, String userPK) {
-        String isbn = request.isbn();
-
+    public ReviewDetailResponse createReview(String isbn, ReviewCreateRequest request, String userPK) {
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
             .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
@@ -88,9 +88,12 @@ public class BookService {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
         }
 
-        // 방금 작성한 리뷰이므로 공감 수는 0, 내 공감 여부는 false
+        // 추천/비추천은 별도 투표에서 파생 (미투표 시 null), 방금 작성한 리뷰이므로 공감 수 0·내 공감 여부 false
+        Boolean isRecommended = bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
+            .map(BookVote::getIsRecommended)
+            .orElse(null);
         String profileImageUrl = getProfileImageUrl(user.getProfileImageKey());
-        return ReviewDetailResponse.of(savedReview, profileImageUrl, false);
+        return ReviewDetailResponse.of(savedReview, profileImageUrl, false, isRecommended);
     }
 
     @Transactional
@@ -233,11 +236,19 @@ public class BookService {
             ? Set.of()
             : Set.copyOf(reviewLikeRepository.findLikedReviewIds(user, reviewIds));
 
+        // 현재 페이지 리뷰 작성자들의 추천/비추천 투표를 한 번의 쿼리로 조회 (리뷰별 조회 N+1 방지)
+        List<String> reviewerIds = reviews.stream().map(review -> review.getReviewer().getId()).distinct().toList();
+        Map<String, Boolean> voteByReviewerId = reviewerIds.isEmpty()
+            ? Map.of()
+            : bookVoteRepository.findByBookInfoAndUserIds(bookInfo, reviewerIds).stream()
+                .collect(Collectors.toMap(vote -> vote.getUser().getId(), BookVote::getIsRecommended));
+
         return reviews.map(review -> {
             boolean isLikedByMe = likedReviewIds.contains(review.getReviewId());
             String profileImageUrl = getProfileImageUrl(review.getReviewer().getProfileImageKey());
+            Boolean isRecommended = voteByReviewerId.get(review.getReviewer().getId());
 
-            return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe);
+            return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe, isRecommended);
         });
     }
 

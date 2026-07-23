@@ -114,14 +114,14 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "리뷰 작성", description = "특정 책에 추천/비추천 여부와 코멘트를 작성하고, 생성된 리뷰 데이터를 반환합니다.")
+    @Operation(summary = "리뷰 작성", description = "특정 책에 코멘트를 작성하고 생성된 리뷰 데이터를 반환합니다. 추천/비추천은 별도 투표 API로 등록하며, 응답의 isRecommended는 작성자의 현재 투표값(미투표 시 null)입니다.")
     @PostMapping("/{isbn}/reviews")
     public ApiResponse<ReviewDetailResponse> addBookReview(
         @PathVariable("isbn") String isbn,
         @Valid @RequestBody ReviewCreateRequest request,
         @AuthenticationPrincipal Object principal
     ) {
-        ReviewDetailResponse response = bookService.createReview(request, getUserPK(principal));
+        ReviewDetailResponse response = bookService.createReview(isbn, request, getUserPK(principal));
         return ApiResponse.success(response);
     }
 

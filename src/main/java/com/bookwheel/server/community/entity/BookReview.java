@@ -42,10 +42,6 @@ public class BookReview {
     @Column(nullable = false, length = 500, columnDefinition = "TEXT")
     private String content;
 
-    // 추천/비추천 (true: 추천, false: 비추천)
-    @Column(name = "is_recommended", nullable = false)
-    private Boolean isRecommended;
-
     @Column(name = "is_hidden", nullable = false)
     private Boolean isHidden;
 
