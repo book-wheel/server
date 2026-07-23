@@ -1,12 +1,16 @@
 package com.bookwheel.server.chat.service;
 
+import com.bookwheel.server.chat.dto.ChatMessageResponse;
 import com.bookwheel.server.chat.dto.ChatRoomReadResponse;
 import com.bookwheel.server.chat.entity.ChatMessage;
+import com.bookwheel.server.chat.entity.ChatMessageType;
 import com.bookwheel.server.chat.entity.ChatRoom;
 import com.bookwheel.server.chat.entity.ChatRoomReadState;
 import com.bookwheel.server.chat.repository.ChatMessageRepository;
 import com.bookwheel.server.chat.repository.ChatRoomReadStateRepository;
 import com.bookwheel.server.chat.repository.ChatRoomRepository;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.repository.GroupRepository;
@@ -19,12 +23,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -56,6 +65,7 @@ class ChatServiceTest {
     private Group group;
     private ChatRoom chatRoom;
     private Member member;
+    private User user;
     private String userPK;
 
     @BeforeEach
@@ -73,7 +83,7 @@ class ChatServiceTest {
                 .groupId(GROUP_ID)
                 .groupName("채팅 모임")
                 .build();
-        User user = User.builder()
+        user = User.builder()
                 .loginId("chat-user")
                 .password("password")
                 .nickname("채팅 사용자")
@@ -92,6 +102,115 @@ class ChatServiceTest {
                 .memberRole(MemberRole.MEMBER)
                 .memberStatus(MemberStatus.ACTIVE)
                 .build();
+    }
+
+    @Test
+    @DisplayName("ACTIVE 멤버가 전송한 텍스트 메시지를 로그인 사용자 작성자로 저장한다")
+    void sendTextMessage_SavesMessageWithAuthenticatedUser() {
+        String content = "안녕하세요!";
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 24, 12, 30);
+        ChatMessage savedMessage = ChatMessage.builder()
+                .chatMessageId(1L)
+                .chatRoom(chatRoom)
+                .sender(user)
+                .messageType(ChatMessageType.TEXT)
+                .content(content)
+                .createdAt(createdAt)
+                .build();
+        givenSendAccess();
+        given(chatMessageRepository.save(any(ChatMessage.class))).willReturn(savedMessage);
+
+        ChatMessageResponse response = chatService.sendTextMessage(GROUP_ID, userPK, content);
+
+        assertThat(response.messageId()).isEqualTo(1L);
+        assertThat(response.sender().userPK()).isEqualTo(userPK);
+        assertThat(response.sender().nickname()).isEqualTo(user.getNickname());
+        assertThat(response.type()).isEqualTo(ChatMessageType.TEXT);
+        assertThat(response.content()).isEqualTo(content);
+        assertThat(response.createdAt()).isEqualTo(createdAt);
+        then(chatMessageRepository).should().save(org.mockito.ArgumentMatchers.argThat(message ->
+                message.getChatRoom() == chatRoom
+                        && message.getSender() == user
+                        && message.getMessageType() == ChatMessageType.TEXT
+                        && content.equals(message.getContent())
+                        && message.getImageKey() == null
+        ));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   ", "\n\t"})
+    @DisplayName("빈 문자열 또는 공백 메시지는 저장하지 않는다")
+    void sendTextMessage_RejectsBlankContent(String content) {
+        assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, content))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        then(chatMessageRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 그룹에는 메시지를 전송할 수 없다")
+    void sendTextMessage_RejectsMissingGroup() {
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, "메시지"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_NOT_FOUND);
+
+        then(chatMessageRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("그룹에 속하지 않은 사용자는 메시지를 전송할 수 없다")
+    void sendTextMessage_RejectsNonMember() {
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, "메시지"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+
+        then(chatMessageRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("비ACTIVE 멤버는 메시지를 전송할 수 없다")
+    void sendTextMessage_RejectsInactiveMember() {
+        Member inactiveMember = Member.builder()
+                .memberId("inactive-member")
+                .group(group)
+                .user(user)
+                .memberRole(MemberRole.OUT)
+                .memberStatus(MemberStatus.EXITED)
+                .build();
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK))
+                .willReturn(Optional.of(inactiveMember));
+
+        assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, "메시지"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+
+        then(chatMessageRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("채팅방이 존재하지 않으면 메시지를 전송할 수 없다")
+    void sendTextMessage_RejectsMissingChatRoom() {
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
+        given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, "메시지"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
+
+        then(chatMessageRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -170,6 +289,12 @@ class ChatServiceTest {
                 requestedMessage.getChatMessageId(),
                 chatRoom
         )).willReturn(Optional.of(requestedMessage));
+    }
+
+    private void givenSendAccess() {
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
+        given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.of(chatRoom));
     }
 
     private ChatMessage message(Long messageId) {
