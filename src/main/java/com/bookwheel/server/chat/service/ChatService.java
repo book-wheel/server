@@ -85,6 +85,26 @@ public class ChatService {
     }
 
     @Transactional
+    public ChatMessageResponse sendTextMessage(String groupId, String userPK, String content) {
+        if (!StringUtils.hasText(content)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        findGroup(groupId);
+        Member member = validateActiveMember(groupId, userPK);
+        ChatRoom chatRoom = findChatRoom(groupId);
+
+        ChatMessage message = ChatMessage.builder()
+                .chatRoom(chatRoom)
+                .sender(member.getUser())
+                .messageType(ChatMessageType.TEXT)
+                .content(content)
+                .build();
+
+        return toMessageResponse(chatMessageRepository.save(message));
+    }
+
+    @Transactional
     public ChatRoomReadResponse updateReadState(String groupId, String userPK, Long lastReadMessageId) {
         // 읽음 상태가 삭제 중인 채팅방에 새로 연결되지 않도록 그룹 행을 먼저 잠근다.
         Group group = findGroupForUpdate(groupId);
@@ -114,8 +134,7 @@ public class ChatService {
     private ChatRoom findAccessibleChatRoom(String groupId, String userPK) {
         findGroup(groupId);
         validateActiveMember(groupId, userPK);
-        return chatRoomRepository.findByGroup_GroupId(groupId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        return findChatRoom(groupId);
     }
 
     private Group findGroup(String groupId) {
@@ -127,6 +146,11 @@ public class ChatService {
     private Group findGroupForUpdate(String groupId) {
         return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
+    private ChatRoom findChatRoom(String groupId) {
+        return chatRoomRepository.findByGroup_GroupId(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
 
     private Member validateActiveMember(String groupId, String userPK) {
