@@ -43,4 +43,14 @@ public class OwnBook {
 
     @Column(name = "note_to_reader", columnDefinition = "TEXT")
     private String noteToReader;
+
+    public void update(
+        Book book,
+        String bookCondition,
+        String noteToReader
+) {
+    this.book = book;
+    this.bookCondition = bookCondition;
+    this.noteToReader = noteToReader;
+}
 }

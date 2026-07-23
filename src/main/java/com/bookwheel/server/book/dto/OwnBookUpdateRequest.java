@@ -9,8 +9,8 @@ import lombok.Builder;
 import java.time.LocalDate;
 
 @Builder
-@Schema(description = "그룹 참여 도서 등록 요청")
-public record OwnBookRegisterRequest(
+@Schema(description = "그룹 참여 도서 수정 요청")
+public record OwnBookUpdateRequest(
         @Schema(description = "도서 ISBN. 필수값입니다.", example = "9791190090018")
         @NotBlank(message = "ISBN을 등록해주세요.")
         @Size(max = 20, message = "ISBN은 20자를 넘어야합니다.")
