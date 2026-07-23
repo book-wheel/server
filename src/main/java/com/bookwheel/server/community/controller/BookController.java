@@ -12,6 +12,8 @@ import com.bookwheel.server.community.dto.ReviewCreateRequest;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewLikeResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
+import com.bookwheel.server.community.dto.ReviewVoteRequest;
+import com.bookwheel.server.community.dto.ReviewVoteResponse;
 import com.bookwheel.server.community.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,7 +26,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -110,14 +114,14 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "리뷰 작성", description = "특정 책에 추천/비추천 여부와 코멘트를 작성하고, 생성된 리뷰 데이터를 반환합니다.")
+    @Operation(summary = "리뷰 작성", description = "특정 책에 코멘트를 작성하고 생성된 리뷰 데이터를 반환합니다. 추천/비추천은 별도 투표 API로 등록하며, 응답의 isRecommended는 작성자의 현재 투표값(미투표 시 null)입니다.")
     @PostMapping("/{isbn}/reviews")
     public ApiResponse<ReviewDetailResponse> addBookReview(
         @PathVariable("isbn") String isbn,
         @Valid @RequestBody ReviewCreateRequest request,
         @AuthenticationPrincipal Object principal
     ) {
-        ReviewDetailResponse response = bookService.createReview(request, getUserPK(principal));
+        ReviewDetailResponse response = bookService.createReview(isbn, request, getUserPK(principal));
         return ApiResponse.success(response);
     }
 
@@ -135,6 +139,27 @@ public class BookController {
         @AuthenticationPrincipal Object principal
     ) {
         Page<ReviewDetailResponse> response = bookService.getReviewList(isbn, sort, page, size, getUserPK(principal));
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "추천/비추천 등록·변경", description = "사용자별 책 한 권당 한 표를 등록하거나 변경합니다. 버튼 클릭 즉시 반영되며 변경 후 통계를 반환합니다.")
+    @PutMapping("/{isbn}/reviews/vote")
+    public ApiResponse<ReviewVoteResponse> vote(
+        @PathVariable("isbn") String isbn,
+        @Valid @RequestBody ReviewVoteRequest request,
+        @AuthenticationPrincipal Object principal
+    ) {
+        ReviewVoteResponse response = bookService.upsertVote(isbn, request.isRecommended(), getUserPK(principal));
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "추천/비추천 취소", description = "현재 사용자의 해당 도서 투표를 취소합니다. 투표가 없어도 성공 처리하며 취소 후 통계를 반환합니다.")
+    @DeleteMapping("/{isbn}/reviews/vote")
+    public ApiResponse<ReviewVoteResponse> cancelVote(
+        @PathVariable("isbn") String isbn,
+        @AuthenticationPrincipal Object principal
+    ) {
+        ReviewVoteResponse response = bookService.cancelVote(isbn, getUserPK(principal));
         return ApiResponse.success(response);
     }
 
@@ -156,5 +181,15 @@ public class BookController {
     ) {
         ReviewLikeResponse response = bookService.toggleReviewLike(reviewId, getUserPK(principal));
         return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "리뷰(코멘트) 삭제", description = "작성자 본인이 자신의 리뷰를 삭제합니다. 연결된 공감(하트)도 함께 제거됩니다.")
+    @DeleteMapping("/reviews/{reviewId}")
+    public ApiResponse<Void> deleteReview(
+        @PathVariable("reviewId") Long reviewId,
+        @AuthenticationPrincipal Object principal
+    ) {
+        bookService.deleteReview(reviewId, getUserPK(principal));
+        return ApiResponse.success(null);
     }
 }
