@@ -11,12 +11,14 @@ import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.BookReview;
+import com.bookwheel.server.community.entity.BookVote;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.ReviewLike;
 import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
+import com.bookwheel.server.community.repository.BookVoteRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.user.entity.User;
@@ -43,6 +45,7 @@ public class BookService {
    private final BookInfoRepository bookInfoRepository;
     private final UserRepository userRepository;
     private final BookReviewRepository bookReviewRepository;
+    private final BookVoteRepository bookVoteRepository;
     private final ReviewLikeRepository reviewLikeRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final BookLikeRepository bookLikeRepository;
@@ -124,37 +127,86 @@ public class BookService {
         return ReviewLikeResponse.of(review.getReviewId(), isLikedByMe, review.getLikeCount());
     }
 
-    public ReviewStatsResponse getReviewStats(String isbn, String userPK) {
+    // 추천/비추천 등록·변경. 기존 투표가 없으면 등록, 있으면 값 변경(같은 값이면 그대로 유지)한다.
+    @Transactional
+    public ReviewVoteResponse upsertVote(String isbn, boolean isRecommended, String userPK) {
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
+        User user = userRepository.findById(userPK)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
+            .ifPresentOrElse(
+                vote -> vote.changeVote(isRecommended),
+                () -> {
+                    try {
+                        bookVoteRepository.save(BookVote.create(bookInfo, user, isRecommended));
+                    } catch (DataIntegrityViolationException e) {
+                        // 조회와 save 사이 동시 요청으로 (book_info_id, user_id) 유니크 제약을 위반한 경우 -> 기존 투표 변경
+                        bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
+                            .ifPresent(vote -> vote.changeVote(isRecommended));
+                    }
+                }
+            );
+
+        return buildVoteResponse(bookInfo, userPK);
+    }
+
+    // 추천/비추천 취소. 투표가 없어도 오류 없이 성공 처리한다.
+    @Transactional
+    public ReviewVoteResponse cancelVote(String isbn, String userPK) {
+        if (!userRepository.existsById(userPK)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
+        if (bookInfo == null) {
+            return new ReviewVoteResponse(isbn, 0, 0, null);
+        }
+
+        bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
+            .ifPresent(bookVoteRepository::delete);
+
+        return buildVoteResponse(bookInfo, userPK);
+    }
+
+    public ReviewStatsResponse getReviewStats(String isbn, String userPK) {
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn).orElse(null);
 
         if (bookInfo == null) {
             return new ReviewStatsResponse(0, 0, null);
         }
 
+        ReviewVoteResponse stats = buildVoteResponse(bookInfo, userPK);
+        return new ReviewStatsResponse(stats.recommendedRatio(), stats.notRecommendedRatio(), stats.myVote());
+    }
+
+    // 해당 도서의 추천/비추천 비율과 로그인 사용자의 선택값(myVote)을 계산한다.
+    private ReviewVoteResponse buildVoteResponse(BookInfo bookInfo, String userPK) {
         VoteType myVote = resolveMyVote(bookInfo, userPK);
 
-        long recommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, true);
-        long notRecommendedCount = bookReviewRepository.countByBookInfoAndIsRecommended(bookInfo, false);
+        long recommendedCount = bookVoteRepository.countByBookInfoAndIsRecommended(bookInfo, true);
+        long notRecommendedCount = bookVoteRepository.countByBookInfoAndIsRecommended(bookInfo, false);
         long totalCount = recommendedCount + notRecommendedCount;
 
         if (totalCount == 0) {
-            return new ReviewStatsResponse(0, 0, myVote); // 리뷰가 없을 때
+            return new ReviewVoteResponse(bookInfo.getIsbn(), 0, 0, myVote); // 투표가 없을 때
         }
 
         int recommendedRatio = (int) ((recommendedCount * 100) / totalCount);
         int notRecommendedRatio = 100 - recommendedRatio;
 
-        return new ReviewStatsResponse(recommendedRatio, notRecommendedRatio, myVote);
+        return new ReviewVoteResponse(bookInfo.getIsbn(), recommendedRatio, notRecommendedRatio, myVote);
     }
 
-    // 로그인 사용자가 해당 도서에 작성한 리뷰의 추천 여부를 myVote로 변환한다. (비로그인/미작성 시 null)
+    // 로그인 사용자가 해당 도서에 투표한 추천 여부를 myVote로 변환한다. (비로그인/미투표 시 null)
     private VoteType resolveMyVote(BookInfo bookInfo, String userPK) {
         if (userPK == null) {
             return null;
         }
-        return bookReviewRepository.findByBookInfoAndReviewer_Id(bookInfo, userPK)
-            .map(review -> VoteType.fromRecommended(review.getIsRecommended()))
+        return bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
+            .map(vote -> VoteType.fromRecommended(vote.getIsRecommended()))
             .orElse(null);
     }
 
