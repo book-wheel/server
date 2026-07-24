@@ -85,6 +85,29 @@ public class ChatService {
     }
 
     @Transactional
+    public ChatMessageResponse sendTextMessage(String groupId, String userPK, String content) {
+        boolean invalidContent = !StringUtils.hasText(content)
+                || content.length() > ChatMessageSendRequest.MAX_CONTENT_LENGTH;
+        if (invalidContent) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // 그룹 삭제·강퇴·하차와 전송을 직렬화해 검증 이후 채팅방이나 ACTIVE 멤버가 사라지는 것을 막는다.
+        findGroupForUpdate(groupId);
+        Member member = validateActiveMember(groupId, userPK);
+        ChatRoom chatRoom = findChatRoom(groupId);
+
+        ChatMessage message = ChatMessage.builder()
+                .chatRoom(chatRoom)
+                .sender(member.getUser())
+                .messageType(ChatMessageType.TEXT)
+                .content(content)
+                .build();
+
+        return toMessageResponse(chatMessageRepository.save(message));
+    }
+
+    @Transactional
     public ChatRoomReadResponse updateReadState(String groupId, String userPK, Long lastReadMessageId) {
         // 읽음 상태가 삭제 중인 채팅방에 새로 연결되지 않도록 그룹 행을 먼저 잠근다.
         Group group = findGroupForUpdate(groupId);
@@ -114,8 +137,7 @@ public class ChatService {
     private ChatRoom findAccessibleChatRoom(String groupId, String userPK) {
         findGroup(groupId);
         validateActiveMember(groupId, userPK);
-        return chatRoomRepository.findByGroup_GroupId(groupId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        return findChatRoom(groupId);
     }
 
     private Group findGroup(String groupId) {
@@ -123,10 +145,15 @@ public class ChatService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    // 읽음 상태를 저장할 때 삭제 중인 그룹을 다시 사용하지 않도록 잠긴 행을 조회한다.
+    // 채팅 데이터를 변경할 때 삭제·멤버 변경과 같은 그룹 행 잠금을 사용한다.
     private Group findGroupForUpdate(String groupId) {
         return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+    }
+
+    private ChatRoom findChatRoom(String groupId) {
+        return chatRoomRepository.findByGroup_GroupId(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
 
     private Member validateActiveMember(String groupId, String userPK) {
