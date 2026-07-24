@@ -86,11 +86,14 @@ public class ChatService {
 
     @Transactional
     public ChatMessageResponse sendTextMessage(String groupId, String userPK, String content) {
-        if (!StringUtils.hasText(content)) {
+        boolean invalidContent = !StringUtils.hasText(content)
+                || content.length() > ChatMessageSendRequest.MAX_CONTENT_LENGTH;
+        if (invalidContent) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        findGroup(groupId);
+        // 그룹 삭제·강퇴·하차와 전송을 직렬화해 검증 이후 채팅방이나 ACTIVE 멤버가 사라지는 것을 막는다.
+        findGroupForUpdate(groupId);
         Member member = validateActiveMember(groupId, userPK);
         ChatRoom chatRoom = findChatRoom(groupId);
 
@@ -142,7 +145,7 @@ public class ChatService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
-    // 읽음 상태를 저장할 때 삭제 중인 그룹을 다시 사용하지 않도록 잠긴 행을 조회한다.
+    // 채팅 데이터를 변경할 때 삭제·멤버 변경과 같은 그룹 행 잠금을 사용한다.
     private Group findGroupForUpdate(String groupId) {
         return groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));

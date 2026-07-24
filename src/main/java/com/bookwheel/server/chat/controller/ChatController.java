@@ -47,7 +47,10 @@ public class ChatController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "채팅 텍스트 메시지 전송", description = "ACTIVE 멤버가 그룹 채팅방에 텍스트 메시지를 전송합니다.")
+    @Operation(
+            summary = "채팅 텍스트 메시지 전송",
+            description = "ACTIVE 멤버가 그룹 채팅방에 최대 1000자의 텍스트 메시지를 전송합니다."
+    )
     @PostMapping("/messages")
     public ApiResponse<ChatMessageResponse> sendTextMessage(
             @PathVariable String groupId,

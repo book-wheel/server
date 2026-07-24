@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+import static com.bookwheel.server.chat.dto.ChatMessageSendRequest.MAX_CONTENT_LENGTH;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -83,6 +84,23 @@ class ChatControllerTest {
     @WithMockUser(username = USER_PK)
     @DisplayName("빈 문자열 또는 공백 메시지 전송 요청은 거부한다")
     void sendTextMessage_RejectsBlankContent(String content) throws Exception {
+        mockMvc.perform(post("/api/v1/groups/{groupId}/chat-room/messages", GROUP_ID)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("content", content))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+
+        then(chatService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @WithMockUser(username = USER_PK)
+    @DisplayName("최대 길이를 초과한 메시지 전송 요청은 거부한다")
+    void sendTextMessage_RejectsContentOverMaxLength() throws Exception {
+        String content = "a".repeat(MAX_CONTENT_LENGTH + 1);
+
         mockMvc.perform(post("/api/v1/groups/{groupId}/chat-room/messages", GROUP_ID)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

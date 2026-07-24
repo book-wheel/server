@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import static com.bookwheel.server.chat.dto.ChatMessageSendRequest.MAX_CONTENT_LENGTH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -150,9 +151,25 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("최대 길이를 초과한 메시지는 저장하지 않는다")
+    void sendTextMessage_RejectsContentOverMaxLength() {
+        String content = "a".repeat(MAX_CONTENT_LENGTH + 1);
+
+        assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, content))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        then(groupRepository).shouldHaveNoInteractions();
+        then(memberRepository).shouldHaveNoInteractions();
+        then(chatRoomRepository).shouldHaveNoInteractions();
+        then(chatMessageRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
     @DisplayName("존재하지 않는 그룹에는 메시지를 전송할 수 없다")
     void sendTextMessage_RejectsMissingGroup() {
-        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.empty());
+        given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, "메시지"))
                 .isInstanceOf(BusinessException.class)
@@ -165,7 +182,7 @@ class ChatServiceTest {
     @Test
     @DisplayName("그룹에 속하지 않은 사용자는 메시지를 전송할 수 없다")
     void sendTextMessage_RejectsNonMember() {
-        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.of(group));
         given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.sendTextMessage(GROUP_ID, userPK, "메시지"))
@@ -186,7 +203,7 @@ class ChatServiceTest {
                 .memberRole(MemberRole.OUT)
                 .memberStatus(MemberStatus.EXITED)
                 .build();
-        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.of(group));
         given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK))
                 .willReturn(Optional.of(inactiveMember));
 
@@ -201,7 +218,7 @@ class ChatServiceTest {
     @Test
     @DisplayName("채팅방이 존재하지 않으면 메시지를 전송할 수 없다")
     void sendTextMessage_RejectsMissingChatRoom() {
-        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.of(group));
         given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
         given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.empty());
 
@@ -292,7 +309,7 @@ class ChatServiceTest {
     }
 
     private void givenSendAccess() {
-        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.of(group));
         given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
         given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.of(chatRoom));
     }
