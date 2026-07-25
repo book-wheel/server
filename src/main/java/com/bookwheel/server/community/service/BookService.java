@@ -251,10 +251,10 @@ public class BookService {
             : Set.copyOf(reviewLikeRepository.findLikedReviewIds(user, reviewIds));
 
         // 현재 페이지 리뷰 작성자들의 추천/비추천 투표를 한 번의 쿼리로 조회 (리뷰별 조회 N+1 방지)
-        List<String> reviewerIds = reviews.stream().map(review -> review.getReviewer().getId()).distinct().toList();
-        Map<String, Boolean> voteByReviewerId = reviewerIds.isEmpty()
+        List<String> reviewerPKs = reviews.stream().map(review -> review.getReviewer().getId()).distinct().toList();
+        Map<String, Boolean> voteByReviewerId = reviewerPKs.isEmpty()
             ? Map.of()
-            : bookVoteRepository.findByBookInfoAndUserIds(bookInfo, reviewerIds).stream()
+            : bookVoteRepository.findByBookInfoAndUserPKs(bookInfo, reviewerPKs).stream()
                 .collect(Collectors.toMap(vote -> vote.getUser().getId(), BookVote::getIsRecommended));
 
         return reviews.map(review -> {

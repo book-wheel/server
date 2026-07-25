@@ -15,6 +15,6 @@ public interface BookVoteRepository extends JpaRepository<BookVote, Long> {
     long countByBookInfoAndIsRecommended(BookInfo bookInfo, boolean isRecommended);
 
     // 주어진 사용자 목록의 해당 도서 투표를 한 번에 조회한다. (리뷰 목록 매핑 시 투표별 조회 N+1 방지)
-    @Query("select v from BookVote v where v.bookInfo = :bookInfo and v.user.id in :userIds")
-    List<BookVote> findByBookInfoAndUserIds(@Param("bookInfo") BookInfo bookInfo, @Param("userIds") List<String> userIds);
+    @Query("select v from BookVote v where v.bookInfo = :bookInfo and v.user.id in :userPKs")
+    List<BookVote> findByBookInfoAndUserPKs(@Param("bookInfo") BookInfo bookInfo, @Param("userPKs") List<String> userPKs);
 }
