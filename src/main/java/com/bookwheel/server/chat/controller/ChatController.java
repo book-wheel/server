@@ -1,6 +1,8 @@
 package com.bookwheel.server.chat.controller;
 
 import com.bookwheel.server.chat.dto.ChatMessageListResponse;
+import com.bookwheel.server.chat.dto.ChatMessageResponse;
+import com.bookwheel.server.chat.dto.ChatMessageSendRequest;
 import com.bookwheel.server.chat.dto.ChatRoomReadRequest;
 import com.bookwheel.server.chat.dto.ChatRoomReadResponse;
 import com.bookwheel.server.chat.dto.ChatRoomResponse;
@@ -42,6 +44,24 @@ public class ChatController {
             @AuthenticationPrincipal Object principal
     ) {
         ChatMessageListResponse response = chatService.getMessages(groupId, getUserPK(principal), cursor, size);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(
+            summary = "채팅 텍스트 메시지 전송",
+            description = "ACTIVE 멤버가 그룹 채팅방에 최대 1000자의 텍스트 메시지를 전송합니다."
+    )
+    @PostMapping("/messages")
+    public ApiResponse<ChatMessageResponse> sendTextMessage(
+            @PathVariable String groupId,
+            @Valid @RequestBody ChatMessageSendRequest request,
+            @AuthenticationPrincipal Object principal
+    ) {
+        ChatMessageResponse response = chatService.sendTextMessage(
+                groupId,
+                getUserPK(principal),
+                request.content()
+        );
         return ApiResponse.success(response);
     }
 
