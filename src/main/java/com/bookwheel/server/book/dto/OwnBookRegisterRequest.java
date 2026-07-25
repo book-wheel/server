@@ -13,7 +13,7 @@ import java.time.LocalDate;
 public record OwnBookRegisterRequest(
         @Schema(description = "도서 ISBN. 필수값입니다.", example = "9791190090018")
         @NotBlank(message = "ISBN을 등록해주세요.")
-        @Size(max = 20, message = "ISBN은 20자를 넘어야합니다.")
+        @Size(max = 20, message = "ISBN은 20자를 초과할 수 없습니다.")
         String isbn,
 
         @Schema(description = "도서 제목. 필수값입니다.", example = "채식주의자")
