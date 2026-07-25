@@ -150,22 +150,13 @@ public class BookService {
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
             .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
-        User user = userRepository.findById(userPK)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!userRepository.existsById(userPK)) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
 
-        bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
-            .ifPresentOrElse(
-                vote -> vote.changeVote(isRecommended),
-                () -> {
-                    try {
-                        bookVoteRepository.save(BookVote.create(bookInfo, user, isRecommended));
-                    } catch (DataIntegrityViolationException e) {
-                        // 조회와 save 사이 동시 요청으로 (book_info_id, user_id) 유니크 제약을 위반한 경우 -> 기존 투표 변경
-                        bookVoteRepository.findByBookInfoAndUser_Id(bookInfo, userPK)
-                            .ifPresent(vote -> vote.changeVote(isRecommended));
-                    }
-                }
-            );
+        // 조회 후 save 방식은 동시 요청 시 유니크 제약 위반으로 트랜잭션이 rollback-only가 될 수 있어,
+        // 등록·변경을 단일 원자적 쿼리(MySQL upsert)로 처리해 경합을 DB에서 해소한다.
+        bookVoteRepository.upsertVote(bookInfo.getBookInfoId(), userPK, isRecommended);
 
         return buildVoteResponse(bookInfo, userPK);
     }
