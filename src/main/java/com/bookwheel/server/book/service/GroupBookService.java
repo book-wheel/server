@@ -113,6 +113,36 @@ public class GroupBookService {
 
     @Transactional
     public OwnBookUpdateResponse updateOwnBook(String groupId, String ownBookId, OwnBookUpdateRequest request, String userPK) {
+        OwnBook ownBook = findMutableOwnBook(groupId, ownBookId, userPK);
+
+        // ISBN이 기존 도서와 달라졌는지 확인
+        boolean isbnChanged = !ownBook.getBook().getIsbn().equals(request.isbn());
+
+        // 변경할 도서가 그룹에 이미 등록되어 있는지 확인
+        if (isbnChanged && ownBookRepository.existsByGroup_GroupIdAndBook_Isbn(groupId, request.isbn())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_BOOK_ISBN);
+        }
+
+        // 변경할 Book 조회 또는 생성
+        Book book = findOrCreateBook(request);
+
+        // 기존 OwnBook의 내용 변경
+        ownBook.update(
+                book,
+                request.bookCondition(),
+                request.noteToReader()
+        );
+
+        return OwnBookUpdateResponse.of(ownBook.getOwnBookId());
+    }
+
+    @Transactional
+    public void deleteOwnBook(String groupId, String ownBookId, String userPK) {
+        OwnBook ownBook = findMutableOwnBook(groupId, ownBookId, userPK);
+        ownBookRepository.delete(ownBook);
+    }
+
+    private OwnBook findMutableOwnBook(String groupId, String ownBookId, String userPK) {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
         Member member = findMember(groupId, userPK);
@@ -136,24 +166,6 @@ public class GroupBookService {
             throw new BusinessException(ErrorCode.BOOK_NOT_FOUND);
         }
 
-        // ISBN이 기존 도서와 달라졌는지 확인
-        boolean isbnChanged = !ownBook.getBook().getIsbn().equals(request.isbn());
-
-        // 변경할 도서가 그룹에 이미 등록되어 있는지 확인
-        if (isbnChanged && ownBookRepository.existsByGroup_GroupIdAndBook_Isbn(groupId, request.isbn())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_BOOK_ISBN);
-        }
-
-        // 변경할 Book 조회 또는 생성
-        Book book = findOrCreateBook(request);
-
-        // 기존 OwnBook의 내용 변경
-        ownBook.update(
-                book,
-                request.bookCondition(),
-                request.noteToReader()
-        );
-
-        return OwnBookUpdateResponse.of(ownBook.getOwnBookId());
+        return ownBook;
     }
 }
