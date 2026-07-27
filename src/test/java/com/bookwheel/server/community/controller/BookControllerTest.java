@@ -91,13 +91,11 @@ class BookControllerTest {
     @DisplayName("Community Comment: create review returns created review")
     void addBookReview_Success() throws Exception {
         String isbn = "9788966263158";
-        given(bookService.createReview(any(), any())).willReturn(sampleReview(isbn));
+        given(bookService.createReview(any(), any(), any())).willReturn(sampleReview(isbn));
 
         String body = """
                 {
-                  "isbn": "9788966263158",
                   "comment": "Great read",
-                  "isRecommended": true,
                   "isHidden": false
                 }
                 """;
