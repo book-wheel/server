@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,5 +65,24 @@ public class GroupBookController {
         );
         
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+        summary = "참여 도서 삭제",
+        description = "그룹에 등록한 본인의 참여 도서를 삭제합니다. 모집 중인 그룹에서만 가능합니다."
+    )
+    @DeleteMapping("/{groupId}/books/{ownBookId}")
+    public ResponseEntity<ApiResponse<Void>> deleteOwnBook(
+        @PathVariable String groupId,
+        @PathVariable String ownBookId,
+        @AuthenticationPrincipal Object principal
+    ) {
+        groupBookService.deleteOwnBook(
+            groupId,
+            ownBookId,
+            getUserPK(principal)
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }
