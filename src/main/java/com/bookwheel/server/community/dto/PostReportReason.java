@@ -1,8 +1,10 @@
 package com.bookwheel.server.community.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+@Schema(description = "게시물 신고 사유")
 @Getter
 @RequiredArgsConstructor
 public enum PostReportReason {

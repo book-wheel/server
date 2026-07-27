@@ -19,8 +19,8 @@ public record ReviewDetailResponse(
     @Schema(description = "리뷰어 프로필 이미지 URL (없으면 null)", nullable = true)
     String profileImageUrl,
 
-    @Schema(description = "추천 여부 (true: 추천, false: 비추천)", example = "true")
-    boolean isRecommended,
+    @Schema(description = "리뷰어의 추천 여부 (true: 추천, false: 비추천, null: 미투표)", example = "true", nullable = true)
+    Boolean isRecommended,
 
     @Schema(description = "리뷰 내용", example = "리뷰 내용")
     String comment,
@@ -37,13 +37,13 @@ public record ReviewDetailResponse(
     @Schema(description = "작성 일시")
     LocalDateTime createdAt
 ) {
-    public static ReviewDetailResponse of(BookReview review, String profileImageUrl, boolean isLikedByMe) {
+    public static ReviewDetailResponse of(BookReview review, String profileImageUrl, boolean isLikedByMe, Boolean isRecommended) {
         return new ReviewDetailResponse(
             review.getReviewId(),
             review.getBookInfo().getIsbn(),
             review.getReviewer().getNickname(),
             profileImageUrl,
-            review.getIsRecommended(),
+            isRecommended,
             review.getContent(),
             review.getIsHidden(),
             review.getLikeCount(),
