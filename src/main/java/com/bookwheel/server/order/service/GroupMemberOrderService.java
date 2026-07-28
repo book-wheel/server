@@ -3,6 +3,7 @@ package com.bookwheel.server.order.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
@@ -11,6 +12,7 @@ import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.order.dto.MemberReadOrderRequest;
 import com.bookwheel.server.order.dto.MemberReadOrderResponse;
 import com.bookwheel.server.order.event.ReadOrderAssignedEvent;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class GroupMemberOrderService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     @Transactional
     public List<MemberReadOrderResponse> assignReadOrder(
@@ -45,6 +48,10 @@ public class GroupMemberOrderService {
         // 읽기 순서 저장과 모임 삭제가 같은 그룹의 자식 행을 동시에 변경하지 않도록 직렬화한다.
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
+        // 시작 후에는 이미 확정된 책바퀴와 멤버 순서가 달라지지 않도록 모집 중에만 변경한다.
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
         validateManagerPermission(groupId, userPK);
         validateRequestShape(request);
 
@@ -59,6 +66,7 @@ public class GroupMemberOrderService {
         }
 
         memberRepository.saveAll(activeMembers);
+        recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
 
         eventPublisher.publishEvent(new ReadOrderAssignedEvent(
                 group.getGroupId(),

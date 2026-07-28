@@ -65,6 +65,9 @@ public class Group {
     @Column(name = "group_round_count")
     private int groupRoundCount = 1;
 
+    @Column(name = "target_member_count")
+    private Integer targetMemberCount;
+
     // enum 스키마 갱신 대상임을 명확히 해 소프트 삭제 상태를 저장할 수 있게 한다.
     @Column(name = "group_state", length = 20)
     @Enumerated(EnumType.STRING)
@@ -80,6 +83,25 @@ public class Group {
         this.groupRoundCount = groupRoundCount;
     }
 
+    public void updateSchedulePlan(LocalDate startDate, int groupRoundCount, int targetMemberCount) {
+        this.startDate = startDate;
+        this.groupRoundCount = groupRoundCount;
+        this.targetMemberCount = targetMemberCount;
+    }
+
+    // 시작 시점의 실제 ACTIVE 인원으로 실행 가능한 라운드 수를 확정한다.
+    // 목표 인원 기준으로 만든 나머지 Round 행은 일정 틀로 보존하고 완료 판단에서는 제외한다.
+    public void confirmExecutableRoundCount(int executableRoundCount) {
+        this.groupRoundCount = executableRoundCount;
+    }
+
+    // target_member_count 도입 전 생성된 일정은 기존 라운드 수로 목표 인원을 복원한다.
+    public void initializeTargetMemberCount(int targetMemberCount) {
+        if (this.targetMemberCount == null) {
+            this.targetMemberCount = targetMemberCount;
+        }
+    }
+
     public void updateScheduleConstraints(
             LocalDate scheduleEndDate,
             String scheduleExcludedDates,
@@ -88,12 +110,6 @@ public class Group {
         this.scheduleEndDate = scheduleEndDate;
         this.scheduleExcludedDates = scheduleExcludedDates;
         this.scheduleExcludedDateRanges = scheduleExcludedDateRanges;
-    }
-
-    // 멤버 구성이 바뀌면 라운드 계획만 무효화한다.
-    // 예정 시작일은 유지해야 시작일에 스케줄러가 일정을 자동 생성할 수 있다.
-    public void invalidateSchedule() {
-        this.groupRoundCount = 0;
     }
 
     public void updateGroupPassword(String groupPassword) {

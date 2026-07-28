@@ -18,6 +18,9 @@ public record GroupScheduleAssignmentResponse(
         @Schema(description = "라운드 종료일", example = "2026-07-15")
         LocalDate endDate,
 
+        @Schema(description = "현재 모집·진행 상태에서 실제 실행 대상으로 확정된 라운드인지 여부")
+        boolean executable,
+
         @Schema(description = "저장된 책바퀴 상태 ID", example = "wheel-uuid-111", nullable = true)
         String wheelStateId,
 
@@ -39,23 +42,35 @@ public record GroupScheduleAssignmentResponse(
     public static GroupScheduleAssignmentResponse withoutAssignment(
             int roundNumber,
             LocalDate startDate,
-            LocalDate endDate
+            LocalDate endDate,
+            boolean executable
     ) {
         return new GroupScheduleAssignmentResponse(
-                roundNumber, startDate, endDate,
+                roundNumber, startDate, endDate, executable,
                 null, null, null, null, null, null
         );
     }
 
-    public static GroupScheduleAssignmentResponse of(Round round, WheelState wheelState, String senderNickname) {
+    public static GroupScheduleAssignmentResponse of(
+            Round round,
+            WheelState wheelState,
+            String senderNickname,
+            boolean executable
+    ) {
         if (wheelState == null) {
-            return withoutAssignment(round.getRoundNumber(), round.getStartDate(), round.getEndDate());
+            return withoutAssignment(
+                    round.getRoundNumber(),
+                    round.getStartDate(),
+                    round.getEndDate(),
+                    executable
+            );
         }
 
         return new GroupScheduleAssignmentResponse(
                 round.getRoundNumber(),
                 round.getStartDate(),
                 round.getEndDate(),
+                executable,
                 wheelState.getWheelStateId(),
                 wheelState.getWheelState(),
                 wheelState.getOwnBook().getBook().getBookId(),

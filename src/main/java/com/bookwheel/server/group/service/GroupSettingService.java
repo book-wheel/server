@@ -25,6 +25,7 @@ import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.dto.WheelAssignmentPlan;
 import com.bookwheel.server.wheel.enums.WheelStatus;
@@ -64,6 +65,7 @@ public class GroupSettingService {
     private final NotificationService notificationService;
     private final S3Service s3Service;
     private final WheelReassignmentService wheelReassignmentService;
+    private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
     private final GroupMemberPermissionValidator memberPermissionValidator;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
@@ -313,6 +315,9 @@ public class GroupSettingService {
         if (request.maxMembers() < activeMemberCount) {
             throw new BusinessException(ErrorCode.GROUP_MAX_MEMBERS_BELOW_CURRENT_MEMBERS);
         }
+        if (group.getTargetMemberCount() != null && request.maxMembers() < group.getTargetMemberCount()) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
+        }
     }
 
     private String resolveGroupPassword(GroupUpdateRequest request) {
@@ -430,11 +435,9 @@ public class GroupSettingService {
                     return () -> deleteFutureRoundsForManualRegeneration(group);
                 }
             }
-            // 모집 중에 바뀐 멤버 구성은 다음 일정 생성 시점에 다시 반영한다.
             case RECRUITING -> {
-                invalidateGeneratedScheduleIfPresent(group);
-                return () -> {
-                };
+                // 라운드는 고정하고 상태 변경이 반영된 뒤 PLANNED 배정만 다시 판단한다.
+                return () -> recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
             }
             case COMPLETE -> {
                 return () -> {
@@ -474,26 +477,6 @@ public class GroupSettingService {
         return round.getStartDate() != null && round.getStartDate().isAfter(today);
     }
 
-    private void invalidateGeneratedScheduleIfPresent(Group group) {
-        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
-        if (rounds.isEmpty()) {
-            return;
-        }
-
-        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
-        List<WheelState> wheelStates = wheelStateRepository.findByRoundIdIn(roundIds);
-        boolean hasStartedWheelState = wheelStates.stream()
-                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
-        if (hasStartedWheelState) {
-            // 이미 생성된 진행 기록은 모집 일정 무효화로 지우지 않는다.
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
-        }
-
-        wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
-        roundRepository.deleteByGroup_GroupId(group.getGroupId());
-        group.invalidateSchedule();
-    }
-
     private Member findActiveMember(List<Member> activeMembers, String userPK) {
         return activeMembers.stream()
                 .filter(member -> member.getUser().getId().equals(userPK))
@@ -526,7 +509,11 @@ public class GroupSettingService {
 
     private void validateCurrentRoundCompletion(String groupId, Member member) {
         // 재배정 로직과 같은 Clock을 사용해 날짜 경계에서 현재 라운드 기준이 달라지는 일을 막는다.
-        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
+        Round currentRound = roundRepository.findCurrentRound(
+                        groupId,
+                        LocalDate.now(clock),
+                        State.IN_PROGRESS
+                )
                 .orElse(null);
 
         if (currentRound != null) {
