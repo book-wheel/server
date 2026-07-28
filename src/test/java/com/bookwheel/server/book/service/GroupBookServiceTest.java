@@ -13,6 +13,7 @@ import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,9 @@ class GroupBookServiceTest {
 
     @Mock
     private OwnBookRepository ownBookRepository;
+
+    @Mock
+    private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     @InjectMocks
     private GroupBookService groupBookService;

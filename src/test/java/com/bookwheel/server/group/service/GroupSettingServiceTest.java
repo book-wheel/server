@@ -25,6 +25,7 @@ import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.notification.service.NotificationService;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.wheel.service.WheelReassignmentService;
 import org.junit.jupiter.api.DisplayName;
@@ -97,6 +98,9 @@ class GroupSettingServiceTest {
 
     @Mock
     private WheelReassignmentService wheelReassignmentService;
+
+    @Mock
+    private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     @Mock
     private GroupMemberPermissionValidator memberPermissionValidator;
