@@ -7,6 +7,7 @@ import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.service.GroupScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +33,13 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "내 독서 일정 조회",
-            description = "저장된 일정 설정과 상태, 라운드별 날짜 및 내 책 배정을 조회합니다. 일정만 설정된 경우에도 설정값과 CONFIGURED 상태를 반환하며, 예정일을 놓치면 RESCHEDULE_REQUIRED를 반환합니다."
+            description = "저장된 전체 날짜 틀과 현재 ACTIVE 멤버 기준 실행 범위, READY 차단 사유 및 내 책 배정을 조회합니다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "일정 조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "모임 없음 또는 삭제된 모임 (GROUP_004, GROUP_049)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "ACTIVE 멤버가 아님 (GROUP_011)")
+    })
     @GetMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<GroupScheduleResponse>> getSchedule(
             @PathVariable String groupId,
@@ -48,8 +54,15 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "독서 일정 생성",
-            description = "모집 중(RECRUITING)인 모임의 일정 설정과 라운드 날짜를 저장하고 전체 설정 상태를 반환합니다. 멤버가 1명이면 CONFIGURED, 라운드 날짜까지 생성되면 READY 상태입니다. 예정 시작일 당일에 조건을 충족하면 최종 멤버와 도서로 책바퀴를 자동 생성합니다. 당일에 조건을 충족하지 못하면 리더가 새로운 미래 시작일을 설정해야 합니다."
+            description = "모집 중(RECRUITING)인 모임에 목표 인원 기준 라운드 날짜 틀을 저장합니다. " +
+                    "현재 인원이나 도서 등록 여부와 관계없이 전체 틀은 생성합니다. ACTIVE 멤버가 2명 이상이고 " +
+                    "전원이 책을 등록해 현재 인원 기준 N-1개 라운드 배정이 준비되면 목표 인원을 다 채우지 않아도 READY를 반환합니다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "일정 생성 또는 기존 모집 일정 교체 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·날짜·목표 인원·종료 제한·시작 당일 교체 오류 (GROUP_018, GROUP_019, GROUP_035, GROUP_048, GROUP_050, GROUP_052)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "리더 권한 없음 (GROUP_007)")
+    })
     @PostMapping("/{groupId}/schedule")
     public ResponseEntity<ApiResponse<GroupScheduleResponse>> createSchedule(
             @PathVariable String groupId,

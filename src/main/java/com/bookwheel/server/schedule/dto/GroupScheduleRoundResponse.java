@@ -6,7 +6,7 @@ import lombok.Builder;
 import java.time.LocalDate;
 
 @Builder
-@Schema(description = "생성된 라운드 일정. 멤버가 1명이면 일정 설정만 저장되고 빈 목록을 반환합니다.")
+@Schema(description = "목표 인원 기준으로 생성된 라운드 일정")
 public record GroupScheduleRoundResponse(
         @Schema(description = "라운드 번호", example = "1")
         int roundNumber,
@@ -17,6 +17,7 @@ public record GroupScheduleRoundResponse(
         @Schema(description = "라운드 종료일", example = "2026-06-27")
         LocalDate endDate
 ) {
+    // 서비스에서 계산한 날짜 값을 응답 전용 객체로 변환한다.
     public static GroupScheduleRoundResponse of(int roundNumber, LocalDate startDate, LocalDate endDate) {
         return GroupScheduleRoundResponse.builder()
                 .roundNumber(roundNumber)
