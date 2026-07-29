@@ -5,9 +5,11 @@ import com.bookwheel.server.chat.entity.ChatMessage;
 import com.bookwheel.server.chat.entity.ChatMessageType;
 import com.bookwheel.server.chat.entity.ChatRoom;
 import com.bookwheel.server.chat.entity.ChatRoomReadState;
+import com.bookwheel.server.chat.image.ChatImagePolicy;
 import com.bookwheel.server.chat.repository.ChatMessageRepository;
 import com.bookwheel.server.chat.repository.ChatRoomReadStateRepository;
 import com.bookwheel.server.chat.repository.ChatRoomRepository;
+import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
@@ -22,9 +24,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -85,6 +90,39 @@ public class ChatService {
     }
 
     @Transactional
+    public ChatImagePresignedUrlResponse createImagePresignedUrl(
+            String groupId,
+            String userPK,
+            ChatImagePresignedUrlRequest request
+    ) {
+        ChatImagePolicy.ValidatedImage validatedImage = ChatImagePolicy.validateUploadRequest(
+                request.fileName(),
+                request.contentType(),
+                request.fileSize()
+        );
+
+        findGroupForUpdate(groupId);
+        validateActiveMember(groupId, userPK);
+        ChatRoom chatRoom = findChatRoom(groupId);
+
+        String objectKey = "chat-temp/"
+                + chatRoom.getChatRoomId() + "/"
+                + userPK + "/"
+                + UUID.randomUUID() + "."
+                + validatedImage.extension();
+        String presignedUrl = s3Service.getPresignedPutUrl(
+                objectKey,
+                validatedImage.contentType(),
+                request.fileSize()
+        );
+
+        return ChatImagePresignedUrlResponse.builder()
+                .presignedUrl(presignedUrl)
+                .objectKey(objectKey)
+                .build();
+    }
+
+    @Transactional
     public ChatMessageResponse sendTextMessage(String groupId, String userPK, String content) {
         boolean invalidContent = !StringUtils.hasText(content)
                 || content.length() > ChatMessageSendRequest.MAX_CONTENT_LENGTH;
@@ -105,6 +143,55 @@ public class ChatService {
                 .build();
 
         return toMessageResponse(chatMessageRepository.save(message));
+    }
+
+    @Transactional
+    public ChatMessageResponse sendImageMessage(String groupId, String userPK, String imageKey) {
+        findGroupForUpdate(groupId);
+        Member member = validateActiveMember(groupId, userPK);
+        ChatRoom chatRoom = findChatRoom(groupId);
+
+        ChatImagePolicy.validateOwnedTemporaryObjectKey(imageKey, chatRoom.getChatRoomId(), userPK);
+        String finalImageKey = ChatImagePolicy.toFinalObjectKey(imageKey);
+        ChatMessage existingMessage = chatMessageRepository.findByImageKey(finalImageKey).orElse(null);
+        if (existingMessage != null) {
+            return toMessageResponse(existingMessage);
+        }
+
+        S3ObjectMetadata metadata = s3Service.getObjectMetadata(imageKey);
+        byte[] signature = s3Service.getObjectSignature(
+                imageKey,
+                metadata.eTag(),
+                ChatImagePolicy.SIGNATURE_LENGTH
+        );
+        ChatImagePolicy.validateUploadedObject(imageKey, metadata, signature);
+        s3Service.copyObjectIfUnchanged(imageKey, finalImageKey, metadata.eTag());
+        registerImageCleanup(imageKey, finalImageKey);
+
+        ChatMessage message = ChatMessage.builder()
+                .chatRoom(chatRoom)
+                .sender(member.getUser())
+                .messageType(ChatMessageType.IMAGE)
+                .imageKey(finalImageKey)
+                .build();
+
+        return toMessageResponse(chatMessageRepository.save(message));
+    }
+
+    private void registerImageCleanup(String temporaryImageKey, String finalImageKey) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                s3Service.deleteObject(temporaryImageKey);
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    s3Service.deleteObject(finalImageKey);
+                }
+            }
+        });
     }
 
     @Transactional

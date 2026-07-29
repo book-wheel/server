@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
 @Builder
 @Table(
         name = "chat_message",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_chat_message_image_key", columnNames = "image_key")
+        },
         indexes = {
                 @Index(name = "idx_chat_message_room_id", columnList = "chat_room_id"),
                 @Index(name = "idx_chat_message_room_message_id", columnList = "chat_room_id, chat_message_id")
