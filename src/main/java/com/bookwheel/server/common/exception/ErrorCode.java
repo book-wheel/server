@@ -113,6 +113,10 @@ public enum ErrorCode {
     // 파일 관련 에러
     FILE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_001", "파일 업로드 중 오류가 발생했습니다."),
     INVALID_FILE_FORMAT(HttpStatus.BAD_REQUEST, "FILE_002", "지원하지 않는 파일 형식입니다."),
+    FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "FILE_003", "파일 크기가 허용된 제한을 초과했습니다."),
+    FILE_NOT_FOUND(HttpStatus.BAD_REQUEST, "FILE_004", "업로드된 파일을 찾을 수 없습니다."),
+    INVALID_FILE_KEY(HttpStatus.BAD_REQUEST, "FILE_005", "유효하지 않은 파일 키입니다."),
+    FILE_CHANGED_DURING_VALIDATION(HttpStatus.CONFLICT, "FILE_006", "업로드된 파일이 검증 중 변경되었습니다. 다시 업로드해주세요."),
 
     //게시물관련 에러
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_001", "해당 게시물을 찾을 수 없습니다."),
