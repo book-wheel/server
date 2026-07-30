@@ -115,9 +115,11 @@ public class GroupService {
         Page<Group> groupPage = groupRepository.findAll(GroupSpecification.searchWith(condition), pageable);
         // 페이지 내 그룹들의 버튼 상태를 한 번에 계산해 응답에 채운다.
         Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groupPage.getContent(), userPK);
+        LocalDate currentDate = LocalDate.now(clock);
         return groupPage.map(group -> GroupSearchResponse.from(
                 group,
-                bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOIN)
+                bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOIN),
+                currentDate
         ));
     }
 
@@ -125,11 +127,13 @@ public class GroupService {
         List<Group> groups = memberRepository.findGroupsByUserPKAndMemberStatus(userPK, MemberStatus.ACTIVE);
         // 내 모임 목록도 상세/탐색과 같은 버튼 상태 규칙을 재사용한다.
         Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groups, userPK);
+        LocalDate currentDate = LocalDate.now(clock);
 
         return groups.stream()
                 .map(group -> GroupSearchResponse.from(
                         group,
-                        bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOINED)
+                        bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOINED),
+                        currentDate
                 ))
                 .toList();
     }

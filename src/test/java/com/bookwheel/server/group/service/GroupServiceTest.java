@@ -6,6 +6,8 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.GroupCreateRequest;
 import com.bookwheel.server.group.dto.GroupCreateResponse;
 import com.bookwheel.server.group.dto.member.GroupJoinRequest;
+import com.bookwheel.server.group.dto.search.GroupSearchCondition;
+import com.bookwheel.server.group.dto.search.GroupSearchResponse;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
@@ -20,12 +22,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -139,6 +146,48 @@ class GroupServiceTest {
                 .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
 
         then(memberRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("그룹 목록 D-day는 UTC 날짜가 아닌 KST 날짜를 기준으로 계산한다")
+    void getGroups_CalculatesDdayWithKstClock() {
+        Clock kstBoundaryClock = Clock.fixed(
+                Instant.parse("2026-07-15T15:30:00Z"),
+                ZoneId.of("Asia/Seoul")
+        );
+        groupService = new GroupService(
+                groupRepository,
+                chatRoomRepository,
+                memberRepository,
+                userRepository,
+                passwordEncoder,
+                eventPublisher,
+                memberPermissionValidator,
+                recruitingScheduleAssignmentService,
+                kstBoundaryClock
+        );
+        Group group = Group.builder()
+                .groupId("group-1")
+                .groupName("KST 모임")
+                .groupState(State.RECRUITING)
+                .startDate(LocalDate.of(2026, 7, 17))
+                .maxMembers(5)
+                .build();
+        Page<Group> groups = new PageImpl<>(List.of(group));
+        given(groupRepository.findAll(
+                org.mockito.ArgumentMatchers.<Specification<Group>>any(),
+                any(Pageable.class)
+        )).willReturn(groups);
+
+        Page<GroupSearchResponse> response = groupService.getGroups(
+                new GroupSearchCondition(null, null, null, null),
+                Pageable.unpaged(),
+                null
+        );
+
+        assertThat(response.getContent()).singleElement()
+                .extracting(GroupSearchResponse::dday)
+                .isEqualTo(1);
     }
 
     private GroupCreateRequest groupCreateRequest(LocalDate startDate) {
