@@ -25,6 +25,16 @@ public interface RoundRepository extends JpaRepository<Round, String> {
     // 특정 라운드 조회 (현재 라운드 계산, 전체 일정 표시용)
     List<Round> findByGroup_GroupIdOrderByRoundNumberAsc(String groupId);
 
+    // 진행 중 멤버 변동 시 시작 시점에 확정된 실행 범위의 라운드만 재배정 대상으로 조회한다.
+    @Query("""
+            select r
+            from Round r
+            where r.group.groupId = :groupId
+              and r.roundNumber <= r.group.groupRoundCount
+            order by r.roundNumber asc
+            """)
+    List<Round> findExecutableRoundsByGroupIdOrderByRoundNumberAsc(@Param("groupId") String groupId);
+
     // 기존 일정의 시작 당일 교체를 막을 때 실제로 생성된 날짜 틀이 있는지 확인한다.
     boolean existsByGroup_GroupId(String groupId);
     

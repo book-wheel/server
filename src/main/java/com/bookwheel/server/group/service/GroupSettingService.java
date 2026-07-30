@@ -450,7 +450,8 @@ public class GroupSettingService {
 
     private void deleteFutureRoundsForManualRegeneration(Group group) {
         LocalDate today = LocalDate.now(clock);
-        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
+        // 재배정 실패 시에도 목표 인원 기준의 비활성 날짜 틀은 보존하고 실행 라운드만 정리한다.
+        List<Round> rounds = roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(group.getGroupId());
         List<Round> futureRounds = rounds.stream()
                 .filter(round -> isFutureRound(round, today))
                 .toList();
