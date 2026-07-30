@@ -200,12 +200,13 @@ public class GroupScheduleService {
     }
 
     @Transactional
-    public List<GroupScheduleRoundResponse> regenerateFutureSchedule(
+    public GroupScheduleResponse regenerateFutureSchedule(
             String groupId,
             GroupScheduleFutureRequest request,
             String userPK
     ) {
-        return futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
+        futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
+        return getSchedule(groupId, userPK);
     }
 
     public GroupScheduleResponse getSchedule(String groupId, String userPK) {
@@ -284,6 +285,13 @@ public class GroupScheduleService {
         LocalDate executableEndDate = executableRoundCount == 0
                 ? null
                 : rounds.get(executableRoundCount - 1).endDate();
+        FutureScheduleService.FutureScheduleConstraints futureConstraints =
+                group.getGroupState() == State.IN_PROGRESS
+                        ? futureScheduleService.resolveConstraints(
+                                group.getGroupId(),
+                                group.getGroupRoundCount()
+                        )
+                        : null;
         GroupScheduleStatus scheduleStatus = resolveScheduleStatus(
                 group,
                 readiness,
@@ -309,6 +317,8 @@ public class GroupScheduleService {
                 executableRoundCount,
                 plannedEndDate,
                 executableEndDate,
+                futureConstraints == null ? null : futureConstraints.protectedRoundCount(),
+                futureConstraints == null ? null : futureConstraints.minTotalRoundCount(),
                 rounds
         );
     }

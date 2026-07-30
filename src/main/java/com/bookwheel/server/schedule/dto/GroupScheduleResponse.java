@@ -10,7 +10,7 @@ public record GroupScheduleResponse(
         @Schema(description = "예정 시작일", example = "2026-07-25", nullable = true)
         LocalDate startDate,
 
-        @Schema(description = "라운드별 독서 기간(일)", example = "5", nullable = true)
+        @Schema(description = "일정 생성 시 전체 라운드에 적용되며, 진행 중 변경 시 새 미래 라운드에 적용되는 독서 기간(일)", example = "5", nullable = true)
         Integer readingPeriod,
 
         @Schema(description = "일정이 넘을 수 없는 종료 제한일", example = "2026-08-31", nullable = true)
@@ -55,6 +55,12 @@ public record GroupScheduleResponse(
 
         @Schema(description = "실제 마지막 실행 라운드 종료일", example = "2026-08-14", nullable = true)
         LocalDate executableEndDate,
+
+        @Schema(description = "이미 시작되어 미래 일정 변경 시 보존해야 하는 라운드 수. 진행 중이 아니면 null", nullable = true)
+        Integer protectedRoundCount,
+
+        @Schema(description = "미래 일정 변경 시 허용되는 최소 전체 라운드 수. 진행 중이 아니면 null", nullable = true)
+        Integer minTotalRoundCount,
 
         @Schema(description = "라운드별 날짜와 내 책바퀴 배정. executable=false인 라운드는 보존된 비활성 날짜 틀입니다.")
         List<GroupScheduleAssignmentResponse> rounds

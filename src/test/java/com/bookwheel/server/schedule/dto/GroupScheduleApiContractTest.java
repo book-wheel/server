@@ -38,6 +38,25 @@ class GroupScheduleApiContractTest {
     }
 
     @Test
+    @DisplayName("미래 일정 변경 요청도 기존 endDate 필드로 종료 제한일을 받는다")
+    void futureRequest_UsesEndDateField() throws Exception {
+        GroupScheduleFutureRequest request = objectMapper.readValue(
+                """
+                        {
+                          "totalRoundCount": 5,
+                          "readingPeriod": 7,
+                          "endDate": "2026-10-31",
+                          "excludedDates": [],
+                          "excludedDateRanges": []
+                        }
+                        """,
+                GroupScheduleFutureRequest.class
+        );
+
+        assertThat(request.endDate()).isEqualTo(LocalDate.of(2026, 10, 31));
+    }
+
+    @Test
     @DisplayName("일정 조회 응답은 종료 제한일을 기존 endDate 필드로 반환한다")
     void response_UsesEndDateField() {
         GroupScheduleResponse response = new GroupScheduleResponse(
@@ -55,6 +74,8 @@ class GroupScheduleApiContractTest {
                 11,
                 0,
                 LocalDate.of(2026, 10, 16),
+                null,
+                null,
                 null,
                 List.of()
         );

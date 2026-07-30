@@ -5,7 +5,6 @@ import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
 import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
-import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.service.GroupScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -21,8 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
 
 @RestController
@@ -33,8 +30,11 @@ public class GroupScheduleController {
     private final GroupScheduleService groupScheduleService;
 
     @Operation(
-            summary = "내 독서 일정 조회",
-            description = "저장된 전체 날짜 틀과 현재 ACTIVE 멤버 기준 실행 범위, READY 차단 사유 및 내 책 배정을 조회합니다."
+            summary = "그룹 독서 일정 조회",
+            description = "그룹의 전체 라운드 일정과 현재 ACTIVE 멤버 기준 실행 범위, READY 차단 사유 및 로그인한 사용자의 책 배정을 조회합니다. " +
+                    "리더 화면은 scheduleStatus가 NOT_CONFIGURED/CONFIGURED/READY/RESCHEDULE_REQUIRED이면 필요할 때 POST /schedule/preview로 확인한 뒤 POST /schedule로 확정하고, " +
+                    "IN_PROGRESS이면 POST /schedule/future를 사용하고 COMPLETE이면 일정 변경 API를 호출하지 않습니다. " +
+                    "단, 저장된 일정의 startDate가 오늘이면 POST /schedule로 교체할 수 없습니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "일정 조회 성공"),
@@ -104,15 +104,22 @@ public class GroupScheduleController {
 
     @Operation(
             summary = "미래 독서 일정 재생성",
-            description = "진행 중(IN_PROGRESS)인 모임에서 이미 시작된 라운드는 보존하고, 요청한 독서 기간으로 미래 라운드만 재생성합니다. 완료된 라운드의 기록과 시작일은 변경하지 않습니다."
+            description = "진행 중(IN_PROGRESS)인 모임에서 오늘 시작했거나 이미 시작된 라운드는 보존하고 미래 라운드만 재생성합니다. " +
+                    "totalRoundCount는 GET /schedule의 minTotalRoundCount 이상이어야 하며, 최대값은 멤버별 남은 미독서 책 수로 검증합니다. " +
+                    "성공하면 변경된 전체 일정 응답을 반환합니다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "미래 일정 재생성 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·라운드 범위·배정·종료 제한 오류 (GROUP_036, GROUP_038~GROUP_042, GROUP_018, GROUP_019)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "리더 권한 없음 (GROUP_007)")
+    })
     @PostMapping("/{groupId}/schedule/future")
-    public ResponseEntity<ApiResponse<List<GroupScheduleRoundResponse>>> regenerateFutureSchedule(
+    public ResponseEntity<ApiResponse<GroupScheduleResponse>> regenerateFutureSchedule(
             @PathVariable String groupId,
             @RequestBody @Valid GroupScheduleFutureRequest request,
             @AuthenticationPrincipal Object principal
     ) {
-        List<GroupScheduleRoundResponse> response = groupScheduleService.regenerateFutureSchedule(
+        GroupScheduleResponse response = groupScheduleService.regenerateFutureSchedule(
                 groupId,
                 request,
                 getUserPK(principal)
