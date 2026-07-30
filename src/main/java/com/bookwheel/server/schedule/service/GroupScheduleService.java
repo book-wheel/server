@@ -14,6 +14,7 @@ import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleBlockingReason;
 import com.bookwheel.server.schedule.dto.ExcludedDateRange;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
+import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
@@ -108,36 +109,23 @@ public class GroupScheduleService {
                 serializeExcludedDateRanges(request.excludedDateRanges())
         );
 
-        long requiredUsableDays = (long) roundCount * readingPeriod;
+        validateScheduleEndDate(
+                startDate,
+                requestedEndDate,
+                roundCount,
+                readingPeriod,
+                excludedCalendar
+        );
 
-        if (requestedEndDate != null) {
-            long usableDaysUntilDeadline = scheduleCalendarService.countUsableDaysUntilDeadline(
-                    startDate,
-                    requestedEndDate,
-                    excludedCalendar
-            );
-            if (usableDaysUntilDeadline < requiredUsableDays) {
-                throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
-            }
-        }
+        // 제외 날짜를 반영해 저장할 라운드별 시작일과 종료일을 계산한다.
+        List<GroupScheduleRoundResponse> rounds = calculateRounds(
+                roundCount,
+                startDate,
+                readingPeriod,
+                excludedCalendar
+        );
 
-        // 핵심 로직: 라운드별 시작일과 종료일 계산 (제외된 날짜는 건너뜀)
-        List<GroupScheduleRoundResponse> rounds = new ArrayList<>(roundCount);
-        LocalDate currentStart = startDate;
-        for (int roundNumber = 1; roundNumber <= roundCount; roundNumber++) {
-            LocalDate endDate = scheduleCalendarService.calculateRoundEndDate(
-                    currentStart,
-                    readingPeriod,
-                    excludedCalendar
-            );
-            rounds.add(GroupScheduleRoundResponse.of(roundNumber, currentStart, endDate));
-            currentStart = endDate.plusDays(1); // 다음 라운드는 이전 라운드 종료일 다음날부터 시작
-        }
-
-        LocalDate calculatedFinalEndDate = rounds.get(rounds.size() - 1).endDate();
-        if (requestedEndDate != null && calculatedFinalEndDate.isAfter(requestedEndDate)) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
-        }
+        validateCalculatedEndDate(rounds, requestedEndDate);
 
         // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
         List<Round> roundEntities = rounds.stream()
@@ -154,6 +142,61 @@ public class GroupScheduleService {
         roundRepository.saveAll(roundEntities);
         recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
         return getSchedule(groupId, userPK);
+    }
+
+    public GroupSchedulePreviewResponse previewSchedule(
+            String groupId,
+            GroupScheduleCreateRequest request,
+            String userPK
+    ) {
+        Group group = findGroupById(groupId);
+        findActiveUserById(userPK);
+        memberPermissionValidator.validateLeader(groupId, userPK);
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
+
+        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+        Integer readingPeriod = request.readingPeriod();
+        if (readingPeriod == null || readingPeriod < 1) {
+            throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
+        }
+        LocalDate startDate = request.startDate();
+        if (startDate == null || !startDate.isAfter(LocalDate.now(clock))) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
+        }
+
+        LocalDate requestedEndDate = request.endDate();
+        if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
+        }
+
+        // 미리보기 역시 현재 모집 인원이 아니라 목표 인원 기준의 전체 날짜 틀을 계산한다.
+        int roundCount = targetMemberCount - 1;
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.normalizeExcludedCalendar(
+                request.excludedDates(),
+                request.excludedDateRanges()
+        );
+        validateScheduleEndDate(
+                startDate,
+                requestedEndDate,
+                roundCount,
+                readingPeriod,
+                excludedCalendar
+        );
+        List<GroupScheduleRoundResponse> rounds = calculateRounds(
+                roundCount,
+                startDate,
+                readingPeriod,
+                excludedCalendar
+        );
+        validateCalculatedEndDate(rounds, requestedEndDate);
+        return new GroupSchedulePreviewResponse(
+                targetMemberCount,
+                roundCount,
+                rounds.get(rounds.size() - 1).endDate(),
+                rounds
+        );
     }
 
     @Transactional
@@ -268,6 +311,60 @@ public class GroupScheduleService {
                 executableEndDate,
                 rounds
         );
+    }
+
+    private void validateScheduleEndDate(
+            LocalDate startDate,
+            LocalDate requestedEndDate,
+            int roundCount,
+            int readingPeriod,
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar
+    ) {
+        if (requestedEndDate == null) {
+            return;
+        }
+        long requiredUsableDays = (long) roundCount * readingPeriod;
+        long usableDaysUntilDeadline = scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                requestedEndDate,
+                excludedCalendar
+        );
+        if (usableDaysUntilDeadline < requiredUsableDays) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
+        }
+    }
+
+    private List<GroupScheduleRoundResponse> calculateRounds(
+            int roundCount,
+            LocalDate startDate,
+            int readingPeriod,
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar
+    ) {
+        List<GroupScheduleRoundResponse> rounds = new ArrayList<>(roundCount);
+        LocalDate currentStart = startDate;
+        for (int roundNumber = 1; roundNumber <= roundCount; roundNumber++) {
+            LocalDate endDate = scheduleCalendarService.calculateRoundEndDate(
+                    currentStart,
+                    readingPeriod,
+                    excludedCalendar
+            );
+            rounds.add(GroupScheduleRoundResponse.of(roundNumber, currentStart, endDate));
+            currentStart = endDate.plusDays(1);
+        }
+        return rounds;
+    }
+
+    private void validateCalculatedEndDate(
+            List<GroupScheduleRoundResponse> rounds,
+            LocalDate requestedEndDate
+    ) {
+        if (requestedEndDate == null || rounds.isEmpty()) {
+            return;
+        }
+        LocalDate calculatedFinalEndDate = rounds.get(rounds.size() - 1).endDate();
+        if (calculatedFinalEndDate.isAfter(requestedEndDate)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
+        }
     }
 
     // 모집 중에는 READY로 완성된 현재 인원 기준 N-1개를, 시작 후에는 확정된 groupRoundCount를 사용한다.

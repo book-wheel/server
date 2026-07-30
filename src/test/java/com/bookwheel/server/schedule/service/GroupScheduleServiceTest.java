@@ -10,6 +10,7 @@ import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleBlockingReason;
+import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
 import com.bookwheel.server.schedule.entity.Round;
@@ -158,6 +159,57 @@ class GroupScheduleServiceTest {
                 .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
 
         then(roundRepository).should(never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("일정 미리보기는 목표 인원 기준 날짜만 계산하고 저장하지 않는다")
+    void previewSchedule_CalculatesTargetMemberRoundsWithoutSaving() {
+        String groupId = "group-1";
+        LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .maxMembers(12)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                startDate,
+                5,
+                startDate.plusDays(60),
+                List.of(),
+                List.of(),
+                10
+        );
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar =
+                mock(ScheduleCalendarService.ExcludedCalendar.class);
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
+                groupId,
+                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+        )).willReturn(1L);
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
+                .willReturn(excludedCalendar);
+        given(scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                startDate.plusDays(60),
+                excludedCalendar
+        )).willReturn(61L);
+        given(scheduleCalendarService.calculateRoundEndDate(
+                org.mockito.ArgumentMatchers.any(LocalDate.class),
+                org.mockito.ArgumentMatchers.eq(5),
+                org.mockito.ArgumentMatchers.eq(excludedCalendar)
+        )).willAnswer(invocation -> ((LocalDate) invocation.getArgument(0)).plusDays(4));
+
+        GroupSchedulePreviewResponse response =
+                groupScheduleService.previewSchedule(groupId, request, "leader-user-pk");
+
+        assertThat(response.targetMemberCount()).isEqualTo(10);
+        assertThat(response.plannedRoundCount()).isEqualTo(9);
+        assertThat(response.plannedEndDate()).isEqualTo(startDate.plusDays(44));
+        assertThat(response.rounds()).hasSize(9);
+        then(roundRepository).shouldHaveNoInteractions();
+        then(recruitingScheduleAssignmentService).shouldHaveNoInteractions();
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.bookwheel.server.schedule.controller;
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
+import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.service.GroupScheduleService;
@@ -70,6 +71,30 @@ public class GroupScheduleController {
             @AuthenticationPrincipal Object principal
     ) {
         GroupScheduleResponse response = groupScheduleService.createSchedule(
+                groupId,
+                request,
+                getUserPK(principal)
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "독서 일정 미리보기",
+            description = "POST /schedule과 같은 요청으로 목표 인원 기준 라운드 날짜를 계산하지만 DB에는 저장하지 않습니다. " +
+                    "응답을 확인한 뒤 동일한 요청 본문을 POST /schedule에 사용할 수 있습니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "일정 미리보기 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·날짜·목표 인원·종료 제한 오류 (GROUP_018, GROUP_019, GROUP_035, GROUP_048, GROUP_050)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "리더 권한 없음 (GROUP_007)")
+    })
+    @PostMapping("/{groupId}/schedule/preview")
+    public ResponseEntity<ApiResponse<GroupSchedulePreviewResponse>> previewSchedule(
+            @PathVariable String groupId,
+            @RequestBody @Valid GroupScheduleCreateRequest request,
+            @AuthenticationPrincipal Object principal
+    ) {
+        GroupSchedulePreviewResponse response = groupScheduleService.previewSchedule(
                 groupId,
                 request,
                 getUserPK(principal)
