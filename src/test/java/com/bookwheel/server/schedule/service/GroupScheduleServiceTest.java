@@ -268,7 +268,7 @@ class GroupScheduleServiceTest {
 
         assertThat(response.startDate()).isEqualTo(startDate);
         assertThat(response.readingPeriod()).isEqualTo(5);
-        assertThat(response.scheduleDeadline()).isEqualTo(startDate.plusDays(60));
+        assertThat(response.endDate()).isEqualTo(startDate.plusDays(60));
         assertThat(response.excludedDates()).isEmpty();
         assertThat(response.excludedDateRanges()).isEmpty();
         assertThat(response.scheduleStatus()).isEqualTo(GroupScheduleStatus.CONFIGURED);
@@ -387,7 +387,7 @@ class GroupScheduleServiceTest {
 
         assertThat(response.startDate()).isEqualTo(today.minusDays(1));
         assertThat(response.readingPeriod()).isEqualTo(5);
-        assertThat(response.scheduleDeadline()).isEqualTo(today.plusDays(30));
+        assertThat(response.endDate()).isEqualTo(today.plusDays(30));
         assertThat(response.excludedDates()).containsExactly(today.plusDays(2));
         assertThat(response.excludedDateRanges()).singleElement().satisfies(range -> {
             assertThat(range.startDate()).isEqualTo(today.plusDays(4));

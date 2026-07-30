@@ -83,7 +83,7 @@ public class GroupScheduleService {
 
         int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
 
-        LocalDate requestedEndDate = request.scheduleDeadline();
+        LocalDate requestedEndDate = request.endDate();
         if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
         }

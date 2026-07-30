@@ -14,7 +14,7 @@ public record GroupScheduleResponse(
         Integer readingPeriod,
 
         @Schema(description = "일정이 넘을 수 없는 종료 제한일", example = "2026-08-31", nullable = true)
-        LocalDate scheduleDeadline,
+        LocalDate endDate,
 
         @Schema(description = "제외할 개별 날짜 목록")
         List<LocalDate> excludedDates,
