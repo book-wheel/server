@@ -323,6 +323,7 @@ public class GroupScheduleService {
         // 목표 인원은 일정 틀의 상한이므로 현재 인원보다 작거나 모임 최대 인원보다 클 수 없다.
         if (targetMemberCount == null
                 || targetMemberCount < 2
+                || targetMemberCount > Group.MAX_MEMBER_COUNT
                 || group.getMaxMembers() == null
                 || targetMemberCount > group.getMaxMembers()
                 || targetMemberCount < currentMemberCount) {

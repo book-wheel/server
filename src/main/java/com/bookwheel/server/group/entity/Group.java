@@ -15,6 +15,9 @@ import java.time.LocalDate;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class Group {
+    // 책바퀴 배정과 라운드 생성 비용이 인원에 따라 증가하므로 모임 정원을 제한한다.
+    public static final int MAX_MEMBER_COUNT = 12;
+
     @Id
     @Column(name = "group_id", length = 50)
     private String groupId;

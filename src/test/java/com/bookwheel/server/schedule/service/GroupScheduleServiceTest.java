@@ -128,6 +128,39 @@ class GroupScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("일정 목표 인원은 12명을 초과할 수 없다")
+    void createSchedule_RejectsTargetMemberCountAboveLimit() {
+        String groupId = "group-1";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .maxMembers(100)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                LocalDate.now(FIXED_CLOCK).plusDays(1),
+                7,
+                null,
+                List.of(),
+                List.of(),
+                13
+        );
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
+                groupId,
+                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+        )).willReturn(1L);
+
+        assertThatThrownBy(() -> groupScheduleService.createSchedule(groupId, request, "leader-user-pk"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
+
+        then(roundRepository).should(never()).saveAll(anyList());
+    }
+
+    @Test
     @DisplayName("삭제된 모임의 일정 조회는 멤버 정리 여부와 관계없이 삭제 오류를 반환한다")
     void getSchedule_RejectsDeletedGroup() {
         String groupId = "deleted-group";
