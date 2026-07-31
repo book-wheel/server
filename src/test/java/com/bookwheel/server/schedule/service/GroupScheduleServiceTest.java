@@ -10,6 +10,7 @@ import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleBlockingReason;
+import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
 import com.bookwheel.server.schedule.entity.Round;
@@ -158,6 +159,185 @@ class GroupScheduleServiceTest {
                 .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
 
         then(roundRepository).should(never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("일정 미리보기는 목표 인원 기준 날짜만 계산하고 저장하지 않는다")
+    void previewSchedule_CalculatesTargetMemberRoundsWithoutSaving() {
+        String groupId = "group-1";
+        LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .maxMembers(12)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                startDate,
+                5,
+                startDate.plusDays(60),
+                List.of(),
+                List.of(),
+                10
+        );
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar =
+                mock(ScheduleCalendarService.ExcludedCalendar.class);
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
+                groupId,
+                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+        )).willReturn(1L);
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
+                .willReturn(excludedCalendar);
+        given(scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                startDate.plusDays(60),
+                excludedCalendar
+        )).willReturn(61L);
+        given(scheduleCalendarService.calculateRoundEndDate(
+                org.mockito.ArgumentMatchers.any(LocalDate.class),
+                org.mockito.ArgumentMatchers.eq(5),
+                org.mockito.ArgumentMatchers.eq(excludedCalendar)
+        )).willAnswer(invocation -> ((LocalDate) invocation.getArgument(0)).plusDays(4));
+
+        GroupSchedulePreviewResponse response =
+                groupScheduleService.previewSchedule(groupId, request, "leader-user-pk");
+
+        assertThat(response.targetMemberCount()).isEqualTo(10);
+        assertThat(response.plannedRoundCount()).isEqualTo(9);
+        assertThat(response.plannedEndDate()).isEqualTo(startDate.plusDays(44));
+        assertThat(response.rounds()).hasSize(9);
+        then(roundRepository).shouldHaveNoInteractions();
+        then(recruitingScheduleAssignmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("기존 일정의 시작 당일에는 동일한 요청으로 미리보기할 수 없다")
+    void previewSchedule_RejectsReplacementOnExistingStartDate() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .startDate(today)
+                .maxMembers(10)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                today.plusDays(3),
+                7,
+                null,
+                List.of(),
+                List.of(),
+                4
+        );
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(roundRepository.existsByGroup_GroupId(groupId)).willReturn(true);
+
+        assertThatThrownBy(() ->
+                groupScheduleService.previewSchedule(groupId, request, "leader-user-pk")
+        )
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE);
+
+        then(memberRepository).shouldHaveNoInteractions();
+        then(scheduleCalendarService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("미리보기 종료 제한일은 일정 시작일로부터 3년을 초과할 수 없다")
+    void previewSchedule_RejectsEndDateBeyondThreeYears() {
+        String groupId = "group-1";
+        LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .maxMembers(10)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                startDate,
+                7,
+                startDate.plusYears(3).plusDays(1),
+                List.of(),
+                List.of(),
+                2
+        );
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar =
+                mock(ScheduleCalendarService.ExcludedCalendar.class);
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
+                groupId,
+                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+        )).willReturn(1L);
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
+                .willReturn(excludedCalendar);
+
+        assertThatThrownBy(() ->
+                groupScheduleService.previewSchedule(groupId, request, "leader-user-pk")
+        )
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_DURATION_EXCEEDED);
+
+        then(scheduleCalendarService).should(never()).calculateRoundEndDate(
+                org.mockito.ArgumentMatchers.any(LocalDate.class),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(ScheduleCalendarService.ExcludedCalendar.class)
+        );
+    }
+
+    @Test
+    @DisplayName("종료 제한일이 없어도 3년을 초과하는 미리보기 계산은 시작하지 않는다")
+    void previewSchedule_RejectsCalculationBeyondThreeYearsWithoutEndDate() {
+        String groupId = "group-1";
+        LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .maxMembers(10)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                startDate,
+                Integer.MAX_VALUE,
+                null,
+                List.of(),
+                List.of(),
+                2
+        );
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar =
+                mock(ScheduleCalendarService.ExcludedCalendar.class);
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
+                groupId,
+                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+        )).willReturn(1L);
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
+                .willReturn(excludedCalendar);
+        given(scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                startDate.plusYears(3),
+                excludedCalendar
+        )).willReturn(1_097L);
+
+        assertThatThrownBy(() ->
+                groupScheduleService.previewSchedule(groupId, request, "leader-user-pk")
+        )
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_DURATION_EXCEEDED);
+
+        then(scheduleCalendarService).should(never()).calculateRoundEndDate(
+                org.mockito.ArgumentMatchers.any(LocalDate.class),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(ScheduleCalendarService.ExcludedCalendar.class)
+        );
     }
 
     @Test
@@ -354,6 +534,11 @@ class GroupScheduleServiceTest {
         given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, "leader-user-pk"))
                 .willReturn(Optional.of(member));
         given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of())).willReturn(excludedCalendar);
+        given(scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                startDate.plusYears(3),
+                excludedCalendar
+        )).willReturn(1_097L);
         given(scheduleCalendarService.calculateRoundEndDate(startDate, 7, excludedCalendar)).willReturn(endDate);
         given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId))
                 .willAnswer(invocation -> savedRounds.get());

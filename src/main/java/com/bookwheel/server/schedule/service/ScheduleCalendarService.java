@@ -92,7 +92,11 @@ class ScheduleCalendarService {
 
         for (int i = 1; i < sorted.size(); i++) {
             DateRange next = sorted.get(i);
-            boolean overlappedOrAdjacent = !next.startDate().isAfter(current.endDate().plusDays(1));
+            // LocalDate.MAX가 들어와도 plusDays(1) 오버플로 없이 겹침과 인접 여부를 계산한다.
+            boolean overlapped = !next.startDate().isAfter(current.endDate());
+            boolean adjacent = !current.endDate().equals(LocalDate.MAX)
+                    && next.startDate().equals(current.endDate().plusDays(1));
+            boolean overlappedOrAdjacent = overlapped || adjacent;
 
             if (overlappedOrAdjacent) {
                 LocalDate mergedEnd = current.endDate().isAfter(next.endDate()) ? current.endDate() : next.endDate();
