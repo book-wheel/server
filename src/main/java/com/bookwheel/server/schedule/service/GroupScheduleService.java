@@ -64,16 +64,12 @@ public class GroupScheduleService {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
-        if (group.getGroupState() != State.RECRUITING) {
-            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
-        }
-        if (isExistingScheduleStartDate(group, LocalDate.now(clock))) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE);
-        }
+        LocalDate today = LocalDate.now(clock);
+        validateRecruitingScheduleChange(group, today);
 
         LocalDate startDate = request.startDate();
         // 시작 처리는 자정 스케줄러가 담당하므로 당일 생성은 시작 시점을 놓칠 수 있다.
-        if (!startDate.isAfter(LocalDate.now(clock))) {
+        if (!startDate.isAfter(today)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
         }
 
@@ -152,9 +148,8 @@ public class GroupScheduleService {
         Group group = findGroupById(groupId);
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
-        if (group.getGroupState() != State.RECRUITING) {
-            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
-        }
+        LocalDate today = LocalDate.now(clock);
+        validateRecruitingScheduleChange(group, today);
 
         int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
         Integer readingPeriod = request.readingPeriod();
@@ -162,7 +157,7 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
         LocalDate startDate = request.startDate();
-        if (startDate == null || !startDate.isAfter(LocalDate.now(clock))) {
+        if (startDate == null || !startDate.isAfter(today)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
         }
 
@@ -437,6 +432,15 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
         }
         return targetMemberCount;
+    }
+
+    private void validateRecruitingScheduleChange(Group group, LocalDate today) {
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
+        if (isExistingScheduleStartDate(group, today)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE);
+        }
     }
 
     private boolean isExistingScheduleStartDate(Group group, LocalDate date) {

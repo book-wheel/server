@@ -213,6 +213,41 @@ class GroupScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("기존 일정의 시작 당일에는 동일한 요청으로 미리보기할 수 없다")
+    void previewSchedule_RejectsReplacementOnExistingStartDate() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.RECRUITING)
+                .startDate(today)
+                .maxMembers(10)
+                .build();
+        GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
+                today.plusDays(3),
+                7,
+                null,
+                List.of(),
+                List.of(),
+                4
+        );
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
+        given(roundRepository.existsByGroup_GroupId(groupId)).willReturn(true);
+
+        assertThatThrownBy(() ->
+                groupScheduleService.previewSchedule(groupId, request, "leader-user-pk")
+        )
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE);
+
+        then(memberRepository).shouldHaveNoInteractions();
+        then(scheduleCalendarService).shouldHaveNoInteractions();
+    }
+
+    @Test
     @DisplayName("삭제된 모임의 일정 조회는 멤버 정리 여부와 관계없이 삭제 오류를 반환한다")
     void getSchedule_RejectsDeletedGroup() {
         String groupId = "deleted-group";
