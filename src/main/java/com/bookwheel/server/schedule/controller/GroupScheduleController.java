@@ -61,7 +61,7 @@ public class GroupScheduleController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "일정 생성 또는 기존 모집 일정 교체 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·날짜·목표 인원·종료 제한·시작 당일 교체 오류 (GROUP_018, GROUP_019, GROUP_035, GROUP_048, GROUP_050, GROUP_052)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·날짜·목표 인원·종료 제한·시작 당일 교체 오류 (GROUP_018, GROUP_019, GROUP_035, GROUP_048, GROUP_050, GROUP_052, GROUP_053)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "리더 권한 없음 (GROUP_007)")
     })
     @PostMapping("/{groupId}/schedule")
@@ -85,7 +85,7 @@ public class GroupScheduleController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "일정 미리보기 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·날짜·목표 인원·종료 제한 오류 (GROUP_018, GROUP_019, GROUP_035, GROUP_048, GROUP_050)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·날짜·목표 인원·종료 제한 오류 (GROUP_018, GROUP_019, GROUP_035, GROUP_048, GROUP_050, GROUP_052, GROUP_053)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "리더 권한 없음 (GROUP_007)")
     })
     @PostMapping("/{groupId}/schedule/preview")
@@ -110,7 +110,7 @@ public class GroupScheduleController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "미래 일정 재생성 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·라운드 범위·배정·종료 제한 오류 (GROUP_036, GROUP_038~GROUP_042, GROUP_018, GROUP_019)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "상태·라운드 범위·배정·종료 제한 오류 (GROUP_036, GROUP_038~GROUP_042, GROUP_018, GROUP_019, GROUP_053)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "리더 권한 없음 (GROUP_007)")
     })
     @PostMapping("/{groupId}/schedule/future")

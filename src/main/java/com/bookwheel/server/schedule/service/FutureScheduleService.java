@@ -306,31 +306,37 @@ public class FutureScheduleService {
             int readingPeriod,
             ScheduleCalendarService.ExcludedCalendar excludedCalendar
     ) {
-        if (requestedEndDate == null) {
-            return;
-        }
+        LocalDate calculationDeadline = SchedulePolicy.resolveCalculationDeadline(
+                firstFutureStartDate,
+                requestedEndDate
+        );
         if (futureRoundCount == 0) {
             // 미래 라운드를 모두 제거해도 종료 제한일은 보존되는 마지막 라운드보다 빠를 수 없다.
             LocalDate lastProtectedEndDate = protectedRounds.isEmpty()
                     ? null
                     : protectedRounds.get(protectedRounds.size() - 1).getEndDate();
-            if (lastProtectedEndDate != null && requestedEndDate.isBefore(lastProtectedEndDate)) {
+            if (requestedEndDate != null
+                    && lastProtectedEndDate != null
+                    && requestedEndDate.isBefore(lastProtectedEndDate)) {
                 throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
             }
             return;
         }
-        if (requestedEndDate.isBefore(firstFutureStartDate)) {
+        if (requestedEndDate != null && requestedEndDate.isBefore(firstFutureStartDate)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
         }
 
         long requiredUsableDays = (long) futureRoundCount * readingPeriod;
         long usableDaysUntilDeadline = scheduleCalendarService.countUsableDaysUntilDeadline(
                 firstFutureStartDate,
-                requestedEndDate,
+                calculationDeadline,
                 excludedCalendar
         );
         if (usableDaysUntilDeadline < requiredUsableDays) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
+            ErrorCode errorCode = requestedEndDate == null
+                    ? ErrorCode.GROUP_SCHEDULE_DURATION_EXCEEDED
+                    : ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH;
+            throw new BusinessException(errorCode);
         }
     }
 

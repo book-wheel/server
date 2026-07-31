@@ -339,6 +339,58 @@ class FutureScheduleServiceTest {
         then(roundRepository).should(never()).deleteByRoundIdIn(org.mockito.ArgumentMatchers.anyList());
     }
 
+    @Test
+    @DisplayName("미래 일정 종료 제한일은 새 미래 일정 시작일로부터 3년을 초과할 수 없다")
+    void regenerateFutureSchedule_RejectsEndDateBeyondThreeYears() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        LocalDate firstFutureStartDate = today.plusDays(1);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.IN_PROGRESS)
+                .groupRoundCount(1)
+                .startDate(today.minusDays(1))
+                .readingPeriod(7)
+                .build();
+        User firstUser = activeUser("첫째");
+        User secondUser = activeUser("둘째");
+        Member firstMember = activeMember("member-1", group, firstUser);
+        Member secondMember = activeMember("member-2", group, secondUser);
+        OwnBook firstBook = ownBook("book-1", group, firstUser);
+        OwnBook secondBook = ownBook("book-2", group, secondUser);
+        GroupScheduleFutureRequest request = new GroupScheduleFutureRequest(
+                1,
+                7,
+                firstFutureStartDate.plusYears(3).plusDays(1),
+                List.of(),
+                List.of()
+        );
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar =
+                org.mockito.Mockito.mock(ScheduleCalendarService.ExcludedCalendar.class);
+
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser("리더")));
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
+                .willReturn(List.of(firstMember, secondMember));
+        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId))
+                .willReturn(List.of());
+        given(ownBookRepository.findByGroup_GroupIdIn(List.of(groupId)))
+                .willReturn(List.of(firstBook, secondBook));
+        given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
+                .willReturn(excludedCalendar);
+
+        assertThatThrownBy(() ->
+                futureScheduleService.regenerateFutureSchedule(groupId, request, "leader-user-pk")
+        )
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_DURATION_EXCEEDED);
+
+        then(wheelReassignmentService).shouldHaveNoInteractions();
+        then(roundRepository).should(never()).deleteByRoundIdIn(org.mockito.ArgumentMatchers.anyList());
+    }
+
     @ParameterizedTest(name = "{0} 상태에서는 미래 일정을 변경할 수 없다")
     @MethodSource("invalidFutureScheduleStates")
     void regenerateFutureSchedule_RejectsInvalidGroupState(State state, ErrorCode expectedErrorCode) {
@@ -474,6 +526,11 @@ class FutureScheduleServiceTest {
         given(ownBookRepository.findByGroup_GroupIdIn(List.of(groupId))).willReturn(books);
         given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
                 .willReturn(excludedCalendar);
+        given(scheduleCalendarService.countUsableDaysUntilDeadline(
+                today.plusDays(1),
+                today.plusDays(1).plusYears(3),
+                excludedCalendar
+        )).willReturn(1_097L);
         given(scheduleCalendarService.calculateRoundEndDate(
                 today.plusDays(1),
                 3,

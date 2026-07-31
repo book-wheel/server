@@ -21,7 +21,7 @@ public record GroupScheduleFutureRequest(
         @Min(value = 1, message = "독서 기간은 최소 1일 이상이어야 합니다.")
         Integer readingPeriod,
 
-        @Schema(description = "미래 일정의 최대 종료일 제한. 선택값이며 없으면 제한 없이 계산합니다.", example = "2026-07-31", nullable = true)
+        @Schema(description = "미래 일정의 최대 종료일 제한. 선택값이며 새 미래 일정 시작일로부터 3년 이내여야 합니다.", example = "2026-07-31", nullable = true)
         LocalDate endDate,
 
         @Schema(description = "미래 일정에서 제외할 개별 날짜 목록", example = "[\"2026-06-28\", \"2026-07-01\"]", nullable = true)

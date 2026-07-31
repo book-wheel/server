@@ -22,7 +22,7 @@ public record GroupScheduleCreateRequest(
         @Min(value = 1, message = "독서 기간은 최소 1일 이상이어야 합니다.")
         Integer readingPeriod,
 
-        @Schema(description = "일정이 넘을 수 없는 종료 제한일. 선택값이며 없으면 제한 없이 계산합니다.", example = "2026-07-31", nullable = true)
+        @Schema(description = "일정이 넘을 수 없는 종료 제한일. 선택값이며 시작일로부터 3년 이내여야 합니다.", example = "2026-07-31", nullable = true)
         LocalDate endDate,
 
         @Schema(description = "제외할 개별 날짜 목록", example = "[\"2026-06-28\", \"2026-07-01\"]", nullable = true)

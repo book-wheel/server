@@ -90,6 +90,7 @@ public enum ErrorCode {
     GROUP_SCHEDULE_TARGET_MEMBER_INVALID(HttpStatus.BAD_REQUEST, "GROUP_050", "목표 인원은 현재 ACTIVE 멤버 수 이상이며, 2명 이상이고 모임 최대 인원 이하여야 합니다."),
     GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED(HttpStatus.BAD_REQUEST, "GROUP_051", "일정의 목표 인원을 초과해 가입할 수 없습니다."),
     GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_052", "시작 당일에는 기존 일정을 교체할 수 없습니다."),
+    GROUP_SCHEDULE_DURATION_EXCEEDED(HttpStatus.BAD_REQUEST, "GROUP_053", "일정은 계산 시작일로부터 3년 이내로 설정해야 합니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

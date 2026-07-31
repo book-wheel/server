@@ -325,17 +325,21 @@ public class GroupScheduleService {
             int readingPeriod,
             ScheduleCalendarService.ExcludedCalendar excludedCalendar
     ) {
-        if (requestedEndDate == null) {
-            return;
-        }
+        LocalDate calculationDeadline = SchedulePolicy.resolveCalculationDeadline(
+                startDate,
+                requestedEndDate
+        );
         long requiredUsableDays = (long) roundCount * readingPeriod;
         long usableDaysUntilDeadline = scheduleCalendarService.countUsableDaysUntilDeadline(
                 startDate,
-                requestedEndDate,
+                calculationDeadline,
                 excludedCalendar
         );
         if (usableDaysUntilDeadline < requiredUsableDays) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
+            ErrorCode errorCode = requestedEndDate == null
+                    ? ErrorCode.GROUP_SCHEDULE_DURATION_EXCEEDED
+                    : ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH;
+            throw new BusinessException(errorCode);
         }
     }
 
