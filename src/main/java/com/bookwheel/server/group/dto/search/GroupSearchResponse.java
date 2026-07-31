@@ -7,6 +7,7 @@ import com.bookwheel.server.group.enums.State;
 import lombok.Builder;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 
 @Builder
@@ -33,6 +34,15 @@ public record GroupSearchResponse(
     }
 
     public static GroupSearchResponse from(Group group, GroupDetailButtonType bottomButtonType) {
+        // 서비스 밖에서 직접 변환하는 경우에도 일정 API와 동일한 한국 날짜를 기준으로 한다.
+        return from(group, bottomButtonType, LocalDate.now(ZoneId.of("Asia/Seoul")));
+    }
+
+    public static GroupSearchResponse from(
+            Group group,
+            GroupDetailButtonType bottomButtonType,
+            LocalDate currentDate
+    ) {
         State normalizedState = normalizeState(group.getGroupState());
 
         return GroupSearchResponse.builder()
@@ -50,7 +60,7 @@ public record GroupSearchResponse(
                 .startDate(group.getStartDate())
                 .status(mapStatus(normalizedState))
                 .bottomButtonType(bottomButtonType)
-                .dday(calculateDday(group.getStartDate()))
+                .dday(calculateDday(group.getStartDate(), currentDate))
                 .build();
     }
 
@@ -79,10 +89,10 @@ public record GroupSearchResponse(
         };
     }
 
-    private static int calculateDday(LocalDate startDate) {
+    private static int calculateDday(LocalDate startDate, LocalDate currentDate) {
         if (startDate == null) {
             return 0;
         }
-        return (int) ChronoUnit.DAYS.between(LocalDate.now(), startDate);
+        return (int) ChronoUnit.DAYS.between(currentDate, startDate);
     }
 }

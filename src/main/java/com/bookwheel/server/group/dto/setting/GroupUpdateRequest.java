@@ -1,6 +1,8 @@
 package com.bookwheel.server.group.dto.setting;
 
 import com.bookwheel.server.group.enums.Region;
+import com.bookwheel.server.group.entity.Group;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,6 +35,7 @@ public record GroupUpdateRequest(
         // 정원은 현재 ACTIVE 멤버 수보다 작아질 수 없다.
         @NotNull(message = "최대 인원은 필수 입력값입니다.")
         @Min(value = 2, message = "최소 인원은 2명 이상이어야 합니다.")
+        @Max(value = Group.MAX_MEMBER_COUNT, message = "최대 인원은 12명 이하여야 합니다.")
         Integer maxMembers
 ) {
 }

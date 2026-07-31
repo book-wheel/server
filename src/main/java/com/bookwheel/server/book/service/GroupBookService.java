@@ -17,6 +17,7 @@ import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class GroupBookService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final OwnBookRepository ownBookRepository;
+    private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     @Transactional
     public OwnBookRegisterResponse registerOwnBook(String groupId, OwnBookRegisterRequest request, String userPK) {
@@ -65,6 +67,7 @@ public class GroupBookService {
                 .noteToReader(request.noteToReader())
                 .build();
         OwnBook savedOwnBook = ownBookRepository.save(ownBook);
+        recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
 
         return OwnBookRegisterResponse.of(savedOwnBook.getOwnBookId());
     }
@@ -139,6 +142,8 @@ public class GroupBookService {
     @Transactional
     public void deleteOwnBook(String groupId, String ownBookId, String userPK) {
         OwnBook ownBook = findMutableOwnBook(groupId, ownBookId, userPK);
+        // OwnBook을 참조하는 모집 중 배정을 먼저 제거해 FK를 지키고, 라운드는 그대로 둔다.
+        recruitingScheduleAssignmentService.clearPlannedAssignments(ownBook.getGroup());
         ownBookRepository.delete(ownBook);
     }
 

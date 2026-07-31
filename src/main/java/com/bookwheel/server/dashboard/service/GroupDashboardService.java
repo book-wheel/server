@@ -7,6 +7,7 @@ import com.bookwheel.server.dashboard.dto.DashboardResponse;
 import com.bookwheel.server.dashboard.dto.MyBookStepResponse;
 import com.bookwheel.server.dashboard.dto.MyStepResponse;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -24,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -39,6 +41,7 @@ public class GroupDashboardService {
     private final OwnBookRepository ownBookRepository;
     private final WheelStateRepository wheelStateRepository;
     private final RoundRepository roundRepository;
+    private final Clock clock;
 
     public DashboardResponse getDashboard(String groupId, String userPK) {
         // 1. 유저, 그룹, 멤버 권한 체크
@@ -47,7 +50,7 @@ public class GroupDashboardService {
         Member member = findActiveMember(groupId, userPK);
 
         // 2. 현재 라운드 조회
-        Round currentRound = getCurrentRound(groupId);
+        Round currentRound = getCurrentRound(group);
 
         // 아직 라운드 일정이 생성되지 않았거나 시작되지 않은 경우
         if (currentRound == null) {
@@ -56,7 +59,7 @@ public class GroupDashboardService {
 
             // 그룹의 예비 시작 날짜가 설정되어 있다면 시작일까지 남은 D-Day 계산
             if (plannedStartDate != null) {
-                dDay = (int) ChronoUnit.DAYS.between(LocalDate.now(), plannedStartDate);
+                dDay = (int) ChronoUnit.DAYS.between(LocalDate.now(clock), plannedStartDate);
             }
 
             Round firstRound = getFirstRound(groupId);
@@ -85,7 +88,7 @@ public class GroupDashboardService {
         }
 
         // 3. dDay 계산
-        int dDay = (int) ChronoUnit.DAYS.between(LocalDate.now(), currentRound.getEndDate());
+        int dDay = (int) ChronoUnit.DAYS.between(LocalDate.now(clock), currentRound.getEndDate());
 
         // 4. myStep (내가 현재 읽고 있는 책 상태 조회)
         MyStepResponse myStep = null;
@@ -214,11 +217,23 @@ public class GroupDashboardService {
                 .orElse(null);
     }
 
-    private Round getCurrentRound(String groupId) {
-        LocalDate today = LocalDate.now();
+    private Round getCurrentRound(Group group) {
+        // 목표 인원 기준 날짜 틀은 모집 중에도 존재하므로 실제 시작 전에는 현재 라운드로 취급하지 않는다.
+        if (group.getGroupState() != State.IN_PROGRESS
+                && group.getGroupState() != State.COMPLETE) {
+            return null;
+        }
 
-        // 라운드 전체를 회차 오름차순으로 조회
-        List<Round> rounds = roundRepository.findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(groupId);
+        LocalDate today = LocalDate.now(clock);
+
+        // 목표 인원 기준 날짜 틀 중 실제 실행 범위 안의 라운드만 대시보드 대상으로 사용한다.
+        List<Round> rounds = roundRepository
+                .findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(
+                        group.getGroupId()
+                )
+                .stream()
+                .filter(round -> round.getRoundNumber() <= group.getGroupRoundCount())
+                .toList();
 
         if (rounds.isEmpty()) {
             return null;
