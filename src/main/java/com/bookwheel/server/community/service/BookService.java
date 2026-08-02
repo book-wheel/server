@@ -294,9 +294,7 @@ public class BookService {
         BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(isbn, isInterested);
 
         // 이용 분석은 부가 정보이므로 조회에 실패하면 null이 되고, 도서 상세 조회 자체는 정상 응답한다.
-        LibraryNaruUsageAnalysisResponse.UsageAnalysis usageAnalysis = libraryNaruService.getUsageAnalysis(isbn);
-
-        return bookDetail.withUsageAnalysis(BookUsageAnalysisResponse.from(usageAnalysis));
+        return bookDetail.withUsageAnalysis(libraryNaruService.getUsageAnalysis(isbn));
     }
 
     @Transactional

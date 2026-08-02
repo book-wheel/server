@@ -7,7 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.bookwheel.server.community.dto.LibraryNaruUsageAnalysisResponse;
+import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,17 +66,14 @@ class LibraryNaruServiceTest {
         server.expect(requestTo(startsWith(API_URL)))
             .andRespond(withSuccess(SUCCESS_BODY, MediaType.APPLICATION_JSON));
 
-        LibraryNaruUsageAnalysisResponse.UsageAnalysis result = libraryNaruService.getUsageAnalysis(ISBN);
+        BookUsageAnalysisResponse result = libraryNaruService.getUsageAnalysis(ISBN);
 
         assertThat(result).isNotNull();
-        assertThat(result.book().loanCnt()).isEqualTo(104490);
-        assertThat(result.loanGrps()).hasSize(2);
-        assertThat(result.loanGrps().get(0).loanGrp().age()).isEqualTo("40대");
-        assertThat(result.loanGrps().get(0).loanGrp().loanCnt()).isEqualTo(384);
-        assertThat(result.keywords()).hasSize(2);
-        assertThat(result.keywords().get(0).keyword().word()).isEqualTo("최은영");
-        // 가중치는 문자열로 내려오지만 숫자로 매핑된다.
-        assertThat(result.keywords().get(0).keyword().weight()).isEqualTo(7.0);
+        assertThat(result.totalLoanCount()).isEqualTo(104490);
+        // ranking(40대=144, 30대=25)이 아니라 loanCnt(384 > 288) 기준으로 선택된다.
+        assertThat(result.mostLoanedAgeGroup()).isEqualTo("40대");
+        // 가중치는 문자열("7")로 내려오지만 숫자로 매핑되어 내림차순 정렬된다.
+        assertThat(result.keywords()).containsExactly("최은영", "쇼코의 미소");
         server.verify();
     }
 

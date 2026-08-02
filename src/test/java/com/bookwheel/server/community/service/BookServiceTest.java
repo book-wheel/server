@@ -14,7 +14,6 @@ import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
-import com.bookwheel.server.community.dto.LibraryNaruUsageAnalysisResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
@@ -139,15 +138,8 @@ class BookServiceTest {
         );
     }
 
-    private LibraryNaruUsageAnalysisResponse.UsageAnalysis sampleUsageAnalysis() {
-        return new LibraryNaruUsageAnalysisResponse.UsageAnalysis(
-                null,
-                new LibraryNaruUsageAnalysisResponse.Book(104490),
-                List.of(new LibraryNaruUsageAnalysisResponse.LoanGrpItem(
-                        new LibraryNaruUsageAnalysisResponse.LoanGrp("40대", 384))),
-                List.of(new LibraryNaruUsageAnalysisResponse.KeywordItem(
-                        new LibraryNaruUsageAnalysisResponse.Keyword("최은영", 7.0)))
-        );
+    private BookUsageAnalysisResponse sampleUsageAnalysis() {
+        return new BookUsageAnalysisResponse(104490, "40대", List.of("최은영"));
     }
 
     @Test
