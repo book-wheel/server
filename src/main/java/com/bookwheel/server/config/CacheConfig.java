@@ -24,8 +24,10 @@ public class CacheConfig implements CachingConfigurer {
 
     public static final String BOOK_USAGE_ANALYSIS = "bookUsageAnalysis";
 
-    // 정보나루 대출 통계는 일 단위로 갱신되므로 하루 동안 캐시해도 사용자에게 보이는 차이가 없다.
-    private static final Duration BOOK_USAGE_ANALYSIS_TTL = Duration.ofHours(24);
+    // 대출 횟수는 규모를 보여주는 값이라 며칠 차이가 사용자에게 의미가 없고, 키워드는 서지정보 기반이라 거의 바뀌지 않는다.
+    // 다만 연령대는 정보나루가 '최근 30일' 집계로 제공하므로, 집계 구간보다 캐시 기간이 길면
+    // 만료 직전 사용자가 최대 두 달 전 정보를 보게 된다. 그래서 30일이 아닌 7일로 둔다.
+    private static final Duration BOOK_USAGE_ANALYSIS_TTL = Duration.ofDays(7);
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
