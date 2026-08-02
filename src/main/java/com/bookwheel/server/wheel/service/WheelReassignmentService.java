@@ -46,9 +46,11 @@ public class WheelReassignmentService {
         this.clock = clock;
     }
 
+    // 재배정 불가는 호출 서비스가 미래 실행 라운드 정리로 전환하는 정상 분기이므로 외부 트랜잭션을 rollback-only로 만들지 않는다.
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public WheelAssignmentPlan reassignFutureRounds(String groupId, Member targetMember, List<Member> remainingMembers) {
         LocalDate today = LocalDate.now(clock);
-        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        List<Round> rounds = roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(groupId);
         // 오늘 이전에 시작한 라운드는 독서 기록으로 보고 절대 다시 배정하지 않는다.
         List<Round> futureRounds = futureRounds(rounds, today);
         if (futureRounds.isEmpty()) {
@@ -104,7 +106,7 @@ public class WheelReassignmentService {
             List<Member> remainingMembers
     ) {
         LocalDate today = LocalDate.now(clock);
-        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        List<Round> rounds = roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(groupId);
         List<Round> futureRounds = futureRounds(rounds, today);
         if (futureRounds.isEmpty()) {
             return;

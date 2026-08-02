@@ -5,6 +5,7 @@ import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.*;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
@@ -87,7 +88,11 @@ public class WheelService {
         }
 
         String groupId = wheelState.getMember().getGroup().getGroupId();
-        Round currentRound = roundRepository.findCurrentRound(groupId, LocalDate.now(clock))
+        Round currentRound = roundRepository.findCurrentRound(
+                        groupId,
+                        LocalDate.now(clock),
+                        State.IN_PROGRESS
+                )
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
         if (!currentRound.getRoundId().equals(wheelState.getRoundId())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);

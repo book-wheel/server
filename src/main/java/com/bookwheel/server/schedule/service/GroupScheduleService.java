@@ -1,7 +1,5 @@
 package com.bookwheel.server.schedule.service;
 
-import com.bookwheel.server.book.entity.OwnBook;
-import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
@@ -13,8 +11,10 @@ import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.dto.GroupScheduleCreateRequest;
 import com.bookwheel.server.schedule.dto.GroupScheduleAssignmentResponse;
+import com.bookwheel.server.schedule.dto.GroupScheduleBlockingReason;
 import com.bookwheel.server.schedule.dto.ExcludedDateRange;
 import com.bookwheel.server.schedule.dto.GroupScheduleFutureRequest;
+import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleRoundResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
@@ -27,11 +27,8 @@ import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import com.bookwheel.server.wheel.entity.WheelState;
-import com.bookwheel.server.wheel.dto.WheelAssignmentPlan;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
-import com.bookwheel.server.wheel.service.WheelAssignmentService;
-import com.bookwheel.server.wheel.service.WheelReassignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -49,14 +46,12 @@ public class GroupScheduleService {
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
-    private final OwnBookRepository ownBookRepository;
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
-    private final WheelAssignmentService wheelAssignmentService;
-    private final WheelReassignmentService wheelReassignmentService;
     private final FutureScheduleService futureScheduleService;
+    private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
     private final ScheduleCalendarService scheduleCalendarService;
     private final Clock clock;
 
@@ -69,33 +64,30 @@ public class GroupScheduleService {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
-        if (group.getGroupState() != State.RECRUITING) {
-            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
-        }
+        LocalDate today = LocalDate.now(clock);
+        validateRecruitingScheduleChange(group, today);
 
         LocalDate startDate = request.startDate();
         // 시작 처리는 자정 스케줄러가 담당하므로 당일 생성은 시작 시점을 놓칠 수 있다.
-        if (!startDate.isAfter(LocalDate.now(clock))) {
+        if (!startDate.isAfter(today)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
         }
-
-        // 일정 확정 시점의 ACTIVE 멤버 수를 기준으로 라운드 수를 결정한다.
-        // 모임 생성 직후처럼 멤버가 1명이어도 일정 설정은 저장할 수 있다.
-        List<Member> activeMembers = memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE);
-        int activeMemberCount = activeMembers.size();
 
         Integer readingPeriod = request.readingPeriod();
         if (readingPeriod == null || readingPeriod < 1) {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
 
+        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+
         LocalDate requestedEndDate = request.endDate();
         if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
         }
 
-        // ACTIVE 멤버 수보다 1 적게 라운드 돌기. 1명일 때는 설정만 저장한다.
-        int roundCount = Math.max(activeMemberCount - 1, 0);
+        // 모집 현황과 무관하게 목표 인원이 서로의 책을 한 번씩 읽을 수 있는 전체 날짜 틀을 먼저 만든다.
+        // 실제 실행 라운드는 시작 시점의 ACTIVE 인원에 따라 N-1개로 확정한다.
+        int roundCount = targetMemberCount - 1;
 
         // 제외할 날짜(단일/범위)들을 병합하여 탐색에 최적화된 달력 객체 생성
         ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.normalizeExcludedCalendar(
@@ -106,47 +98,30 @@ public class GroupScheduleService {
         // 기존 일정은 새 설정으로 교체하되, 미래 책바퀴 배정은 다시 만들지 않는다.
         deleteReplaceableRecruitingSchedule(group);
         group.updateReadingPeriod(readingPeriod);
-        group.updateScheduleInfo(startDate, roundCount);
+        group.updateSchedulePlan(startDate, roundCount, targetMemberCount);
         group.updateScheduleConstraints(
                 requestedEndDate,
                 serializeExcludedDates(request.excludedDates()),
                 serializeExcludedDateRanges(request.excludedDateRanges())
         );
 
-        if (roundCount == 0) {
-            return buildScheduleResponse(group, List.of());
-        }
+        validateScheduleEndDate(
+                startDate,
+                requestedEndDate,
+                roundCount,
+                readingPeriod,
+                excludedCalendar
+        );
 
-        long requiredUsableDays = (long) roundCount * readingPeriod;
+        // 제외 날짜를 반영해 저장할 라운드별 시작일과 종료일을 계산한다.
+        List<GroupScheduleRoundResponse> rounds = calculateRounds(
+                roundCount,
+                startDate,
+                readingPeriod,
+                excludedCalendar
+        );
 
-        if (requestedEndDate != null) {
-            long usableDaysUntilDeadline = scheduleCalendarService.countUsableDaysUntilDeadline(
-                    startDate,
-                    requestedEndDate,
-                    excludedCalendar
-            );
-            if (usableDaysUntilDeadline < requiredUsableDays) {
-                throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
-            }
-        }
-
-        // 핵심 로직: 라운드별 시작일과 종료일 계산 (제외된 날짜는 건너뜀)
-        List<GroupScheduleRoundResponse> rounds = new ArrayList<>(roundCount);
-        LocalDate currentStart = startDate;
-        for (int roundNumber = 1; roundNumber <= roundCount; roundNumber++) {
-            LocalDate endDate = scheduleCalendarService.calculateRoundEndDate(
-                    currentStart,
-                    readingPeriod,
-                    excludedCalendar
-            );
-            rounds.add(GroupScheduleRoundResponse.of(roundNumber, currentStart, endDate));
-            currentStart = endDate.plusDays(1); // 다음 라운드는 이전 라운드 종료일 다음날부터 시작
-        }
-
-        LocalDate calculatedFinalEndDate = rounds.get(rounds.size() - 1).endDate();
-        if (requestedEndDate != null && calculatedFinalEndDate.isAfter(requestedEndDate)) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
-        }
+        validateCalculatedEndDate(rounds, requestedEndDate);
 
         // 계산된 DTO(rounds)를 Round 엔티티 리스트로 변환
         List<Round> roundEntities = rounds.stream()
@@ -161,33 +136,99 @@ public class GroupScheduleService {
 
         // JPA의 saveAll()을 사용하여 한 번에 저장
         roundRepository.saveAll(roundEntities);
+        recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
+        return getSchedule(groupId, userPK);
+    }
 
-        List<GroupScheduleAssignmentResponse> roundResponses = rounds.stream()
-                .map(round -> GroupScheduleAssignmentResponse.withoutAssignment(
-                        round.roundNumber(), round.startDate(), round.endDate()
-                ))
-                .toList();
-        return buildScheduleResponse(group, roundResponses);
+    public GroupSchedulePreviewResponse previewSchedule(
+            String groupId,
+            GroupScheduleCreateRequest request,
+            String userPK
+    ) {
+        Group group = findGroupById(groupId);
+        findActiveUserById(userPK);
+        memberPermissionValidator.validateLeader(groupId, userPK);
+        LocalDate today = LocalDate.now(clock);
+        validateRecruitingScheduleChange(group, today);
+
+        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+        Integer readingPeriod = request.readingPeriod();
+        if (readingPeriod == null || readingPeriod < 1) {
+            throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
+        }
+        LocalDate startDate = request.startDate();
+        if (startDate == null || !startDate.isAfter(today)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
+        }
+
+        LocalDate requestedEndDate = request.endDate();
+        if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_BEFORE_START_DATE);
+        }
+
+        // 미리보기 역시 현재 모집 인원이 아니라 목표 인원 기준의 전체 날짜 틀을 계산한다.
+        int roundCount = targetMemberCount - 1;
+        ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.normalizeExcludedCalendar(
+                request.excludedDates(),
+                request.excludedDateRanges()
+        );
+        validateScheduleEndDate(
+                startDate,
+                requestedEndDate,
+                roundCount,
+                readingPeriod,
+                excludedCalendar
+        );
+        List<GroupScheduleRoundResponse> rounds = calculateRounds(
+                roundCount,
+                startDate,
+                readingPeriod,
+                excludedCalendar
+        );
+        validateCalculatedEndDate(rounds, requestedEndDate);
+        return new GroupSchedulePreviewResponse(
+                targetMemberCount,
+                roundCount,
+                rounds.get(rounds.size() - 1).endDate(),
+                rounds
+        );
     }
 
     @Transactional
-    public List<GroupScheduleRoundResponse> regenerateFutureSchedule(
+    public GroupScheduleResponse regenerateFutureSchedule(
             String groupId,
             GroupScheduleFutureRequest request,
             String userPK
     ) {
-        return futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
+        futureScheduleService.regenerateFutureSchedule(groupId, request, userPK);
+        return getSchedule(groupId, userPK);
     }
 
     public GroupScheduleResponse getSchedule(String groupId, String userPK) {
         Group group = findGroupById(groupId);
+        // 삭제된 모임은 멤버 데이터 정리 여부와 관계없이 동일한 오류 계약을 반환한다.
+        if (group.getGroupState() == State.DELETED) {
+            throw new BusinessException(ErrorCode.GROUP_DELETED);
+        }
         findActiveUserById(userPK);
         Member member = findActiveMember(groupId, userPK);
 
         // 저장된 배정이 없는 과거 일정도 날짜 정보는 함께 반환한다.
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+        RecruitingScheduleAssignmentService.Readiness readiness =
+                recruitingScheduleAssignmentService.evaluate(group);
+        int executableRoundCount = resolveExecutableRoundCount(
+                group,
+                readiness,
+                rounds.size()
+        );
         if (rounds.isEmpty()) {
-            return buildScheduleResponse(group, List.of());
+            return buildScheduleResponse(
+                    group,
+                    readiness,
+                    executableRoundCount,
+                    List.of()
+            );
         }
 
         List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
@@ -213,46 +254,212 @@ public class GroupScheduleService {
                     return GroupScheduleAssignmentResponse.of(
                             round,
                             wheelState,
-                            resolveSenderNickname(round, wheelState, roundByNumber, readerNicknameByRoundAndBookId)
+                            resolveSenderNickname(round, wheelState, roundByNumber, readerNicknameByRoundAndBookId),
+                            round.getRoundNumber() <= executableRoundCount
                     );
                 })
                 .toList();
-        return buildScheduleResponse(group, roundResponses);
+        return buildScheduleResponse(
+                group,
+                readiness,
+                executableRoundCount,
+                roundResponses
+        );
     }
 
     private GroupScheduleResponse buildScheduleResponse(
             Group group,
+            RecruitingScheduleAssignmentService.Readiness readiness,
+            int executableRoundCount,
             List<GroupScheduleAssignmentResponse> rounds
     ) {
+        Integer resolvedTargetMemberCount = resolveTargetMemberCount(group, rounds.size());
+        LocalDate plannedEndDate = rounds.isEmpty()
+                ? null
+                : rounds.get(rounds.size() - 1).endDate();
+        LocalDate executableEndDate = executableRoundCount == 0
+                ? null
+                : rounds.get(executableRoundCount - 1).endDate();
+        FutureScheduleService.FutureScheduleConstraints futureConstraints =
+                group.getGroupState() == State.IN_PROGRESS
+                        ? futureScheduleService.resolveConstraints(
+                                group.getGroupId(),
+                                group.getGroupRoundCount()
+                        )
+                        : null;
+        GroupScheduleStatus scheduleStatus = resolveScheduleStatus(
+                group,
+                readiness,
+                resolvedTargetMemberCount
+        );
+        List<GroupScheduleBlockingReason> blockingReasons = new ArrayList<>(readiness.blockingReasons());
+        if (scheduleStatus == GroupScheduleStatus.RESCHEDULE_REQUIRED) {
+            blockingReasons.add(GroupScheduleBlockingReason.START_DATE_PASSED);
+        }
         return new GroupScheduleResponse(
                 group.getStartDate(),
                 group.getReadingPeriod(),
                 group.getScheduleEndDate(),
                 deserializeExcludedDates(group.getScheduleExcludedDates()),
                 deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
-                resolveScheduleStatus(group, rounds),
+                scheduleStatus,
+                resolvedTargetMemberCount,
+                readiness.currentMemberCount(),
+                scheduleStatus == GroupScheduleStatus.READY,
+                List.copyOf(blockingReasons),
+                readiness.missingBookMembers(),
+                rounds.size(),
+                executableRoundCount,
+                plannedEndDate,
+                executableEndDate,
+                futureConstraints == null ? null : futureConstraints.protectedRoundCount(),
+                futureConstraints == null ? null : futureConstraints.minTotalRoundCount(),
                 rounds
         );
     }
 
+    private void validateScheduleEndDate(
+            LocalDate startDate,
+            LocalDate requestedEndDate,
+            int roundCount,
+            int readingPeriod,
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar
+    ) {
+        LocalDate calculationDeadline = SchedulePolicy.resolveCalculationDeadline(
+                startDate,
+                requestedEndDate
+        );
+        long requiredUsableDays = (long) roundCount * readingPeriod;
+        long usableDaysUntilDeadline = scheduleCalendarService.countUsableDaysUntilDeadline(
+                startDate,
+                calculationDeadline,
+                excludedCalendar
+        );
+        if (usableDaysUntilDeadline < requiredUsableDays) {
+            ErrorCode errorCode = requestedEndDate == null
+                    ? ErrorCode.GROUP_SCHEDULE_DURATION_EXCEEDED
+                    : ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH;
+            throw new BusinessException(errorCode);
+        }
+    }
+
+    private List<GroupScheduleRoundResponse> calculateRounds(
+            int roundCount,
+            LocalDate startDate,
+            int readingPeriod,
+            ScheduleCalendarService.ExcludedCalendar excludedCalendar
+    ) {
+        List<GroupScheduleRoundResponse> rounds = new ArrayList<>(roundCount);
+        LocalDate currentStart = startDate;
+        for (int roundNumber = 1; roundNumber <= roundCount; roundNumber++) {
+            LocalDate endDate = scheduleCalendarService.calculateRoundEndDate(
+                    currentStart,
+                    readingPeriod,
+                    excludedCalendar
+            );
+            rounds.add(GroupScheduleRoundResponse.of(roundNumber, currentStart, endDate));
+            currentStart = endDate.plusDays(1);
+        }
+        return rounds;
+    }
+
+    private void validateCalculatedEndDate(
+            List<GroupScheduleRoundResponse> rounds,
+            LocalDate requestedEndDate
+    ) {
+        if (requestedEndDate == null || rounds.isEmpty()) {
+            return;
+        }
+        LocalDate calculatedFinalEndDate = rounds.get(rounds.size() - 1).endDate();
+        if (calculatedFinalEndDate.isAfter(requestedEndDate)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_END_DATE_MISMATCH);
+        }
+    }
+
+    // 모집 중에는 READY로 완성된 현재 인원 기준 N-1개를, 시작 후에는 확정된 groupRoundCount를 사용한다.
+    private int resolveExecutableRoundCount(
+            Group group,
+            RecruitingScheduleAssignmentService.Readiness readiness,
+            int storedRoundCount
+    ) {
+        if (storedRoundCount == 0) {
+            return 0;
+        }
+        if (group.getGroupState() == State.RECRUITING) {
+            // 시작일을 놓친 일정은 READY 선행 조건이 남아 있어도 더는 실행 대상이 아니다.
+            if (group.getStartDate() != null && group.getStartDate().isBefore(LocalDate.now(clock))) {
+                return 0;
+            }
+            return readiness.ready()
+                    ? Math.min(readiness.currentMemberCount() - 1, storedRoundCount)
+                    : 0;
+        }
+        return Math.min(Math.max(group.getGroupRoundCount(), 0), storedRoundCount);
+    }
+
     private GroupScheduleStatus resolveScheduleStatus(
             Group group,
-            List<GroupScheduleAssignmentResponse> rounds
+            RecruitingScheduleAssignmentService.Readiness readiness,
+            Integer resolvedTargetMemberCount
     ) {
-        if (group.getStartDate() == null || group.getReadingPeriod() == null) {
-            return GroupScheduleStatus.NOT_CONFIGURED;
-        }
-        if (group.getGroupState() == State.RECRUITING
-                && !group.getStartDate().isAfter(LocalDate.now(clock))) {
-            return GroupScheduleStatus.RESCHEDULE_REQUIRED;
-        }
         if (group.getGroupState() == State.IN_PROGRESS) {
             return GroupScheduleStatus.IN_PROGRESS;
         }
         if (group.getGroupState() == State.COMPLETE) {
             return GroupScheduleStatus.COMPLETE;
         }
-        return rounds.isEmpty() ? GroupScheduleStatus.CONFIGURED : GroupScheduleStatus.READY;
+        if (resolvedTargetMemberCount == null
+                || group.getStartDate() == null
+                || group.getReadingPeriod() == null) {
+            return GroupScheduleStatus.NOT_CONFIGURED;
+        }
+        if (group.getGroupState() == State.RECRUITING
+                && group.getStartDate().isBefore(LocalDate.now(clock))) {
+            return GroupScheduleStatus.RESCHEDULE_REQUIRED;
+        }
+        // 최소 2명과 각자의 책, 현재 인원 기준 N-1개 라운드 배정이 준비되면 목표 인원 전에도 READY다.
+        return readiness.ready() ? GroupScheduleStatus.READY : GroupScheduleStatus.CONFIGURED;
+    }
+
+    private int validateTargetMemberCount(Group group, Integer targetMemberCount) {
+        long currentMemberCount = memberRepository.countByGroup_GroupIdAndMemberStatus(
+                group.getGroupId(),
+                MemberStatus.ACTIVE
+        );
+        // 목표 인원은 일정 틀의 상한이므로 현재 인원보다 작거나 모임 최대 인원보다 클 수 없다.
+        if (targetMemberCount == null
+                || targetMemberCount < 2
+                || targetMemberCount > Group.MAX_MEMBER_COUNT
+                || group.getMaxMembers() == null
+                || targetMemberCount > group.getMaxMembers()
+                || targetMemberCount < currentMemberCount) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
+        }
+        return targetMemberCount;
+    }
+
+    private void validateRecruitingScheduleChange(Group group, LocalDate today) {
+        if (group.getGroupState() != State.RECRUITING) {
+            throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
+        if (isExistingScheduleStartDate(group, today)) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE);
+        }
+    }
+
+    private boolean isExistingScheduleStartDate(Group group, LocalDate date) {
+        // 시작 당일에는 준비된 라운드와 배정을 임의로 교체하지 못하게 한다.
+        return group.getStartDate() != null
+                && roundRepository.existsByGroup_GroupId(group.getGroupId())
+                && group.getStartDate().equals(date);
+    }
+
+    // target_member_count 도입 전에 생성된 일정은 저장된 전체 라운드 수로 목표 인원을 추론한다.
+    private Integer resolveTargetMemberCount(Group group, int storedRoundCount) {
+        if (group.getTargetMemberCount() != null) {
+            return group.getTargetMemberCount();
+        }
+        return storedRoundCount == 0 ? null : storedRoundCount + 1;
     }
 
     private String resolveSenderNickname(
@@ -279,29 +486,6 @@ public class GroupScheduleService {
 
     private RoundBookKey roundBookKey(String roundId, String ownBookId) {
         return new RoundBookKey(roundId, ownBookId);
-    }
-
-    private WheelAssignmentPlan planInitialAssignments(
-            List<Round> rounds,
-            List<Member> activeMembers,
-            List<OwnBook> books
-    ) {
-        List<WheelAssignmentPlan.Assignment> assignments = new ArrayList<>(rounds.size() * activeMembers.size());
-        for (Round round : rounds) {
-            List<WheelAssignmentService.WheelAssignment> roundAssignments =
-                    wheelAssignmentService.assignBooks(activeMembers, books, round.getRoundNumber());
-            if (roundAssignments.size() != activeMembers.size()) {
-                throw new BusinessException(ErrorCode.GROUP_SCHEDULE_OWN_BOOK_REQUIRED);
-            }
-            roundAssignments.stream()
-                    .map(assignment -> new WheelAssignmentPlan.Assignment(
-                            round.getRoundId(),
-                            assignment.member().getMemberId(),
-                            assignment.ownBook().getOwnBookId()
-                    ))
-                    .forEach(assignments::add);
-        }
-        return new WheelAssignmentPlan(assignments);
     }
 
     private void deleteReplaceableRecruitingSchedule(Group group) {
@@ -373,47 +557,23 @@ public class GroupScheduleService {
     }
 
     private boolean prepareStartableSchedule(Group group, LocalDate startDate) {
+        // 시작 판단 중 멤버 승인·탈퇴가 끼어들지 않도록 ACTIVE 멤버를 잠근 상태로 확인한다.
         List<Member> activeMembers = memberRepository.findByGroupIdAndMemberStatusForUpdate(
                 group.getGroupId(),
                 MemberStatus.ACTIVE
         );
-        if (activeMembers.size() < 2) {
-            return false;
-        }
-
-        List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(group.getGroupId()));
-        if (!wheelAssignmentService.findMembersWithoutBook(activeMembers, books).isEmpty()) {
-            return false;
-        }
-
-        Integer readingPeriod = group.getReadingPeriod();
-        if (readingPeriod == null || readingPeriod < 1) {
-            return false;
-        }
-
+        // 기존 일정은 라운드 수 + 1로 목표 인원을 복원해 배포 순서와 무관하게 시작할 수 있게 한다.
         List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
-        int expectedRoundCount = activeMembers.size() - 1;
+        Integer targetMemberCount = resolveTargetMemberCount(group, rounds.size());
+        if (targetMemberCount == null
+                || activeMembers.size() < 2
+                || activeMembers.size() > targetMemberCount) {
+            return false;
+        }
 
-        if (rounds.isEmpty() || !hasValidExistingRoundShape(rounds, expectedRoundCount)) {
-            // 미리 일정을 만들지 않았거나 멤버 구성이 바뀐 경우
-            // 시작 시점의 최종 ACTIVE 멤버 수와 저장된 설정으로 일정을 다시 만든다.
-            deleteReplaceableRecruitingSchedule(group);
-            group.invalidateSchedule();
-            ScheduleCalendarService.ExcludedCalendar excludedCalendar = scheduleCalendarService.normalizeExcludedCalendar(
-                    deserializeExcludedDates(group.getScheduleExcludedDates()),
-                    deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges())
-            );
-            if (!canFitSchedule(
-                    startDate,
-                    group.getScheduleEndDate(),
-                    expectedRoundCount,
-                    readingPeriod,
-                    excludedCalendar
-            )) {
-                return false;
-            }
-            rounds = createRounds(group, expectedRoundCount, startDate, readingPeriod, excludedCalendar);
-            group.updateScheduleInfo(startDate, expectedRoundCount);
+        // 목표 인원 기준으로 만든 전체 날짜 틀은 시작 당일에도 삭제하거나 다시 계산하지 않는다.
+        if (!hasValidExistingRoundShape(rounds, targetMemberCount - 1)) {
+            return false;
         }
 
         Round firstRound = rounds.get(0);
@@ -421,31 +581,15 @@ public class GroupScheduleService {
             return false;
         }
 
-        // 일정 API는 날짜만 저장한다. 모임을 실제로 시작하기 직전에
-        // 최종 멤버와 도서를 기준으로 전체 라운드 배정을 PLANNED로 생성한다.
-        replaceInitialPlannedAssignments(rounds, activeMembers, books);
+        // 시작일에는 라운드나 배정을 만들지 않고 모집 중에 준비된 계획을 그대로 사용한다.
+        if (!recruitingScheduleAssignmentService.isReady(group)) {
+            return false;
+        }
+
+        // 완료 판단은 목표 인원이 아니라 시작 시점의 실제 인원으로 실행하는 N-1개 라운드를 기준으로 한다.
+        group.initializeTargetMemberCount(targetMemberCount);
+        group.confirmExecutableRoundCount(activeMembers.size() - 1);
         return true;
-    }
-
-    private void replaceInitialPlannedAssignments(
-            List<Round> rounds,
-            List<Member> activeMembers,
-            List<OwnBook> books
-    ) {
-        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
-        List<WheelState> existingStates = wheelStateRepository.findByRoundIdIn(roundIds);
-        boolean hasStartedState = existingStates.stream()
-                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
-        if (hasStartedState) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
-        }
-        if (!existingStates.isEmpty()) {
-            wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
-            wheelStateRepository.flush();
-        }
-
-        WheelAssignmentPlan assignmentPlan = planInitialAssignments(rounds, activeMembers, books);
-        wheelReassignmentService.savePlannedAssignments(assignmentPlan, activeMembers, books);
     }
 
     private boolean hasValidExistingRoundShape(List<Round> rounds, int expectedRoundCount) {
@@ -474,56 +618,6 @@ public class GroupScheduleService {
         }
 
         return true;
-    }
-
-    private List<Round> createRounds(
-            Group group,
-            int roundCount,
-            LocalDate startDate,
-            int readingPeriod,
-            ScheduleCalendarService.ExcludedCalendar excludedCalendar
-    ) {
-        List<Round> rounds = new ArrayList<>(roundCount);
-        LocalDate currentStart = startDate;
-
-        for (int roundNumber = 1; roundNumber <= roundCount; roundNumber++) {
-            LocalDate endDate = scheduleCalendarService.calculateRoundEndDate(
-                    currentStart,
-                    readingPeriod,
-                    excludedCalendar
-            );
-            rounds.add(Round.builder()
-                    .roundId(UUID.randomUUID().toString())
-                    .group(group)
-                    .roundNumber(roundNumber)
-                    .startDate(currentStart)
-                    .endDate(endDate)
-                    .build());
-            currentStart = endDate.plusDays(1);
-        }
-
-        return roundRepository.saveAll(rounds);
-    }
-
-    private boolean canFitSchedule(
-            LocalDate startDate,
-            LocalDate requestedEndDate,
-            int roundCount,
-            int readingPeriod,
-            ScheduleCalendarService.ExcludedCalendar excludedCalendar
-    ) {
-        if (requestedEndDate == null) {
-            return true;
-        }
-        if (requestedEndDate.isBefore(startDate)) {
-            return false;
-        }
-        long usableDays = scheduleCalendarService.countUsableDaysUntilDeadline(
-                startDate,
-                requestedEndDate,
-                excludedCalendar
-        );
-        return usableDays >= (long) roundCount * readingPeriod;
     }
 
     private String serializeExcludedDates(List<LocalDate> excludedDates) {
@@ -567,10 +661,13 @@ public class GroupScheduleService {
     // 끝난 라운드를 종료시키는 로직
     @Transactional
     public int closeExpiredWheelStates() {
-        LocalDate localDate = LocalDate.now();
+        LocalDate localDate = LocalDate.now(clock);
 
         // 1.'오늘'을 기준으로 종료일이 지난 roundId 리스트 조회
-        List<String> expiredRoundIds = roundRepository.findRoundIdsByEndDateBefore(localDate);
+        List<String> expiredRoundIds = roundRepository.findExecutableRoundIdsByEndDateBefore(
+                localDate,
+                State.IN_PROGRESS
+        );
 
         // 만약 끝난 라운드가 하나도 없다면(비어있다면) 메서드 종료
         if (expiredRoundIds.isEmpty()) return 0;
@@ -579,7 +676,10 @@ public class GroupScheduleService {
         int updated = wheelStateRepository.bulkCloseWheelStates(expiredRoundIds, WheelStatus.UNFINISHED);
 
         // 3. 어제(=오늘 종료된) 라운드들은 명시적으로 알림 발행 - 라운드 단위 이벤트
-        List<Round> closedYesterday = roundRepository.findByEndDate(localDate.minusDays(1));
+        List<Round> closedYesterday = roundRepository.findExecutableRoundsByEndDate(
+                localDate.minusDays(1),
+                State.IN_PROGRESS
+        );
         for (Round round : closedYesterday) {
             Group group = round.getGroup();
             eventPublisher.publishEvent(new RoundFinishedUnfinishedEvent(
@@ -592,85 +692,56 @@ public class GroupScheduleService {
     @Transactional
     public int startRoundWheelState() {
         LocalDate localDate = LocalDate.now(clock);
-
-        // 1. 오늘 진행되어야 하는 라운드 조회
-        List<Round> startingRounds = roundRepository.findByStartDateLessThanEqualAndEndDateGreaterThanEqual(
+        List<Round> startingRounds = roundRepository.findExecutableRoundsContainingDate(
                 localDate,
-                localDate
+                State.IN_PROGRESS
         );
-
-        // 없을 경우, 0 리턴
-        if (startingRounds.isEmpty()) return 0;
+        if (startingRounds.isEmpty()) {
+            return 0;
+        }
 
         int cnt = 0;
-        List<WheelState> newWheels = new ArrayList<>();
         List<Round> startedRounds = new ArrayList<>();
 
-        // 그룹 잠금 이후 최신 ACTIVE 멤버와 책을 조회해 멤버 변경과의 경쟁 조건을 막는다.
         for (Round round : startingRounds) {
             String groupId = round.getGroup().getGroupId();
             Group group = groupRepository.findByGroupIdForUpdate(groupId).orElse(null);
-            if (group == null) continue;
-            // 자정 경계에서 재생성으로 삭제된 라운드를 영속성 컨텍스트의 오래된 객체로 시작하지 않도록 DB를 재확인한다.
-            boolean isCurrentRound = roundRepository
-                    .existsByRoundIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
-                            round.getRoundId(), localDate, localDate
-                    );
-            if (!isCurrentRound) continue;
-
-            List<Member> members = memberRepository
-                    .findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(groupId, MemberStatus.ACTIVE);
-            List<OwnBook> books = ownBookRepository.findByGroup_GroupIdIn(List.of(groupId));
-
-            // 멤버나 책이 없는 비정상 그룹은 스킵
-            if (group.getGroupState() != State.IN_PROGRESS) continue;
-
-            List<WheelState> existingWheelStates = wheelStateRepository.findByRoundId(round.getRoundId());
-            if (!existingWheelStates.isEmpty()) {
-                // 미래 책 배정은 이미 저장돼 있으므로 새로 만들지 않고, 시작일에만 실제 독서 상태로 전환한다.
-                List<WheelState> plannedWheelStates = existingWheelStates.stream()
-                        .filter(wheelState -> wheelState.getWheelState() == WheelStatus.PLANNED)
-                        .toList();
-                if (plannedWheelStates.size() == existingWheelStates.size()) {
-                    plannedWheelStates.forEach(WheelState::activate);
-                    cnt += plannedWheelStates.size();
-                    startedRounds.add(round);
-                }
+            if (group == null || group.getGroupState() != State.IN_PROGRESS) {
                 continue;
             }
 
-            if (members.isEmpty() || books.isEmpty()) continue;
-            if (!wheelAssignmentService.findMembersWithoutBook(members, books).isEmpty()) continue;
-
-            int currentRound = round.getRoundNumber(); //현재 라운드
-            // 이번 라운드의 책 배정 결과 조회
-            List<WheelAssignmentService.WheelAssignment> assignments =
-                    wheelAssignmentService.assignBooks(members, books, currentRound);
-            if (assignments.isEmpty()) continue;
-
-            // 배정 하나를 WheelState 엔티티로 생성
-            for (WheelAssignmentService.WheelAssignment assignment : assignments) {
-                WheelState newWheel = WheelState.builder()
-                        .wheelStateId(UUID.randomUUID().toString())
-                        .roundId(round.getRoundId())
-                        .member(assignment.member())
-                        .ownBook(assignment.ownBook())
-                        .build();
-
-                newWheels.add(newWheel);
-                cnt++;
+            boolean isCurrentRound = roundRepository
+                    .existsExecutableRoundContainingDate(
+                            round.getRoundId(),
+                            localDate,
+                            State.IN_PROGRESS
+                    );
+            if (!isCurrentRound) {
+                continue;
             }
+
+            List<WheelState> existingWheelStates = wheelStateRepository.findByRoundId(round.getRoundId());
+            if (existingWheelStates.isEmpty()) {
+                continue;
+            }
+
+            List<WheelState> plannedWheelStates = existingWheelStates.stream()
+                    .filter(wheelState -> wheelState.getWheelState() == WheelStatus.PLANNED)
+                    .toList();
+            if (plannedWheelStates.size() != existingWheelStates.size()) {
+                continue;
+            }
+
+            plannedWheelStates.forEach(WheelState::activate);
+            cnt += plannedWheelStates.size();
             startedRounds.add(round);
         }
-        // 한 번에 DB에 저장
-        if (!newWheels.isEmpty()) {
-            wheelStateRepository.saveAll(newWheels);
-        }
 
-        // 라운드 시작 알림
         for (Round round : startedRounds) {
             Group group = groupRepository.findByGroupIdForUpdate(round.getGroup().getGroupId()).orElse(null);
-            if (group == null) continue;
+            if (group == null) {
+                continue;
+            }
             eventPublisher.publishEvent(new RoundStartedEvent(
                     group.getGroupId(), group.getGroupName(), round.getRoundNumber()
             ));
@@ -681,7 +752,7 @@ public class GroupScheduleService {
     // 모든 라운드가 끝난 그룹을 COMPLETE 상태로 변경
     @Transactional
     public int closeFinishedGroups() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         List<Group> completing = groupRepository.findGroupsBecomingComplete(State.IN_PROGRESS, today);
 
@@ -709,7 +780,7 @@ public class GroupScheduleService {
 
     private Member findActiveMember(String groupId, String userPK) {
         Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
         // 미래 일정은 현재 모임에 참여 중인 멤버만 조회할 수 있다.
         if (member.getMemberStatus() != MemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
