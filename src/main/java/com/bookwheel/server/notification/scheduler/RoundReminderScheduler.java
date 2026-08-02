@@ -1,6 +1,7 @@
 package com.bookwheel.server.notification.scheduler;
 
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.event.RoundDeadlineApproachingEvent;
 import com.bookwheel.server.schedule.repository.RoundRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.Clock;
 import java.util.List;
 
 /**
@@ -25,17 +27,21 @@ public class RoundReminderScheduler {
 
     private final RoundRepository roundRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
     @Transactional(readOnly = true)
     public void dispatchDeadlineReminders() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         publishFor(today.plusDays(3), 3);
         publishFor(today.plusDays(1), 1);
     }
 
     private void publishFor(LocalDate targetEndDate, int daysLeft) {
-        List<Round> rounds = roundRepository.findByEndDate(targetEndDate);
+        List<Round> rounds = roundRepository.findExecutableRoundsByEndDate(
+                targetEndDate,
+                State.IN_PROGRESS
+        );
         if (rounds.isEmpty()) {
             return;
         }

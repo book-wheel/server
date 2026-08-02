@@ -107,6 +107,30 @@ class GroupSettingControllerTest {
 
     @Test
     @WithMockUser
+    @DisplayName("모임 수정 시 최대 인원은 12명을 초과할 수 없다")
+    void updateGroup_RejectsMaxMembersAboveLimit() throws Exception {
+        String request = """
+                {
+                  "groupName": "수정된 모임",
+                  "groupComment": "수정된 한줄소개",
+                  "groupRule": "수정된 규칙",
+                  "groupPublic": true,
+                  "groupOffline": false,
+                  "maxMembers": 13
+                }
+                """;
+
+        mockMvc.perform(patch("/api/v1/groups/{groupId}", "group-1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest());
+
+        then(groupSettingService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @WithMockUser
     @DisplayName("모임 삭제 API 성공")
     void deleteGroup_Success() throws Exception {
         String groupId = "group-1";

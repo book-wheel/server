@@ -30,7 +30,7 @@ public class GroupBookController {
 
     @Operation(
             summary = "참여 도서 등록",
-            description = "그룹에 내가 읽힐 책을 등록합니다. isbn, title은 필수입니다. totalPage는 선택값이며, 입력할 경우 1 이상이어야 합니다."
+            description = "그룹에 내가 읽힐 책을 등록합니다. 모집 중 ACTIVE 멤버가 2명 이상이고 전원이 책을 등록하면 현재 인원 기준 N-1개 라운드에 PLANNED 배정이 생성될 수 있으므로, 프론트는 성공 후 GET /schedule을 다시 조회해 READY 여부를 갱신합니다."
     )
     @PostMapping("/{groupId}/books")
     public ResponseEntity<ApiResponse<OwnBookRegisterResponse>> registerOwnBook(
@@ -48,7 +48,7 @@ public class GroupBookController {
 
     @Operation(
         summary = "참여 도서 변경",
-        description = "그룹에 등록한 참여 도서를 다른 도서로 변경합니다. 그룹이 모집중일 때만 가능하며 다른 사용자가 등록한 책은 불가능합니다."
+        description = "그룹에 등록한 참여 도서를 다른 도서로 변경합니다. 그룹이 모집중일 때만 가능하며 다른 사용자가 등록한 책은 불가능합니다. OwnBook ID가 유지돼 기존 PLANNED 배정도 새 도서 정보를 참조합니다."
     )
     @PatchMapping("/{groupId}/books/{ownBookId}")
     public ResponseEntity<ApiResponse<OwnBookUpdateResponse>> updateOwnBook(
@@ -69,7 +69,7 @@ public class GroupBookController {
 
     @Operation(
         summary = "참여 도서 삭제",
-        description = "그룹에 등록한 본인의 참여 도서를 삭제합니다. 모집 중인 그룹에서만 가능합니다."
+        description = "그룹에 등록한 본인의 참여 도서를 삭제합니다. 모집 중인 그룹에서만 가능하며 기존 라운드는 유지되고 PLANNED 배정은 제거됩니다. 프론트는 성공 후 GET /schedule을 다시 조회합니다."
     )
     @DeleteMapping("/{groupId}/books/{ownBookId}")
     public ResponseEntity<ApiResponse<Void>> deleteOwnBook(

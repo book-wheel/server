@@ -86,7 +86,10 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "그룹 가입 신청", description = "그룹에 가입 신청을 보냅니다.")
+    @Operation(
+            summary = "그룹 가입 신청",
+            description = "그룹에 가입 신청을 보냅니다. 일정 목표 인원에 도달한 모임은 GROUP_051로 거절합니다."
+    )
     @PostMapping("/{groupId}/join")
     public ResponseEntity<ApiResponse<GroupJoinResponse>> joinGroup(
             @PathVariable String groupId,
@@ -109,7 +112,7 @@ public class GroupController {
 
     @Operation(
             summary = "가입 요청 처리",
-            description = "모집 중(RECRUITING)인 모임에서만 리더가 가입 요청을 승인 또는 거절합니다. 승인으로 ACTIVE 멤버 구성이 바뀌면 기존 라운드는 무효화되지만 예정 시작일은 유지되며, 시작일에 최종 멤버 기준으로 자동 생성됩니다. 무효화 여부는 groupRoundCount로 확인합니다. 진행 중 또는 완료된 모임에서는 GROUP_035 오류가 반환됩니다."
+            description = "모집 중(RECRUITING)인 모임에서 리더가 가입 요청을 승인 또는 거절합니다. 승인 후에도 목표 인원 기준 라운드는 유지되고 PLANNED 배정만 재검증됩니다. 목표 인원을 초과하는 승인은 GROUP_051로 거절되며, 프론트는 처리 후 GET /schedule을 다시 조회해 CONFIGURED/READY 상태를 갱신합니다."
     )
     @PatchMapping("/{groupId}/members/{memberId}/status")
     public ResponseEntity<ApiResponse<MemberRequestStatusUpdateResponse>> updateMemberRequestStatus(

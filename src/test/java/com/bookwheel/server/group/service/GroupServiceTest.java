@@ -5,13 +5,16 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.GroupCreateRequest;
 import com.bookwheel.server.group.dto.GroupCreateResponse;
+import com.bookwheel.server.group.dto.member.GroupJoinRequest;
+import com.bookwheel.server.group.dto.search.GroupSearchCondition;
+import com.bookwheel.server.group.dto.search.GroupSearchResponse;
+import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.repository.MemberRepository;
-import com.bookwheel.server.schedule.repository.RoundRepository;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
-import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,12 +22,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,10 +71,7 @@ class GroupServiceTest {
     private GroupMemberPermissionValidator memberPermissionValidator;
 
     @Mock
-    private RoundRepository roundRepository;
-
-    @Mock
-    private WheelStateRepository wheelStateRepository;
+    private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     private GroupService groupService;
 
@@ -80,8 +85,7 @@ class GroupServiceTest {
                 passwordEncoder,
                 eventPublisher,
                 memberPermissionValidator,
-                roundRepository,
-                wheelStateRepository,
+                recruitingScheduleAssignmentService,
                 FIXED_CLOCK
         );
     }
@@ -114,6 +118,76 @@ class GroupServiceTest {
                 .isEqualTo(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
 
         then(userRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("일정 목표 인원을 채운 모임에는 가입 신청을 만들지 않는다")
+    void joinGroup_RejectsWhenTargetMemberCountReached() {
+        String groupId = "group-1";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("목표 인원 모임")
+                .groupPublic(true)
+                .maxMembers(10)
+                .targetMemberCount(4)
+                .currentMembers(4)
+                .groupState(State.RECRUITING)
+                .build();
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("member-user-pk")).willReturn(Optional.of(activeUser()));
+
+        assertThatThrownBy(() -> groupService.joinGroup(
+                groupId,
+                new GroupJoinRequest(null, "가입하고 싶습니다"),
+                "member-user-pk"
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
+
+        then(memberRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("그룹 목록 D-day는 UTC 날짜가 아닌 KST 날짜를 기준으로 계산한다")
+    void getGroups_CalculatesDdayWithKstClock() {
+        Clock kstBoundaryClock = Clock.fixed(
+                Instant.parse("2026-07-15T15:30:00Z"),
+                ZoneId.of("Asia/Seoul")
+        );
+        groupService = new GroupService(
+                groupRepository,
+                chatRoomRepository,
+                memberRepository,
+                userRepository,
+                passwordEncoder,
+                eventPublisher,
+                memberPermissionValidator,
+                recruitingScheduleAssignmentService,
+                kstBoundaryClock
+        );
+        Group group = Group.builder()
+                .groupId("group-1")
+                .groupName("KST 모임")
+                .groupState(State.RECRUITING)
+                .startDate(LocalDate.of(2026, 7, 17))
+                .maxMembers(5)
+                .build();
+        Page<Group> groups = new PageImpl<>(List.of(group));
+        given(groupRepository.findAll(
+                org.mockito.ArgumentMatchers.<Specification<Group>>any(),
+                any(Pageable.class)
+        )).willReturn(groups);
+
+        Page<GroupSearchResponse> response = groupService.getGroups(
+                new GroupSearchCondition(null, null, null, null),
+                Pageable.unpaged(),
+                null
+        );
+
+        assertThat(response.getContent()).singleElement()
+                .extracting(GroupSearchResponse::dday)
+                .isEqualTo(1);
     }
 
     private GroupCreateRequest groupCreateRequest(LocalDate startDate) {

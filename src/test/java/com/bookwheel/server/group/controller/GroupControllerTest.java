@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -96,6 +97,32 @@ class GroupControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupId").value("group-uuid-1234"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("그룹 생성 시 최대 인원은 12명을 초과할 수 없다")
+    void createGroup_RejectsMaxMembersAboveLimit() throws Exception {
+        String request = """
+                {
+                  "groupName": "스프링스터디",
+                  "groupComment": "열심히 합시다",
+                  "groupRule": "규칙입니다",
+                  "groupPublic": true,
+                  "groupOffline": false,
+                  "readingPeriod": 7,
+                  "startDate": "2027-01-01",
+                  "maxMembers": 13
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/groups/making")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest());
+
+        then(groupService).shouldHaveNoInteractions();
     }
 
     @Test

@@ -16,13 +16,9 @@ import com.bookwheel.server.group.repository.*;
 import com.bookwheel.server.member.entity.*;
 import com.bookwheel.server.member.enums.*;
 import com.bookwheel.server.member.repository.*;
-import com.bookwheel.server.schedule.entity.Round;
-import com.bookwheel.server.schedule.repository.RoundRepository;
+import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
-import com.bookwheel.server.wheel.entity.WheelState;
-import com.bookwheel.server.wheel.enums.WheelStatus;
-import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -50,8 +46,7 @@ public class GroupService {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
-    private final RoundRepository roundRepository;
-    private final WheelStateRepository wheelStateRepository;
+    private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
     private final Clock clock;
 
     @Transactional
@@ -120,9 +115,11 @@ public class GroupService {
         Page<Group> groupPage = groupRepository.findAll(GroupSpecification.searchWith(condition), pageable);
         // 페이지 내 그룹들의 버튼 상태를 한 번에 계산해 응답에 채운다.
         Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groupPage.getContent(), userPK);
+        LocalDate currentDate = LocalDate.now(clock);
         return groupPage.map(group -> GroupSearchResponse.from(
                 group,
-                bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOIN)
+                bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOIN),
+                currentDate
         ));
     }
 
@@ -130,11 +127,13 @@ public class GroupService {
         List<Group> groups = memberRepository.findGroupsByUserPKAndMemberStatus(userPK, MemberStatus.ACTIVE);
         // 내 모임 목록도 상세/탐색과 같은 버튼 상태 규칙을 재사용한다.
         Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groups, userPK);
+        LocalDate currentDate = LocalDate.now(clock);
 
         return groups.stream()
                 .map(group -> GroupSearchResponse.from(
                         group,
-                        bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOINED)
+                        bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOINED),
+                        currentDate
                 ))
                 .toList();
     }
@@ -181,9 +180,17 @@ public class GroupService {
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
-            // 승인으로 ACTIVE 멤버 수가 달라지므로, 기존 계획표는 승인 전에 폐기한다.
-            invalidateGeneratedScheduleIfPresent(group);
+            Integer targetMemberCount = group.getTargetMemberCount();
+            long activeMemberCount = memberRepository.countByGroup_GroupIdAndMemberStatus(
+                    groupId,
+                    MemberStatus.ACTIVE
+            );
+            if (targetMemberCount != null && activeMemberCount >= targetMemberCount) {
+                throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
+            }
             targetMember.approve();
+            // 라운드는 유지하고 새 멤버 구성을 기준으로 모집 중 PLANNED 배정만 다시 판단한다.
+            recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
         } else {
             targetMember.reject();
         }
@@ -196,26 +203,6 @@ public class GroupService {
         ));
 
         return MemberRequestStatusUpdateResponse.of(targetMember.getMemberId(), status);
-    }
-
-    private void invalidateGeneratedScheduleIfPresent(Group group) {
-        List<Round> rounds = roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(group.getGroupId());
-        if (rounds.isEmpty()) {
-            return;
-        }
-
-        List<String> roundIds = rounds.stream().map(Round::getRoundId).toList();
-        List<WheelState> wheelStates = wheelStateRepository.findByRoundIdIn(roundIds);
-        boolean hasStartedWheelState = wheelStates.stream()
-                .anyMatch(wheelState -> wheelState.getWheelState() != WheelStatus.PLANNED);
-        if (hasStartedWheelState) {
-            // 진행 기록이 있으면 일정만 삭제해 데이터 연결이 끊기는 일을 막는다.
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_INVALIDATION_BLOCKED_BY_WHEEL_STATE);
-        }
-
-        wheelStateRepository.deleteByRoundIdInAndWheelState(roundIds, WheelStatus.PLANNED);
-        roundRepository.deleteByGroup_GroupId(group.getGroupId());
-        group.invalidateSchedule();
     }
 
     private void validateGroupCreateRequest(GroupCreateRequest request) {
@@ -247,6 +234,11 @@ public class GroupService {
 
         if (group.getCurrentMembers() >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
+        }
+
+        Integer targetMemberCount = group.getTargetMemberCount();
+        if (targetMemberCount != null && group.getCurrentMembers() >= targetMemberCount) {
+            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
         }
     }
 
