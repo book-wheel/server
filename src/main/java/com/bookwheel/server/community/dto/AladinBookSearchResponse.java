@@ -13,12 +13,11 @@ public record AladinBookSearchResponse(
         String isbn13,     // 13자리 ISBN
         String cover,      // 표지 이미지
         String description,// 책 소개
-        SubInfo subInfo    // 부가 정보(목차)
+        SubInfo subInfo    // 부가 정보(쪽수)
     ) {}
 
     // 부가 정보 객체
     public record SubInfo(
-        Integer itemPage,  // 쪽수
-        String toc         // 목차
+        Integer itemPage   // 쪽수
     ) {}
 }

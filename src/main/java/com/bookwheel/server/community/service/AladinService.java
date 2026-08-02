@@ -37,7 +37,7 @@ public class AladinService {
             .queryParam("ItemId", isbn)
             .queryParam("output", "js")
             .queryParam("Version", "20131101")
-            .queryParam("OptResult", "toc,itemPage,subInfo")
+            .queryParam("OptResult", "itemPage,subInfo")
             .build()
             .toUri();
 

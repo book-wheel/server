@@ -22,9 +22,6 @@ public record BookDetailResponse(
     @Schema(description = "전체 페이지 수 (쪽수). 외부 도서 API가 페이지 수를 제공하지 않으면 null이 반환됩니다.", example = "236")
     Integer itemPage,
 
-    @Schema(description = "목차 정보 (데이터가 없으면 '등록된 목차 정보가 없습니다.' 반환)", example = "1. 윤해리\n2. 김마틴...")
-    String toc,
-
     @Schema(description = "13자리 ISBN", example = "9791161571188")
     String isbn,
 
@@ -46,8 +43,6 @@ public record BookDetailResponse(
             item.description(),
             item.cover(),
             (subInfo != null) ? subInfo.itemPage() : null,
-            (subInfo != null && subInfo.toc() != null && !subInfo.toc().isBlank())
-                ? subInfo.toc() : "등록된 목차 정보가 없습니다.",
             item.isbn13(),
             isInterested,
             null
@@ -63,7 +58,6 @@ public record BookDetailResponse(
             description,
             cover,
             itemPage,
-            toc,
             isbn,
             isInterested,
             usageAnalysis

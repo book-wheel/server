@@ -133,7 +133,6 @@ class BookServiceTest {
                 "책 소개",
                 "https://image.aladin.co.kr/cover.jpg",
                 340,
-                "등록된 목차 정보가 없습니다.",
                 isbn,
                 true,
                 null

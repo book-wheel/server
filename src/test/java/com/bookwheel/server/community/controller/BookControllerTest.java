@@ -85,7 +85,6 @@ class BookControllerTest {
                 "책 소개",
                 "https://image.aladin.co.kr/cover.jpg",
                 340,
-                "등록된 목차 정보가 없습니다.",
                 isbn,
                 true,
                 usageAnalysis
@@ -109,7 +108,9 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.usageAnalysis.mostLoanedAgeGroup").value("40대"))
                 .andExpect(jsonPath("$.data.usageAnalysis.keywords.length()").value(3))
                 .andExpect(jsonPath("$.data.usageAnalysis.keywords[0]").value("역사"))
-                .andExpect(jsonPath("$.data.usageAnalysis.keywords[2]").value("광주민주화운동"));
+                .andExpect(jsonPath("$.data.usageAnalysis.keywords[2]").value("광주민주화운동"))
+                // 목차 영역은 이용 분석으로 대체되었으므로 toc 필드는 더 이상 내려가지 않는다.
+                .andExpect(jsonPath("$.data.toc").doesNotExist());
     }
 
     @Test
