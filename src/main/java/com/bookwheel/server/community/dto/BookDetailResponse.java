@@ -29,7 +29,11 @@ public record BookDetailResponse(
     String isbn,
 
     @Schema(description = "현재 로그인한 사용자의 관심 도서(찜) 여부", example = "true")
-    boolean isInterested
+    boolean isInterested,
+
+    @Schema(description = "도서관정보나루 기반 도서 이용 분석 정보. "
+        + "해당 ISBN의 데이터가 없거나 외부 API 조회에 실패하면 null이 반환되며, 이 경우에도 도서 상세 조회는 정상 응답합니다.")
+    BookUsageAnalysisResponse usageAnalysis
 ) {
 
     public static BookDetailResponse from(AladinBookSearchResponse.Item item, boolean isInterested) {
@@ -45,7 +49,24 @@ public record BookDetailResponse(
             (subInfo != null && subInfo.toc() != null && !subInfo.toc().isBlank())
                 ? subInfo.toc() : "등록된 목차 정보가 없습니다.",
             item.isbn13(),
-            isInterested
+            isInterested,
+            null
+        );
+    }
+
+    // 이용 분석은 도서 상세 조회의 부가 정보이므로 알라딘 응답 조립과 분리해서 덧붙인다.
+    public BookDetailResponse withUsageAnalysis(BookUsageAnalysisResponse usageAnalysis) {
+        return new BookDetailResponse(
+            title,
+            author,
+            publisher,
+            description,
+            cover,
+            itemPage,
+            toc,
+            isbn,
+            isInterested,
+            usageAnalysis
         );
     }
 }

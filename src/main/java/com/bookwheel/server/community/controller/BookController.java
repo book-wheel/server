@@ -94,7 +94,10 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "도서 상세 조회", description = "ISBN을 통해 도서 상세 정보를 조회합니다.")
+    @Operation(summary = "도서 상세 조회",
+        description = "ISBN을 통해 도서 상세 정보를 조회합니다. "
+            + "도서관정보나루 기반 이용 분석 정보(usageAnalysis)를 함께 제공하며, "
+            + "해당 데이터가 없거나 외부 API 조회에 실패한 경우 usageAnalysis는 null로 내려가고 도서 상세 조회는 정상 응답합니다.")
     @GetMapping("/{isbn}")
     public ApiResponse<BookDetailResponse> getBookDetail(
         @PathVariable("isbn") String isbn,

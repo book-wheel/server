@@ -55,6 +55,7 @@ public class BookService {
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
     private final AladinService aladinService;
+    private final LibraryNaruService libraryNaruService;
     private final S3Service s3Service;
 
     private static final int DEFAULT_GALLERY_SIZE = 18;
@@ -290,7 +291,12 @@ public class BookService {
 
     public BookDetailResponse getBookDetail(String isbn, String userPK) {
         boolean isInterested = bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK);
-        return aladinService.getBookDetailByIsbn(isbn, isInterested);
+        BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(isbn, isInterested);
+
+        // 이용 분석은 부가 정보이므로 조회에 실패하면 null이 되고, 도서 상세 조회 자체는 정상 응답한다.
+        LibraryNaruUsageAnalysisResponse.UsageAnalysis usageAnalysis = libraryNaruService.getUsageAnalysis(isbn);
+
+        return bookDetail.withUsageAnalysis(BookUsageAnalysisResponse.from(usageAnalysis));
     }
 
     @Transactional
