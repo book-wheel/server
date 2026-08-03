@@ -10,6 +10,7 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.CursorUtils;
+import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
@@ -49,6 +50,7 @@ class PostServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private S3Service s3Service;
     @Mock private CursorUtils cursorUtils;
+    @Mock private AladinService aladinService;
 
     @InjectMocks
     private PostService postService;
@@ -81,12 +83,23 @@ class PostServiceTest {
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
         given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
         given(bookRepository.findByIsbn(isbn)).willReturn(Optional.empty());
+        given(aladinService.getBookDetailByIsbn(isbn, false)).willReturn(new BookDetailResponse(
+                "Clean Code",
+                "Robert C. Martin",
+                "Prentice Hall",
+                "A handbook of agile software craftsmanship.",
+                "https://example.com/clean-code.jpg",
+                464,
+                "Contents",
+                isbn,
+                false
+        ));
         given(postCommentRepository.countByPost(post)).willReturn(0L);
         given(postLikeRepository.existsByPostAndUser(post, viewer)).willReturn(false);
 
         PostDetailResponse response = postService.getPostDetail(postId, userPK);
 
-        assertThat(response.title()).isNotBlank();
+        assertThat(response.title()).isEqualTo("Clean Code");
     }
 
     @Test

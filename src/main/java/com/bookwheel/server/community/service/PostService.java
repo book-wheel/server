@@ -12,6 +12,7 @@ import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCommentResponse;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
+import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostReportRequest;
 import com.bookwheel.server.community.entity.*;
@@ -49,6 +50,7 @@ public class PostService {
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
     private final CursorUtils cursorUtils;
+    private final AladinService aladinService;
 
     private static final int DEFAULT_COMMENT_SIZE = 20;
     private static final int MAX_COMMENT_PAGE_SIZE = 50;
@@ -121,10 +123,7 @@ public class PostService {
 
         String isbn = post.getBookInfo().getIsbn();
 
-        // 책 제목은 별도 Book 테이블에서 조회한다. (미등록 도서면 null)
-        String title = bookRepository.findByIsbn(isbn)
-            .map(Book::getTitle)
-            .orElse(null);
+        String title = resolvePostBookTitle(isbn);
 
         String profileImageUrl = getProfileImageUrl(post.getUploader().getProfileImageKey());
 
@@ -160,6 +159,26 @@ public class PostService {
             return null;
         }
         return s3Service.getPresignedGetUrl(profileImageKey);
+    }
+
+    private String resolvePostBookTitle(String isbn) {
+        return bookRepository.findByIsbn(isbn)
+            .map(Book::getTitle)
+            .filter(StringUtils::hasText)
+            .orElseGet(() -> resolveAladinBookTitle(isbn));
+    }
+
+    private String resolveAladinBookTitle(String isbn) {
+        try {
+            BookDetailResponse response = aladinService.getBookDetailByIsbn(isbn, false);
+            if (response != null && StringUtils.hasText(response.title())) {
+                return response.title();
+            }
+        } catch (BusinessException e) {
+            // Keep post detail available even when external book metadata lookup fails.
+        }
+
+        return isbn;
     }
 
     // 작성 요청의 groupId로 모임을 조회한다.
