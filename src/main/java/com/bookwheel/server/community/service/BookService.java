@@ -283,8 +283,15 @@ public class BookService {
     }
 
 
-    public BookSearchListResponse searchBooks(BookSearchRequest request) {
-        return kaKaoService.searchBooks(request);
+    public BookSearchListResponse searchBooks(BookSearchRequest request, String userPK) {
+        BookSearchListResponse response = kaKaoService.searchBooks(request);
+        Set<String> interestedIsbns = findInterestedSearchIsbns(response.books(), userPK);
+
+        List<BookSearchResponse> books = response.books().stream()
+            .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
+            .toList();
+
+        return new BookSearchListResponse(books, response.totalCount(), response.isEnd());
     }
 
 
@@ -432,6 +439,24 @@ public class BookService {
             cursor.bookId(),
             pageRequest
         );
+    }
+
+    private Set<String> findInterestedSearchIsbns(List<BookSearchResponse> books, String userPK) {
+        if (userPK == null || books.isEmpty()) {
+            return Set.of();
+        }
+
+        List<String> isbns = books.stream()
+            .map(BookSearchResponse::isbn)
+            .filter(StringUtils::hasText)
+            .distinct()
+            .toList();
+
+        if (isbns.isEmpty()) {
+            return Set.of();
+        }
+
+        return Set.copyOf(bookLikeRepository.findInterestedIsbns(userPK, isbns));
     }
 
     private String createNextInterestCursor(List<InterestBookResponseDto> books) {
