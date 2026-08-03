@@ -10,6 +10,8 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.CursorUtils;
+import com.bookwheel.server.community.dto.PostDetailResponse;
+import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
@@ -17,8 +19,11 @@ import com.bookwheel.server.community.repository.PostLikeRepository;
 import com.bookwheel.server.community.repository.PostReportRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.user.repository.UserRepository;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -47,6 +52,42 @@ class PostServiceTest {
 
     @InjectMocks
     private PostService postService;
+
+    @Test
+    @DisplayName("Book 테이블에 도서가 없어도 게시글 상세 title은 null이 아니다.")
+    void getPostDetail_TitleIsNonNullWhenBookIsMissing() {
+        Long postId = 10L;
+        String userPK = UUID.randomUUID().toString();
+        String isbn = "9780132350884";
+
+        BookInfo bookInfo = mock(BookInfo.class);
+        given(bookInfo.getIsbn()).willReturn(isbn);
+
+        User uploader = mock(User.class);
+        given(uploader.getNickname()).willReturn("writer");
+        given(uploader.getProfileImageKey()).willReturn(null);
+
+        User viewer = mock(User.class);
+        Post post = mock(Post.class);
+        given(post.getPostId()).willReturn(postId);
+        given(post.getBookInfo()).willReturn(bookInfo);
+        given(post.getUploader()).willReturn(uploader);
+        given(post.getImages()).willReturn(List.of());
+        given(post.getGroup()).willReturn(null);
+        given(post.getContent()).willReturn("post content");
+        given(post.getLikeCount()).willReturn(0);
+        given(post.getCreatedAt()).willReturn(LocalDateTime.of(2026, 8, 3, 12, 0));
+
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
+        given(bookRepository.findByIsbn(isbn)).willReturn(Optional.empty());
+        given(postCommentRepository.countByPost(post)).willReturn(0L);
+        given(postLikeRepository.existsByPostAndUser(post, viewer)).willReturn(false);
+
+        PostDetailResponse response = postService.getPostDetail(postId, userPK);
+
+        assertThat(response.title()).isNotBlank();
+    }
 
     @Test
     @DisplayName("댓글 size가 상한(50)을 초과하면 INVALID_INPUT_VALUE 예외를 던진다.")
