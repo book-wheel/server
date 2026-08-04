@@ -1,6 +1,8 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.community.dto.BookSearchListResponse;
+import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewLikeResponse;
@@ -71,6 +73,33 @@ class BookControllerTest {
                 true,
                 LocalDateTime.of(2024, 1, 1, 10, 0)
         );
+    }
+
+    @Test
+    @WithMockUser(username = "user-pk")
+    @DisplayName("Book Search: returns interest state for each book")
+    void searchBooks_IncludesInterestedState() throws Exception {
+        BookSearchListResponse response = new BookSearchListResponse(
+                List.of(new BookSearchResponse(
+                        "Clean Code",
+                        "Robert C. Martin",
+                        "Prentice Hall",
+                        "2008-08-01",
+                        "https://example.com/clean-code.jpg",
+                        "9780132350884",
+                        true
+                )),
+                1,
+                true
+        );
+        given(bookService.searchBooks(any(), eq("user-pk"))).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/books/search")
+                        .param("query", "clean code"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].isbn").value("9780132350884"))
+                .andExpect(jsonPath("$.data.books[0].isInterested").value(true));
     }
 
     @Test

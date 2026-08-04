@@ -21,6 +21,18 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
     long countByUserPK(String userPK);
 
     @Query("""
+            select bi.isbn
+            from BookLike bl
+            join bl.bookInfo bi
+            where bl.userPK = :userPK
+            and bi.isbn in :isbns
+            """)
+    List<String> findInterestedIsbns(
+        @Param("userPK") String userPK,
+        @Param("isbns") List<String> isbns
+    );
+
+    @Query("""
             select new com.bookwheel.server.community.dto.InterestBookResponseDto(
                 bi.bookInfoId,
                 b.title,
