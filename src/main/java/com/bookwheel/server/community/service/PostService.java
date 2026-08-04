@@ -161,6 +161,8 @@ public class PostService {
         return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
+    // 책 제목은 Book 테이블에서 조회하고, 미등록 도서면 알라딘 도서 상세로 보완한다.
+    // 알라딘에서도 확인되지 않으면 null을 반환한다. (ISBN 등으로 대체하면 실제 도서명과 구분할 수 없다)
     private String resolvePostBookTitle(String isbn) {
         return bookRepository.findByIsbn(isbn)
             .map(Book::getTitle)
@@ -175,10 +177,10 @@ public class PostService {
                 return response.title();
             }
         } catch (BusinessException e) {
-            // Keep post detail available even when external book metadata lookup fails.
+            // 외부 도서 메타데이터 조회에 실패해도 게시글 상세는 계속 응답한다.
         }
 
-        return isbn;
+        return null;
     }
 
     // 작성 요청의 groupId로 모임을 조회한다.

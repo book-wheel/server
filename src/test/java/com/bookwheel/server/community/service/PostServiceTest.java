@@ -55,15 +55,15 @@ class PostServiceTest {
     @InjectMocks
     private PostService postService;
 
-    @Test
-    @DisplayName("Book 테이블에 도서가 없어도 게시글 상세 title은 null이 아니다.")
-    void getPostDetail_TitleIsNonNullWhenBookIsMissing() {
-        Long postId = 10L;
+    private static final Long POST_ID = 10L;
+    private static final String ISBN = "9780132350884";
+
+    // Book 테이블에 도서가 없는 게시글 상세 조회를 stubbing한다. (title 조회 경로만 테스트별로 다르다)
+    private String stubPostDetailWithoutBook() {
         String userPK = UUID.randomUUID().toString();
-        String isbn = "9780132350884";
 
         BookInfo bookInfo = mock(BookInfo.class);
-        given(bookInfo.getIsbn()).willReturn(isbn);
+        given(bookInfo.getIsbn()).willReturn(ISBN);
 
         User uploader = mock(User.class);
         given(uploader.getNickname()).willReturn("writer");
@@ -71,7 +71,7 @@ class PostServiceTest {
 
         User viewer = mock(User.class);
         Post post = mock(Post.class);
-        given(post.getPostId()).willReturn(postId);
+        given(post.getPostId()).willReturn(POST_ID);
         given(post.getBookInfo()).willReturn(bookInfo);
         given(post.getUploader()).willReturn(uploader);
         given(post.getImages()).willReturn(List.of());
@@ -80,10 +80,20 @@ class PostServiceTest {
         given(post.getLikeCount()).willReturn(0);
         given(post.getCreatedAt()).willReturn(LocalDateTime.of(2026, 8, 3, 12, 0));
 
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
         given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
-        given(bookRepository.findByIsbn(isbn)).willReturn(Optional.empty());
-        given(aladinService.getBookDetailByIsbn(isbn, false)).willReturn(new BookDetailResponse(
+        given(bookRepository.findByIsbn(ISBN)).willReturn(Optional.empty());
+        given(postCommentRepository.countByPost(post)).willReturn(0L);
+        given(postLikeRepository.existsByPostAndUser(post, viewer)).willReturn(false);
+
+        return userPK;
+    }
+
+    @Test
+    @DisplayName("Book 테이블에 도서가 없으면 알라딘 도서 상세로 title을 보완한다.")
+    void getPostDetail_ResolvesTitleFromAladinWhenBookIsMissing() {
+        String userPK = stubPostDetailWithoutBook();
+        given(aladinService.getBookDetailByIsbn(ISBN, false)).willReturn(new BookDetailResponse(
                 "Clean Code",
                 "Robert C. Martin",
                 "Prentice Hall",
@@ -91,15 +101,26 @@ class PostServiceTest {
                 "https://example.com/clean-code.jpg",
                 464,
                 "Contents",
-                isbn,
+                ISBN,
                 false
         ));
-        given(postCommentRepository.countByPost(post)).willReturn(0L);
-        given(postLikeRepository.existsByPostAndUser(post, viewer)).willReturn(false);
 
-        PostDetailResponse response = postService.getPostDetail(postId, userPK);
+        PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
 
         assertThat(response.title()).isEqualTo("Clean Code");
+    }
+
+    @Test
+    @DisplayName("알라딘 조회까지 실패하면 title은 ISBN으로 대체되지 않고 null로 내려간다.")
+    void getPostDetail_TitleIsNullWhenBookLookupFails() {
+        String userPK = stubPostDetailWithoutBook();
+        given(aladinService.getBookDetailByIsbn(ISBN, false))
+            .willThrow(new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+
+        PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
+
+        assertThat(response.title()).isNull();
+        assertThat(response.isbn()).isEqualTo(ISBN);
     }
 
     @Test
