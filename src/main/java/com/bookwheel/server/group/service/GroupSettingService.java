@@ -27,7 +27,6 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.wheel.entity.WheelState;
-import com.bookwheel.server.wheel.dto.WheelAssignmentPlan;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.wheel.service.WheelReassignmentService;
@@ -127,7 +126,7 @@ public class GroupSettingService {
             throw new BusinessException(ErrorCode.CANNOT_KICK_YOURSELF);
         }
 
-        // 멤버 구성과 라운드 재배정 판단을 하나의 잠긴 시점에서 처리한다.
+        // 멤버 구성 변경과 일정 재확정 상태 전환을 하나의 잠긴 시점에서 처리한다.
         LockedActiveMembers lockedMembers = lockedActiveMembers(groupId);
         List<Member> activeMembers = lockedMembers.activeMembers();
 
@@ -135,12 +134,9 @@ public class GroupSettingService {
 
         Member targetMember = findKickTargetMember(groupId, activeMembers, targetUserPK);
         validateKickableTarget(targetMember);
-        List<Member> remainingMembers = remainingMembers(activeMembers, targetMember);
-
         Runnable postStatusMutation = prepareRemovalBeforeStatusMutation(
                 lockedMembers.group(),
                 targetMember,
-                remainingMembers,
                 false
         );
         targetMember.kick();
@@ -238,17 +234,15 @@ public class GroupSettingService {
         List<Member> activeMembers = lockedMembers.activeMembers();
         Member member = findActiveMember(activeMembers, userPK);
 
-        // 1. 그룹장/부그룹장은 중도하차 불가 — 권한 위임/해제 선행 필요
+        // 그룹장/부그룹장은 중도하차 불가 — 권한 위임/해제 선행 필요
         MemberRole role = member.getMemberRole();
         if (role == MemberRole.LEADER || role == MemberRole.SUB_LEADER) {
             throw new BusinessException(ErrorCode.LEADER_CANNOT_EXIT);
         }
 
-        List<Member> remainingMembers = remainingMembers(activeMembers, member);
         Runnable postStatusMutation = prepareRemovalBeforeStatusMutation(
                 lockedMembers.group(),
                 member,
-                remainingMembers,
                 true
         );
 
@@ -397,7 +391,7 @@ public class GroupSettingService {
     }
 
     private LockedActiveMembers lockedActiveMembers(String groupId) {
-        // 멤버 변동 전 모임과 활성 멤버 목록을 같은 잠금 시점에 읽어 재배정 기준을 고정한다.
+        // 멤버 변동 전 모임과 활성 멤버 목록을 같은 잠금 시점에 읽어 상태 전환 기준을 고정한다.
         Group group = groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
         List<Member> activeMembers = memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE);
@@ -407,33 +401,15 @@ public class GroupSettingService {
     private Runnable prepareRemovalBeforeStatusMutation(
             Group group,
             Member member,
-            List<Member> remainingMembers,
             boolean validateCurrentReading
     ) {
         switch (group.getGroupState()) {
             case IN_PROGRESS -> {
-                // 현재/완료 라운드는 보존하고, 미래 라운드만 모두 재배정 가능할 때 탈퇴를 허용한다.
                 if (validateCurrentReading) {
                     validateCurrentRoundCompletion(group.getGroupId(), member);
                 }
-                try {
-                    WheelAssignmentPlan plan = wheelReassignmentService.reassignFutureRounds(
-                            group.getGroupId(),
-                            member,
-                            remainingMembers
-                    );
-                    return () -> wheelReassignmentService.replaceFuturePlannedAssignments(
-                            group.getGroupId(),
-                            plan,
-                            remainingMembers
-                    );
-                } catch (BusinessException exception) {
-                    if (exception.getErrorCode() != ErrorCode.WHEEL_REASSIGNMENT_IMPOSSIBLE) {
-                        throw exception;
-                    }
-                    // 미래 배정이 불가능해도 멤버 이탈은 막지 않고, 리더가 이후 일정을 다시 만들도록 한다.
-                    return () -> deleteFutureRoundsForManualRegeneration(group);
-                }
+                // 기존 미래 일정은 리더의 수정 화면에 남기되 실행 범위에서 제외해 자동 시작을 막는다.
+                return () -> pauseFutureRoundsForManualReconfiguration(group);
             }
             case RECRUITING -> {
                 // 라운드는 고정하고 상태 변경이 반영된 뒤 PLANNED 배정만 다시 판단한다.
@@ -448,30 +424,25 @@ public class GroupSettingService {
         throw new IllegalStateException("Unsupported group state: " + group.getGroupState());
     }
 
-    private void deleteFutureRoundsForManualRegeneration(Group group) {
+    private void pauseFutureRoundsForManualReconfiguration(Group group) {
         LocalDate today = LocalDate.now(clock);
-        // 재배정 실패 시에도 목표 인원 기준의 비활성 날짜 틀은 보존하고 실행 라운드만 정리한다.
+        // groupRoundCount까지만 스케줄러가 실행하므로 미래 행을 삭제하지 않고도 안전하게 보류할 수 있다.
         List<Round> rounds = roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(group.getGroupId());
         List<Round> futureRounds = rounds.stream()
                 .filter(round -> isFutureRound(round, today))
                 .toList();
-        if (futureRounds.isEmpty()) {
-            return;
-        }
-
-        List<String> futureRoundIds = futureRounds.stream()
-                .map(Round::getRoundId)
-                .toList();
         int lastProtectedRoundNumber = rounds.stream()
-                .filter(round -> !isFutureRound(round, today))
+                // 날짜가 없는 손상된 라운드는 보호 대상으로 간주하지 않아 실행 범위에 남기지 않는다.
+                .filter(round -> round.getStartDate() != null && !round.getStartDate().isAfter(today))
                 .map(Round::getRoundNumber)
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(0);
 
+        // 멤버 구성이 바뀌면 기존 미래 배정 전체가 유효하지 않으므로 배정만 제거하고 라운드 날짜는 남긴다.
         wheelReassignmentService.deleteReplaceableFutureAssignments(futureRounds);
-        roundRepository.deleteAllByIdInBatch(futureRoundIds);
         group.updateScheduleInfo(group.getStartDate(), lastProtectedRoundNumber);
+        group.requireReadOrderConfirmation();
     }
 
     private boolean isFutureRound(Round round, LocalDate today) {
@@ -502,14 +473,8 @@ public class GroupSettingService {
         }
     }
 
-    private List<Member> remainingMembers(List<Member> activeMembers, Member targetMember) {
-        return activeMembers.stream()
-                .filter(member -> !member.getMemberId().equals(targetMember.getMemberId()))
-                .toList();
-    }
-
     private void validateCurrentRoundCompletion(String groupId, Member member) {
-        // 재배정 로직과 같은 Clock을 사용해 날짜 경계에서 현재 라운드 기준이 달라지는 일을 막는다.
+        // 다른 로직과 같은 Clock을 사용해 날짜 경계에서 현재 라운드 기준이 달라지는 일을 막는다.
         Round currentRound = roundRepository.findCurrentRound(
                         groupId,
                         LocalDate.now(clock),

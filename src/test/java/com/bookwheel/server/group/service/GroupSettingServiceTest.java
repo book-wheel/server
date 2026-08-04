@@ -18,6 +18,7 @@ import com.bookwheel.server.group.dto.GroupDetailResponse;
 import com.bookwheel.server.group.dto.setting.GroupUpdateRequest;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.Region;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -29,7 +30,6 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
-import com.bookwheel.server.wheel.dto.WheelAssignmentPlan;
 import com.bookwheel.server.wheel.service.WheelReassignmentService;
 import com.bookwheel.server.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
@@ -306,8 +306,8 @@ class GroupSettingServiceTest {
     }
 
     @Test
-    @DisplayName("진행 중 재배정 실패 시 비활성 날짜 틀은 제외하고 미래 실행 라운드만 삭제한다")
-    void kickMember_OnReassignmentFailureDeletesOnlyFutureExecutableRounds() {
+    @DisplayName("진행 중 멤버 강퇴 시 미래 라운드는 보존하고 리더 재확인 상태로 전환한다")
+    void kickMember_PreservesFutureRoundsAndRequiresReadOrderConfirmation() {
         String groupId = "group-1";
         LocalDate today = LocalDate.of(2026, 7, 30);
         Group group = Group.builder()
@@ -324,13 +324,9 @@ class GroupSettingServiceTest {
         Member target = activeMember("member-2", group, targetUser, MemberRole.MEMBER);
         Round currentRound = round("round-1", group, 1, today.minusDays(6), today);
         Round futureExecutableRound = round("round-2", group, 2, today.plusDays(1), today.plusDays(7));
-        List<Member> remainingMembers = List.of(leader);
-
         given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
         given(memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE))
                 .willReturn(List.of(leader, target));
-        given(wheelReassignmentService.reassignFutureRounds(groupId, target, remainingMembers))
-                .willThrow(new BusinessException(ErrorCode.WHEEL_REASSIGNMENT_IMPOSSIBLE));
         given(clock.instant()).willReturn(Instant.parse("2026-07-30T03:00:00Z"));
         given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
         given(roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(groupId))
@@ -340,11 +336,49 @@ class GroupSettingServiceTest {
 
         assertThat(target.getMemberStatus()).isEqualTo(MemberStatus.BANNED);
         assertThat(group.getGroupRoundCount()).isEqualTo(1);
-        then(wheelReassignmentService).should().deleteReplaceableFutureAssignments(
-                List.of(futureExecutableRound)
-        );
-        then(roundRepository).should().deleteAllByIdInBatch(List.of(futureExecutableRound.getRoundId()));
+        assertThat(group.getScheduleReconfigurationStatus())
+                .isEqualTo(ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED);
+        then(wheelReassignmentService).should().deleteReplaceableFutureAssignments(List.of(futureExecutableRound));
+        then(roundRepository).should(never()).deleteAllByIdInBatch(List.of(futureExecutableRound.getRoundId()));
         then(roundRepository).should(never()).findByGroup_GroupIdOrderByRoundNumberAsc(groupId);
+    }
+
+    @Test
+    @DisplayName("진행 중 멤버 탈퇴 시 미래 라운드는 보존하고 리더 재확인 상태로 전환한다")
+    void exitMember_PreservesFutureRoundsAndRequiresReadOrderConfirmation() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.of(2026, 7, 30);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("진행 중 모임")
+                .groupState(State.IN_PROGRESS)
+                .startDate(today.minusDays(6))
+                .groupRoundCount(2)
+                .maxMembers(4)
+                .build();
+        User exitingUser = activeUser("탈퇴자");
+        Member exitingMember = activeMember("member-2", group, exitingUser, MemberRole.MEMBER);
+        Round currentRound = round("round-1", group, 1, today.minusDays(6), today);
+        Round futureRound = round("round-2", group, 2, today.plusDays(1), today.plusDays(7));
+
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE))
+                .willReturn(List.of(exitingMember));
+        given(clock.instant()).willReturn(Instant.parse("2026-07-30T03:00:00Z"));
+        given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
+        given(roundRepository.findCurrentRound(groupId, today, State.IN_PROGRESS))
+                .willReturn(Optional.empty());
+        given(roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(groupId))
+                .willReturn(List.of(currentRound, futureRound));
+
+        groupSettingService.exitMember(groupId, exitingUser.getId());
+
+        assertThat(exitingMember.getMemberStatus()).isEqualTo(MemberStatus.EXITED);
+        assertThat(group.getGroupRoundCount()).isEqualTo(1);
+        assertThat(group.getScheduleReconfigurationStatus())
+                .isEqualTo(ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED);
+        then(wheelReassignmentService).should().deleteReplaceableFutureAssignments(List.of(futureRound));
+        then(roundRepository).should(never()).deleteAllByIdInBatch(List.of(futureRound.getRoundId()));
     }
 
     @Test
