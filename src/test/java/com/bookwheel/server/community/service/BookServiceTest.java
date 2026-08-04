@@ -12,6 +12,9 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.BookDetailResponse;
+import com.bookwheel.server.community.dto.BookSearchListResponse;
+import com.bookwheel.server.community.dto.BookSearchRequest;
+import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.entity.BookInfo;
@@ -53,6 +56,50 @@ class BookServiceTest {
 
     @InjectMocks
     private BookService bookService;
+
+    @Test
+    @DisplayName("도서 검색 결과에 현재 사용자의 관심 도서 여부를 표시한다.")
+    void searchBooks_MarksInterestedBooks() {
+        String userPK = UUID.randomUUID().toString();
+        BookSearchRequest request = new BookSearchRequest("clean code", null, null, null);
+        BookSearchResponse interestedBook = new BookSearchResponse(
+                "Clean Code",
+                "Robert C. Martin",
+                "Prentice Hall",
+                "2008-08-01",
+                "https://example.com/clean-code.jpg",
+                "9780132350884",
+                false
+        );
+        BookSearchResponse otherBook = new BookSearchResponse(
+                "Refactoring",
+                "Martin Fowler",
+                "Addison-Wesley",
+                "2018-11-19",
+                "https://example.com/refactoring.jpg",
+                "9780134757599",
+                false
+        );
+        BookSearchListResponse kakaoResponse = new BookSearchListResponse(
+                List.of(interestedBook, otherBook),
+                2,
+                true
+        );
+
+        given(kaKaoService.searchBooks(request)).willReturn(kakaoResponse);
+        given(bookLikeRepository.findInterestedIsbns(
+                userPK,
+                List.of("9780132350884", "9780134757599")
+        )).willReturn(List.of("9780132350884"));
+
+        BookSearchListResponse response = bookService.searchBooks(request, userPK);
+
+        assertThat(response.books()).hasSize(2);
+        assertThat(response.books().get(0).isbn()).isEqualTo("9780132350884");
+        assertThat(response.books().get(0).isInterested()).isTrue();
+        assertThat(response.books().get(1).isbn()).isEqualTo("9780134757599");
+        assertThat(response.books().get(1).isInterested()).isFalse();
+    }
 
     @Test
     @DisplayName("갤러리 size가 상한(50)을 초과하면 INVALID_INPUT_VALUE 예외를 던진다.")

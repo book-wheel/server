@@ -47,8 +47,11 @@ public class BookController {
 
     @Operation(summary = "도서 검색(목록 조회)", description = "카카오 API를 사용해 도서 목록을 검색합니다.")
     @GetMapping("/search")
-    public ApiResponse<BookSearchListResponse> searchBooks(@ModelAttribute BookSearchRequest request) {
-        BookSearchListResponse response = bookService.searchBooks(request);
+    public ApiResponse<BookSearchListResponse> searchBooks(
+        @ModelAttribute BookSearchRequest request,
+        @AuthenticationPrincipal Object principal
+    ) {
+        BookSearchListResponse response = bookService.searchBooks(request, getUserPK(principal));
         return ApiResponse.success(response);
     }
 

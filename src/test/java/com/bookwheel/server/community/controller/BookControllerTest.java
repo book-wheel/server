@@ -2,6 +2,8 @@ package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.community.dto.BookDetailResponse;
+import com.bookwheel.server.community.dto.BookSearchListResponse;
+import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
@@ -129,6 +131,33 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.isbn").value(isbn))
                 // 필드가 생략되지 않고 null로 내려가야 프론트에서 데이터 없음을 구분할 수 있다.
                 .andExpect(content().string(containsString("\"usageAnalysis\":null")));
+    }
+
+    @Test
+    @WithMockUser(username = "user-pk")
+    @DisplayName("Book Search: returns interest state for each book")
+    void searchBooks_IncludesInterestedState() throws Exception {
+        BookSearchListResponse response = new BookSearchListResponse(
+                List.of(new BookSearchResponse(
+                        "Clean Code",
+                        "Robert C. Martin",
+                        "Prentice Hall",
+                        "2008-08-01",
+                        "https://example.com/clean-code.jpg",
+                        "9780132350884",
+                        true
+                )),
+                1,
+                true
+        );
+        given(bookService.searchBooks(any(), eq("user-pk"))).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/books/search")
+                        .param("query", "clean code"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].isbn").value("9780132350884"))
+                .andExpect(jsonPath("$.data.books[0].isInterested").value(true));
     }
 
     @Test
