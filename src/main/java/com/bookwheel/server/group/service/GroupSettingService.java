@@ -17,6 +17,7 @@ import com.bookwheel.server.group.dto.setting.MemberExitResponse;
 import com.bookwheel.server.group.dto.setting.MemberKickResponse;
 import com.bookwheel.server.group.dto.setting.MemberRoleChangeResponse;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
@@ -431,6 +432,16 @@ public class GroupSettingService {
         List<Round> futureRounds = rounds.stream()
                 .filter(round -> isFutureRound(round, today))
                 .toList();
+
+        // 미래 실행 라운드 없음 + 재확정 상태 NONE: 재확정 생략
+        // 재확정 진행 중 추가 인원 변동: 변경된 멤버 기준 읽기 순서 확인 단계로 복귀
+        if (futureRounds.isEmpty()) {
+            if (group.getScheduleReconfigurationStatus() != ScheduleReconfigurationStatus.NONE) {
+                group.requireReadOrderConfirmation();
+            }
+            return;
+        }
+
         int lastProtectedRoundNumber = rounds.stream()
                 // 날짜가 없는 손상된 라운드는 보호 대상으로 간주하지 않아 실행 범위에 남기지 않는다.
                 .filter(round -> round.getStartDate() != null && !round.getStartDate().isAfter(today))

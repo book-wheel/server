@@ -382,6 +382,77 @@ class GroupSettingServiceTest {
     }
 
     @Test
+    @DisplayName("미래 라운드가 없는 진행 중 모임에서 탈퇴해도 재확정 상태로 전환하지 않는다")
+    void exitMember_DoesNotRequireReconfirmationWithoutFutureRound() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.of(2026, 7, 30);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("마지막 라운드 종료 모임")
+                .groupState(State.IN_PROGRESS)
+                .startDate(today.minusDays(7))
+                .groupRoundCount(1)
+                .maxMembers(2)
+                .build();
+        User exitingUser = activeUser("탈퇴자");
+        Member exitingMember = activeMember("member-2", group, exitingUser, MemberRole.MEMBER);
+        Round lastRound = round("round-1", group, 1, today.minusDays(7), today.minusDays(1));
+
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE))
+                .willReturn(List.of(exitingMember));
+        given(clock.instant()).willReturn(Instant.parse("2026-07-30T03:00:00Z"));
+        given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
+        given(roundRepository.findCurrentRound(groupId, today, State.IN_PROGRESS))
+                .willReturn(Optional.empty());
+        given(roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(groupId))
+                .willReturn(List.of(lastRound));
+
+        groupSettingService.exitMember(groupId, exitingUser.getId());
+
+        assertThat(exitingMember.getMemberStatus()).isEqualTo(MemberStatus.EXITED);
+        assertThat(group.getGroupRoundCount()).isEqualTo(1);
+        assertThat(group.getScheduleReconfigurationStatus()).isEqualTo(ScheduleReconfigurationStatus.NONE);
+        then(wheelReassignmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("미래 일정 재확정 중 추가 강퇴가 발생하면 읽기 순서 확인 단계로 돌아간다")
+    void kickMember_ReturnsToReadOrderConfirmationWhenReconfigurationIsAlreadyPending() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.of(2026, 7, 30);
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("재확정 중 모임")
+                .groupState(State.IN_PROGRESS)
+                .scheduleReconfigurationStatus(ScheduleReconfigurationStatus.FUTURE_SCHEDULE_CONFIRMATION_REQUIRED)
+                .startDate(today.minusDays(6))
+                .groupRoundCount(1)
+                .maxMembers(3)
+                .build();
+        User leaderUser = activeUser("리더");
+        User targetUser = activeUser("대상");
+        Member leader = activeMember("member-1", group, leaderUser, MemberRole.LEADER);
+        Member target = activeMember("member-2", group, targetUser, MemberRole.MEMBER);
+        Round currentRound = round("round-1", group, 1, today.minusDays(6), today);
+
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroupIdAndMemberStatusForUpdate(groupId, MemberStatus.ACTIVE))
+                .willReturn(List.of(leader, target));
+        given(clock.instant()).willReturn(Instant.parse("2026-07-30T03:00:00Z"));
+        given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
+        given(roundRepository.findExecutableRoundsByGroupIdOrderByRoundNumberAsc(groupId))
+                .willReturn(List.of(currentRound));
+
+        groupSettingService.kickMember(groupId, targetUser.getId(), leaderUser.getId());
+
+        assertThat(target.getMemberStatus()).isEqualTo(MemberStatus.BANNED);
+        assertThat(group.getScheduleReconfigurationStatus())
+                .isEqualTo(ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED);
+        then(wheelReassignmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
     @DisplayName("진행 중인 모임은 삭제할 수 없다")
     void deleteGroup_RejectsInProgressWithoutSideEffects() {
         Group group = Group.builder()
