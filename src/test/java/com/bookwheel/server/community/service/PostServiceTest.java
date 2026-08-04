@@ -4,13 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.CursorUtils;
-import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
@@ -50,7 +51,6 @@ class PostServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private S3Service s3Service;
     @Mock private CursorUtils cursorUtils;
-    @Mock private AladinService aladinService;
 
     @InjectMocks
     private PostService postService;
@@ -58,12 +58,9 @@ class PostServiceTest {
     private static final Long POST_ID = 10L;
     private static final String ISBN = "9780132350884";
 
-    // Book 테이블에 도서가 없는 게시글 상세 조회를 stubbing한다. (title 조회 경로만 테스트별로 다르다)
-    private String stubPostDetailWithoutBook() {
+    // 게시글 상세 조회를 stubbing한다. (title 조회 경로만 테스트별로 다르다)
+    private String stubPostDetail(BookInfo bookInfo) {
         String userPK = UUID.randomUUID().toString();
-
-        BookInfo bookInfo = mock(BookInfo.class);
-        given(bookInfo.getIsbn()).willReturn(ISBN);
 
         User uploader = mock(User.class);
         given(uploader.getNickname()).willReturn("writer");
@@ -82,28 +79,36 @@ class PostServiceTest {
 
         given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
         given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
-        given(bookRepository.findByIsbn(ISBN)).willReturn(Optional.empty());
         given(postCommentRepository.countByPost(post)).willReturn(0L);
         given(postLikeRepository.existsByPostAndUser(post, viewer)).willReturn(false);
 
         return userPK;
     }
 
+    private BookInfo bookInfo(String title) {
+        BookInfo bookInfo = mock(BookInfo.class);
+        given(bookInfo.getIsbn()).willReturn(ISBN);
+        given(bookInfo.getTitle()).willReturn(title);
+        return bookInfo;
+    }
+
     @Test
-    @DisplayName("Book 테이블에 도서가 없으면 알라딘 도서 상세로 title을 보완한다.")
-    void getPostDetail_ResolvesTitleFromAladinWhenBookIsMissing() {
-        String userPK = stubPostDetailWithoutBook();
-        given(aladinService.getBookDetailByIsbn(ISBN, false)).willReturn(new BookDetailResponse(
-                "Clean Code",
-                "Robert C. Martin",
-                "Prentice Hall",
-                "A handbook of agile software craftsmanship.",
-                "https://example.com/clean-code.jpg",
-                464,
-                "Contents",
-                ISBN,
-                false
-        ));
+    @DisplayName("BookInfo에 저장된 제목이 있으면 Book 테이블을 조회하지 않고 그대로 내려준다.")
+    void getPostDetail_UsesStoredTitleWithoutQueryingBook() {
+        String userPK = stubPostDetail(bookInfo("Clean Code"));
+
+        PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
+
+        assertThat(response.title()).isEqualTo("Clean Code");
+        verifyNoInteractions(bookRepository);
+    }
+
+    @Test
+    @DisplayName("제목 저장 전에 작성된 게시글은 Book 테이블에서 제목을 찾는다.")
+    void getPostDetail_FallsBackToBookTable() {
+        String userPK = stubPostDetail(bookInfo(null));
+        given(bookRepository.findByIsbn(ISBN))
+            .willReturn(Optional.of(Book.builder().isbn(ISBN).title("Clean Code").build()));
 
         PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
 
@@ -111,11 +116,10 @@ class PostServiceTest {
     }
 
     @Test
-    @DisplayName("알라딘 조회까지 실패하면 title은 ISBN으로 대체되지 않고 null로 내려간다.")
-    void getPostDetail_TitleIsNullWhenBookLookupFails() {
-        String userPK = stubPostDetailWithoutBook();
-        given(aladinService.getBookDetailByIsbn(ISBN, false))
-            .willThrow(new BusinessException(ErrorCode.BOOK_NOT_FOUND));
+    @DisplayName("저장된 제목이 어디에도 없으면 title은 ISBN으로 대체되지 않고 null로 내려간다.")
+    void getPostDetail_TitleIsNullWhenNoStoredTitleExists() {
+        String userPK = stubPostDetail(bookInfo(null));
+        given(bookRepository.findByIsbn(ISBN)).willReturn(Optional.empty());
 
         PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
 

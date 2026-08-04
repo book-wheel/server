@@ -12,7 +12,6 @@ import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCommentResponse;
 import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
-import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostReportRequest;
 import com.bookwheel.server.community.entity.*;
@@ -50,7 +49,6 @@ public class PostService {
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
     private final CursorUtils cursorUtils;
-    private final AladinService aladinService;
 
     private static final int DEFAULT_COMMENT_SIZE = 20;
     private static final int MAX_COMMENT_PAGE_SIZE = 50;
@@ -121,9 +119,10 @@ public class PostService {
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        String isbn = post.getBookInfo().getIsbn();
+        BookInfo bookInfo = post.getBookInfo();
+        String isbn = bookInfo.getIsbn();
 
-        String title = resolvePostBookTitle(isbn);
+        String title = resolvePostBookTitle(bookInfo);
 
         String profileImageUrl = getProfileImageUrl(post.getUploader().getProfileImageKey());
 
@@ -161,26 +160,18 @@ public class PostService {
         return s3Service.getPresignedGetUrl(profileImageKey);
     }
 
-    // 책 제목은 Book 테이블에서 조회하고, 미등록 도서면 알라딘 도서 상세로 보완한다.
-    // 알라딘에서도 확인되지 않으면 null을 반환한다. (ISBN 등으로 대체하면 실제 도서명과 구분할 수 없다)
-    private String resolvePostBookTitle(String isbn) {
-        return bookRepository.findByIsbn(isbn)
-            .map(Book::getTitle)
-            .filter(StringUtils::hasText)
-            .orElseGet(() -> resolveAladinBookTitle(isbn));
-    }
-
-    private String resolveAladinBookTitle(String isbn) {
-        try {
-            BookDetailResponse response = aladinService.getBookDetailByIsbn(isbn, false);
-            if (response != null && StringUtils.hasText(response.title())) {
-                return response.title();
-            }
-        } catch (BusinessException e) {
-            // 외부 도서 메타데이터 조회에 실패해도 게시글 상세는 계속 응답한다.
+    // 게시글 작성 시 저장해 둔 제목을 우선 사용하고, 없으면(제목 저장 전에 작성된 게시글)
+    // 그룹 도서로 등록되며 만들어진 Book에서 찾는다. 둘 다 없으면 null을 반환한다.
+    // 상세 조회는 읽기 트랜잭션 안에서 수행되므로 이 경로에서 외부 API를 호출하지 않는다.
+    private String resolvePostBookTitle(BookInfo bookInfo) {
+        if (StringUtils.hasText(bookInfo.getTitle())) {
+            return bookInfo.getTitle();
         }
 
-        return null;
+        return bookRepository.findByIsbn(bookInfo.getIsbn())
+            .map(Book::getTitle)
+            .filter(StringUtils::hasText)
+            .orElse(null);
     }
 
     // 작성 요청의 groupId로 모임을 조회한다.
@@ -209,6 +200,9 @@ public class PostService {
         String isbn = request.isbn();
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
             .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+
+        // 상세 조회에서 외부 API 없이 제목을 내려줄 수 있도록 작성 시점에 저장해 둔다.
+        bookInfo.applyTitleIfAbsent(request.title());
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
