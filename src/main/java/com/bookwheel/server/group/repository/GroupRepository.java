@@ -2,6 +2,7 @@ package com.bookwheel.server.group.repository;
 
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
@@ -57,6 +58,7 @@ public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecif
     @Modifying
     @Query("UPDATE Group g SET g.groupState = :completed " +
             "WHERE g.groupState = :inProgress " +
+            "AND g.scheduleReconfigurationStatus = :reconfigurationNone " +
             "AND g.groupId IN (" +
             "    SELECT r.group.groupId FROM Round r " +
             "    WHERE r.endDate < :today AND r.roundNumber = g.groupRoundCount" +
@@ -64,6 +66,7 @@ public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecif
     int updateFinishedGroupsToComplete(
             @Param("completed") State completed,
             @Param("inProgress") State inProgress,
+            @Param("reconfigurationNone") ScheduleReconfigurationStatus reconfigurationNone,
             @Param("today") LocalDate today
     );
 
@@ -71,9 +74,15 @@ public interface GroupRepository extends JpaRepository<Group, String>, JpaSpecif
     List<Group> findByGroupStateAndStartDate(State state, LocalDate today);
 
     // 마지막 라운드 종료일이 today 이전인, IN_PROGRESS 그룹들 (종료 알림 대상)
-    @Query("SELECT g FROM Group g WHERE g.groupState = :inProgress AND g.groupId IN (" +
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT g FROM Group g WHERE g.groupState = :inProgress " +
+            "AND g.scheduleReconfigurationStatus = :reconfigurationNone AND g.groupId IN (" +
             "    SELECT r.group.groupId FROM Round r " +
             "    WHERE r.endDate < :today AND r.roundNumber = g.groupRoundCount" +
             ")")
-    List<Group> findGroupsBecomingComplete(@Param("inProgress") State inProgress, @Param("today") LocalDate today);
+    List<Group> findGroupsBecomingComplete(
+            @Param("inProgress") State inProgress,
+            @Param("reconfigurationNone") ScheduleReconfigurationStatus reconfigurationNone,
+            @Param("today") LocalDate today
+    );
 }

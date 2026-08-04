@@ -3,6 +3,7 @@ package com.bookwheel.server.schedule.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
@@ -303,6 +304,7 @@ public class GroupScheduleService {
                 deserializeExcludedDates(group.getScheduleExcludedDates()),
                 deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
                 scheduleStatus,
+                group.getScheduleReconfigurationStatus(),
                 resolvedTargetMemberCount,
                 readiness.currentMemberCount(),
                 scheduleStatus == GroupScheduleStatus.READY,
@@ -754,11 +756,16 @@ public class GroupScheduleService {
     public int closeFinishedGroups() {
         LocalDate today = LocalDate.now(clock);
 
-        List<Group> completing = groupRepository.findGroupsBecomingComplete(State.IN_PROGRESS, today);
+        List<Group> completing = groupRepository.findGroupsBecomingComplete(
+                State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
+                today
+        );
 
         int updated = groupRepository.updateFinishedGroupsToComplete(
                 State.COMPLETE,
                 State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
                 today
         );
 

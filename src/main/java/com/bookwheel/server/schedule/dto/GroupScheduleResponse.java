@@ -1,5 +1,6 @@
 package com.bookwheel.server.schedule.dto;
 
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -28,6 +29,9 @@ public record GroupScheduleResponse(
                         "RESCHEDULE_REQUIRED는 시작일을 놓친 상태입니다."
         )
         GroupScheduleStatus scheduleStatus,
+
+        @Schema(description = "진행 중 멤버 변동 후 리더가 완료해야 하는 일정 재확정 단계")
+        ScheduleReconfigurationStatus scheduleReconfigurationStatus,
 
         @Schema(description = "전체 라운드 날짜 틀을 만드는 기준이자 시작 전 모집 가능한 상한 인원", example = "10", nullable = true)
         Integer targetMemberCount,

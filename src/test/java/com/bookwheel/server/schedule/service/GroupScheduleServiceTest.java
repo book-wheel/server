@@ -3,6 +3,7 @@ package com.bookwheel.server.schedule.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
@@ -853,6 +854,28 @@ class GroupScheduleServiceTest {
                 org.mockito.ArgumentMatchers.any(),
                 anyList()
         );
+    }
+
+    @Test
+    @DisplayName("일정 재확정 중인 모임은 자동 완료 대상에서 제외한다")
+    void closeFinishedGroups_UsesOnlyGroupsWithoutPendingReconfiguration() {
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        given(groupRepository.findGroupsBecomingComplete(
+                State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
+                today
+        )).willReturn(List.of());
+        given(groupRepository.updateFinishedGroupsToComplete(
+                State.COMPLETE,
+                State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
+                today
+        )).willReturn(0);
+
+        int updated = groupScheduleService.closeFinishedGroups();
+
+        assertThat(updated).isZero();
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     private User activeUser() {
