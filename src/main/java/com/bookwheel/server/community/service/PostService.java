@@ -1,7 +1,5 @@
 package com.bookwheel.server.community.service;
 
-import com.bookwheel.server.book.entity.Book;
-import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.cursor.CommentCursor;
@@ -40,7 +38,6 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BookInfoRepository bookInfoRepository;
-    private final BookRepository bookRepository;
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final PostLikeRepository postLikeRepository;
@@ -122,8 +119,6 @@ public class PostService {
         BookInfo bookInfo = post.getBookInfo();
         String isbn = bookInfo.getIsbn();
 
-        String title = resolvePostBookTitle(bookInfo);
-
         String profileImageUrl = getProfileImageUrl(post.getUploader().getProfileImageKey());
 
         List<String> imageUrls = post.getImages().stream()
@@ -142,7 +137,7 @@ public class PostService {
             post.getUploader().getNickname(),
             profileImageUrl,
             groupName,
-            title,
+            post.getBookTitle(),
             post.getContent(),
             imageUrls,
             post.getLikeCount(),
@@ -158,20 +153,6 @@ public class PostService {
             return null;
         }
         return s3Service.getPresignedGetUrl(profileImageKey);
-    }
-
-    // 게시글 작성 시 저장해 둔 제목을 우선 사용하고, 없으면(제목 저장 전에 작성된 게시글)
-    // 그룹 도서로 등록되며 만들어진 Book에서 찾는다. 둘 다 없으면 null을 반환한다.
-    // 상세 조회는 읽기 트랜잭션 안에서 수행되므로 이 경로에서 외부 API를 호출하지 않는다.
-    private String resolvePostBookTitle(BookInfo bookInfo) {
-        if (StringUtils.hasText(bookInfo.getTitle())) {
-            return bookInfo.getTitle();
-        }
-
-        return bookRepository.findByIsbn(bookInfo.getIsbn())
-            .map(Book::getTitle)
-            .filter(StringUtils::hasText)
-            .orElse(null);
     }
 
     // 작성 요청의 groupId로 모임을 조회한다.
@@ -198,18 +179,19 @@ public class PostService {
     @Transactional
     public PostCreateResponse create(PostCreateRequest request, String userPK) {
         String isbn = request.isbn();
+        String bookTitle = requireBookTitle(request.title());
         BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
             .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
 
         // 상세 조회에서 외부 API 없이 제목을 내려줄 수 있도록 작성 시점에 저장해 둔다.
-        bookInfo.applyTitleIfAbsent(request.title());
+        bookInfo.applyTitleIfAbsent(bookTitle);
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Group group = resolveGroup(request.groupId(), userPK);
 
-        Post post = request.toEntity(bookInfo, user, group);
+        Post post = request.toEntity(bookInfo, user, group, bookTitle);
 
         if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
             for (String key : request.objectKeys()) {
@@ -225,6 +207,13 @@ public class PostService {
         return PostCreateResponse.from(savedPost);
 
 
+    }
+
+    private String requireBookTitle(String title) {
+        if (!StringUtils.hasText(title)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return title.strip();
     }
 
     @Transactional

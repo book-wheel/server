@@ -17,9 +17,12 @@ public record PostCreateRequest(
     @NotBlank(message = "ISBN은 필수입니다.")
     String isbn,
 
-    @Schema(description = "도서 제목. 도서 검색 결과의 제목을 그대로 전달한다. "
-        + "전달하지 않으면 게시물 상세의 title이 null로 내려갈 수 있다.",
-        example = "클린 코드", nullable = true)
+    @Schema(
+        description = "도서 제목. 도서 검색 결과의 제목을 그대로 전달한다.",
+        example = "클린 코드",
+        requiredMode = Schema.RequiredMode.REQUIRED
+    )
+    @NotBlank(message = "도서 제목은 필수입니다.")
     @Size(max = 255, message = "도서 제목은 255자를 넘을 수 없습니다.")
     String title,
 
@@ -34,9 +37,10 @@ public record PostCreateRequest(
     String groupId
 ) {
 
-    public Post toEntity(BookInfo bookInfo, User uploader, Group group) {
+    public Post toEntity(BookInfo bookInfo, User uploader, Group group, String bookTitle) {
         return Post.builder()
             .bookInfo(bookInfo)
+            .bookTitle(bookTitle)
             .uploader(uploader)
             .group(group)
             .content(this.content)

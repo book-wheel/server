@@ -22,7 +22,7 @@ public record PostDetailResponse(
     @Schema(description = "모임 이름 (모임에서 작성한 글이면 모임명, 개인 작성이면 null)", nullable = true)
     String groupName,
 
-    @Schema(description = "책 제목 (서버에 저장된 도서 정보가 없으면 null)", example = "내 남편을 팝니다", nullable = true)
+    @Schema(description = "책 제목", example = "내 남편을 팝니다")
     String title,
 
     @Schema(description = "게시글 내용", example = "게시글 내용")
