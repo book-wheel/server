@@ -15,7 +15,7 @@ public record PostCreateResponse(
     @Schema(description = "도서 ISBN", example = "9788966263158")
     String isbn,
 
-    @Schema(description = "도서 제목", example = "클린 코드")
+    @Schema(description = "도서 제목", example = "클린 코드", requiredMode = Schema.RequiredMode.REQUIRED)
     String title,
 
     @Schema(description = "감상평 내용", example = "양꼬치 먹고싶다 이 책 내용은 왜 양꼬치 언급이 없나요? 하 참;")
