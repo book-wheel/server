@@ -1,22 +1,33 @@
 package com.bookwheel.server.common.service;
 
+import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -81,6 +92,150 @@ public class S3Service {
 
         // 최종 URL 문자열 반환
         return s3Presigner.presignPutObject(presignRequest).url().toString();
+    }
+
+    public String getPresignedPutUrl(String objectKey, String contentType, long contentLength) {
+        if (objectKey == null || objectKey.isBlank()
+                || contentType == null || contentType.isBlank()
+                || contentLength <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .contentType(contentType)
+                .contentLength(contentLength)
+                .build();
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(5))
+                .putObjectRequest(putObjectRequest)
+                .build();
+
+        try {
+            return s3Presigner.presignPutObject(presignRequest).url().toString();
+        } catch (RuntimeException exception) {
+            log.error("S3 Presigned PUT URL 발급 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public S3ObjectMetadata getObjectMetadata(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_KEY);
+        }
+
+        try {
+            HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .build());
+            return new S3ObjectMetadata(response.contentLength(), response.contentType(), response.eTag());
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+            }
+            log.error("S3 객체 정보 조회 실패: key={}, status={}, error={}",
+                    objectKey, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 정보 조회 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public byte[] getObjectSignature(String objectKey, String expectedETag, int length) {
+        if (objectKey == null || objectKey.isBlank()
+                || expectedETag == null || expectedETag.isBlank()
+                || length <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .ifMatch(expectedETag)
+                    .range("bytes=0-" + (length - 1))
+                    .build());
+            return response.asByteArray();
+        } catch (S3Exception exception) {
+            throw mapObjectValidationException(objectKey, exception);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 시그니처 조회 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public void copyObjectIfUnchanged(String sourceKey, String destinationKey, String expectedETag) {
+        if (sourceKey == null || sourceKey.isBlank()
+                || destinationKey == null || destinationKey.isBlank()
+                || expectedETag == null || expectedETag.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            s3Client.copyObject(CopyObjectRequest.builder()
+                    .sourceBucket(bucket)
+                    .sourceKey(sourceKey)
+                    .destinationBucket(bucket)
+                    .destinationKey(destinationKey)
+                    .copySourceIfMatch(expectedETag)
+                    .build());
+        } catch (S3Exception exception) {
+            throw mapObjectValidationException(sourceKey, exception);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 확정 복사 실패: sourceKey={}, destinationKey={}, error={}",
+                    sourceKey, destinationKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public List<String> findObjectKeysOlderThan(String prefix, Instant cutoff) {
+        if (prefix == null || prefix.isBlank() || cutoff == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        List<String> objectKeys = new ArrayList<>();
+        String continuationToken = null;
+        try {
+            do {
+                ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+                        .bucket(bucket)
+                        .prefix(prefix)
+                        .continuationToken(continuationToken)
+                        .build());
+                response.contents().stream()
+                        .filter(object -> object.lastModified() != null)
+                        .filter(object -> object.lastModified().isBefore(cutoff))
+                        .map(software.amazon.awssdk.services.s3.model.S3Object::key)
+                        .forEach(objectKeys::add);
+                continuationToken = Boolean.TRUE.equals(response.isTruncated())
+                        ? response.nextContinuationToken()
+                        : null;
+            } while (continuationToken != null);
+            return objectKeys;
+        } catch (S3Exception exception) {
+            log.error("S3 만료 객체 조회 실패: prefix={}, status={}, error={}",
+                    prefix, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 만료 객체 조회 실패: prefix={}, error={}", prefix, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    private BusinessException mapObjectValidationException(String objectKey, S3Exception exception) {
+        if (exception.statusCode() == 404) {
+            return new BusinessException(ErrorCode.FILE_NOT_FOUND);
+        }
+        if (exception.statusCode() == 412) {
+            return new BusinessException(ErrorCode.FILE_CHANGED_DURING_VALIDATION);
+        }
+        log.error("S3 객체 검증 실패: key={}, status={}, error={}",
+                objectKey, exception.statusCode(), exception.getMessage());
+        return new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
     }
 
     public PostImagePresignedResponse getPostPresignedUrls(String bookId, List<String> fileExtensions) {
