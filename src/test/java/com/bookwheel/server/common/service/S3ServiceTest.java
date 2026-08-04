@@ -18,7 +18,10 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -26,6 +29,8 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -171,5 +176,43 @@ class S3ServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.FILE_CHANGED_DURING_VALIDATION);
+    }
+
+    @Test
+    @DisplayName("prefix 아래 객체를 페이지 끝까지 조회하고 기준 시각보다 오래된 키만 반환한다")
+    void findObjectKeysOlderThan_PaginatesAndFiltersByCutoff() {
+        Instant cutoff = Instant.parse("2026-08-03T00:00:00Z");
+        ListObjectsV2Response firstPage = ListObjectsV2Response.builder()
+                .contents(
+                        S3Object.builder()
+                                .key("chat-temp/old.png")
+                                .lastModified(cutoff.minusSeconds(1))
+                                .build(),
+                        S3Object.builder()
+                                .key("chat-temp/recent.png")
+                                .lastModified(cutoff.plusSeconds(1))
+                                .build()
+                )
+                .isTruncated(true)
+                .nextContinuationToken("next-page")
+                .build();
+        ListObjectsV2Response secondPage = ListObjectsV2Response.builder()
+                .contents(S3Object.builder()
+                        .key("chat-temp/older.png")
+                        .lastModified(cutoff.minusSeconds(60))
+                        .build())
+                .isTruncated(false)
+                .build();
+        given(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .willReturn(firstPage, secondPage);
+
+        List<String> result = s3Service.findObjectKeysOlderThan("chat-temp/", cutoff);
+
+        assertThat(result).containsExactly("chat-temp/old.png", "chat-temp/older.png");
+        ArgumentCaptor<ListObjectsV2Request> captor = ArgumentCaptor.forClass(ListObjectsV2Request.class);
+        then(s3Client).should(org.mockito.Mockito.times(2)).listObjectsV2(captor.capture());
+        assertThat(captor.getAllValues().get(0).prefix()).isEqualTo("chat-temp/");
+        assertThat(captor.getAllValues().get(0).continuationToken()).isNull();
+        assertThat(captor.getAllValues().get(1).continuationToken()).isEqualTo("next-page");
     }
 }

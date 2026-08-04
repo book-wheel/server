@@ -17,6 +17,8 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -24,6 +26,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -184,6 +188,40 @@ public class S3Service {
         } catch (RuntimeException exception) {
             log.error("S3 객체 확정 복사 실패: sourceKey={}, destinationKey={}, error={}",
                     sourceKey, destinationKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public List<String> findObjectKeysOlderThan(String prefix, Instant cutoff) {
+        if (prefix == null || prefix.isBlank() || cutoff == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        List<String> objectKeys = new ArrayList<>();
+        String continuationToken = null;
+        try {
+            do {
+                ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+                        .bucket(bucket)
+                        .prefix(prefix)
+                        .continuationToken(continuationToken)
+                        .build());
+                response.contents().stream()
+                        .filter(object -> object.lastModified() != null)
+                        .filter(object -> object.lastModified().isBefore(cutoff))
+                        .map(software.amazon.awssdk.services.s3.model.S3Object::key)
+                        .forEach(objectKeys::add);
+                continuationToken = Boolean.TRUE.equals(response.isTruncated())
+                        ? response.nextContinuationToken()
+                        : null;
+            } while (continuationToken != null);
+            return objectKeys;
+        } catch (S3Exception exception) {
+            log.error("S3 만료 객체 조회 실패: prefix={}, status={}, error={}",
+                    prefix, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 만료 객체 조회 실패: prefix={}, error={}", prefix, exception.getMessage());
             throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
         }
     }

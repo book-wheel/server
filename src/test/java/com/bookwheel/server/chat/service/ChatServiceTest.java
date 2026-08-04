@@ -28,13 +28,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static com.bookwheel.server.chat.dto.ChatMessageSendRequest.MAX_CONTENT_LENGTH;
@@ -46,6 +44,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,6 +74,9 @@ class ChatServiceTest {
     @Mock
     private S3Service s3Service;
 
+    @Mock
+    private ChatImageMessageTransactionService chatImageMessageTransactionService;
+
     private ChatService chatService;
     private Group group;
     private ChatRoom chatRoom;
@@ -90,7 +92,8 @@ class ChatServiceTest {
                 chatRoomReadStateRepository,
                 groupRepository,
                 memberRepository,
-                s3Service
+                s3Service,
+                chatImageMessageTransactionService
         );
 
         group = Group.builder()
@@ -251,7 +254,7 @@ class ChatServiceTest {
                 "image/png",
                 123_456L
         );
-        givenSendAccess();
+        givenPresignedUrlAccess();
         given(s3Service.getPresignedPutUrl(anyString(), eq("image/png"), eq(123_456L)))
                 .willReturn("https://s3.example.com/upload");
 
@@ -319,7 +322,7 @@ class ChatServiceTest {
                 .memberRole(MemberRole.OUT)
                 .memberStatus(MemberStatus.EXITED)
                 .build();
-        given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.of(group));
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
         given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK))
                 .willReturn(Optional.of(inactiveMember));
 
@@ -347,12 +350,12 @@ class ChatServiceTest {
                 .imageKey(finalImageKey)
                 .createdAt(createdAt)
                 .build();
-        givenSendAccess();
-        given(chatMessageRepository.findByImageKey(finalImageKey)).willReturn(Optional.empty());
+        givenImagePreparation(temporaryImageKey, finalImageKey);
         given(s3Service.getObjectMetadata(temporaryImageKey))
                 .willReturn(new S3ObjectMetadata(123_456L, "image/png", ETAG));
         given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
-        given(chatMessageRepository.save(any(ChatMessage.class))).willReturn(savedMessage);
+        given(chatImageMessageTransactionService.persist(GROUP_ID, userPK, temporaryImageKey))
+                .willReturn(savedMessage);
         given(s3Service.getPresignedGetUrl(finalImageKey)).willReturn(imageUrl);
 
         ChatMessageResponse response = chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey);
@@ -364,14 +367,14 @@ class ChatServiceTest {
         assertThat(response.imageKey()).isEqualTo(finalImageKey);
         assertThat(response.imageUrl()).isEqualTo(imageUrl);
         assertThat(response.createdAt()).isEqualTo(createdAt);
-        then(chatMessageRepository).should().save(org.mockito.ArgumentMatchers.argThat(message ->
-                message.getChatRoom() == chatRoom
-                        && message.getSender() == user
-                        && message.getMessageType() == ChatMessageType.IMAGE
-                        && message.getContent() == null
-                        && finalImageKey.equals(message.getImageKey())
-        ));
-        then(s3Service).should().copyObjectIfUnchanged(temporaryImageKey, finalImageKey, ETAG);
+        InOrder order = inOrder(chatImageMessageTransactionService, s3Service);
+        order.verify(chatImageMessageTransactionService).prepare(GROUP_ID, userPK, temporaryImageKey);
+        order.verify(s3Service).getObjectMetadata(temporaryImageKey);
+        order.verify(s3Service).getObjectSignature(temporaryImageKey, ETAG, 12);
+        order.verify(s3Service).copyObjectIfUnchanged(temporaryImageKey, finalImageKey, ETAG);
+        order.verify(chatImageMessageTransactionService).persist(GROUP_ID, userPK, temporaryImageKey);
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(s3Service).should(never()).deleteObject(finalImageKey);
     }
 
     @Test
@@ -379,7 +382,8 @@ class ChatServiceTest {
     void sendImageMessage_RejectsAnotherUsersObjectKey() {
         String imageKey = "chat-temp/" + chatRoom.getChatRoomId()
                 + "/another-user-pk/550e8400-e29b-41d4-a716-446655440000.png";
-        givenSendAccess();
+        given(chatImageMessageTransactionService.prepare(GROUP_ID, userPK, imageKey))
+                .willThrow(new BusinessException(ErrorCode.INVALID_FILE_KEY));
 
         assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, imageKey))
                 .isInstanceOf(BusinessException.class)
@@ -387,15 +391,14 @@ class ChatServiceTest {
                 .isEqualTo(ErrorCode.INVALID_FILE_KEY);
 
         then(s3Service).shouldHaveNoInteractions();
-        then(chatMessageRepository).shouldHaveNoInteractions();
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
     }
 
     @Test
     @DisplayName("S3에 업로드되지 않은 이미지 키로 메시지를 저장할 수 없다")
     void sendImageMessage_RejectsMissingObject() {
         String imageKey = temporaryImageKey("png");
-        givenSendAccess();
-        given(chatMessageRepository.findByImageKey(finalImageKey("png"))).willReturn(Optional.empty());
+        givenImagePreparation(imageKey, finalImageKey("png"));
         given(s3Service.getObjectMetadata(imageKey))
                 .willThrow(new BusinessException(ErrorCode.FILE_NOT_FOUND));
 
@@ -404,15 +407,16 @@ class ChatServiceTest {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.FILE_NOT_FOUND);
 
-        then(chatMessageRepository).should(never()).save(any(ChatMessage.class));
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+        then(s3Service).should().deleteObject(imageKey);
+        then(s3Service).should(never()).deleteObject(finalImageKey("png"));
     }
 
     @Test
     @DisplayName("실제 업로드된 이미지의 MIME 타입이 키 확장자와 다르면 메시지를 저장하지 않는다")
     void sendImageMessage_RejectsUploadedContentTypeMismatch() {
         String imageKey = temporaryImageKey("png");
-        givenSendAccess();
-        given(chatMessageRepository.findByImageKey(finalImageKey("png"))).willReturn(Optional.empty());
+        givenImagePreparation(imageKey, finalImageKey("png"));
         given(s3Service.getObjectMetadata(imageKey))
                 .willReturn(new S3ObjectMetadata(100L, "image/jpeg", ETAG));
         given(s3Service.getObjectSignature(imageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
@@ -422,15 +426,15 @@ class ChatServiceTest {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
 
-        then(chatMessageRepository).should(never()).save(any(ChatMessage.class));
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+        then(s3Service).should().deleteObject(imageKey);
     }
 
     @Test
     @DisplayName("Content-Type만 위장하고 실제 이미지 시그니처가 아니면 메시지를 저장하지 않는다")
     void sendImageMessage_RejectsInvalidBinarySignature() {
         String temporaryImageKey = temporaryImageKey("png");
-        givenSendAccess();
-        given(chatMessageRepository.findByImageKey(finalImageKey("png"))).willReturn(Optional.empty());
+        givenImagePreparation(temporaryImageKey, finalImageKey("png"));
         given(s3Service.getObjectMetadata(temporaryImageKey))
                 .willReturn(new S3ObjectMetadata(100L, "image/png", ETAG));
         given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12))
@@ -442,7 +446,8 @@ class ChatServiceTest {
                 .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
 
         then(s3Service).should(never()).copyObjectIfUnchanged(anyString(), anyString(), anyString());
-        then(chatMessageRepository).should(never()).save(any(ChatMessage.class));
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+        then(s3Service).should().deleteObject(temporaryImageKey);
     }
 
     @Test
@@ -458,8 +463,8 @@ class ChatServiceTest {
                 .imageKey(finalImageKey)
                 .createdAt(LocalDateTime.of(2026, 7, 27, 12, 30))
                 .build();
-        givenSendAccess();
-        given(chatMessageRepository.findByImageKey(finalImageKey)).willReturn(Optional.of(existingMessage));
+        given(chatImageMessageTransactionService.prepare(GROUP_ID, userPK, temporaryImageKey))
+                .willReturn(new ChatImageMessageTransactionService.Preparation(finalImageKey, existingMessage));
         given(s3Service.getPresignedGetUrl(finalImageKey)).willReturn("https://s3.example.com/image");
 
         ChatMessageResponse response = chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey);
@@ -467,52 +472,52 @@ class ChatServiceTest {
         assertThat(response.messageId()).isEqualTo(10L);
         assertThat(response.imageKey()).isEqualTo(finalImageKey);
         then(s3Service).should(never()).getObjectMetadata(anyString());
-        then(chatMessageRepository).should(never()).save(any(ChatMessage.class));
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {
-            TransactionSynchronization.STATUS_COMMITTED,
-            TransactionSynchronization.STATUS_ROLLED_BACK
-    })
-    @DisplayName("트랜잭션 완료 시 임시 객체를 지우고 롤백이면 최종 객체도 정리한다")
-    void sendImageMessage_CleansUpObjectsAfterTransaction(int completionStatus) {
+    @Test
+    @DisplayName("최종 객체 복사 후 DB 저장이 실패하면 임시 객체와 최종 객체를 정리한다")
+    void sendImageMessage_CleansUpCopiedObjectsWhenPersistenceFails() {
         String temporaryImageKey = temporaryImageKey("png");
         String finalImageKey = finalImageKey("png");
-        ChatMessage savedMessage = ChatMessage.builder()
-                .chatMessageId(10L)
-                .chatRoom(chatRoom)
-                .sender(user)
-                .messageType(ChatMessageType.IMAGE)
-                .imageKey(finalImageKey)
-                .createdAt(LocalDateTime.of(2026, 7, 27, 12, 30))
-                .build();
-        givenSendAccess();
-        given(chatMessageRepository.findByImageKey(finalImageKey)).willReturn(Optional.empty());
+        givenImagePreparation(temporaryImageKey, finalImageKey);
         given(s3Service.getObjectMetadata(temporaryImageKey))
                 .willReturn(new S3ObjectMetadata(100L, "image/png", ETAG));
         given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
-        given(chatMessageRepository.save(any(ChatMessage.class))).willReturn(savedMessage);
-        given(s3Service.getPresignedGetUrl(finalImageKey)).willReturn("https://s3.example.com/image");
+        given(chatImageMessageTransactionService.persist(GROUP_ID, userPK, temporaryImageKey))
+                .willThrow(new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
 
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey);
-            List<TransactionSynchronization> synchronizations =
-                    TransactionSynchronizationManager.getSynchronizations();
-            assertThat(synchronizations).hasSize(1);
-
-            synchronizations.get(0).afterCompletion(completionStatus);
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
 
         then(s3Service).should().deleteObject(temporaryImageKey);
-        if (completionStatus == TransactionSynchronization.STATUS_COMMITTED) {
-            then(s3Service).should(never()).deleteObject(finalImageKey);
-        } else {
-            then(s3Service).should().deleteObject(finalImageKey);
-        }
+        then(s3Service).should().deleteObject(finalImageKey);
+    }
+
+    @Test
+    @DisplayName("CopyObject가 실패해도 생성 여부가 불확실한 최종 객체와 임시 객체를 정리한다")
+    void sendImageMessage_CleansUpObjectsWhenCopyFails() {
+        String temporaryImageKey = temporaryImageKey("png");
+        String finalImageKey = finalImageKey("png");
+        givenImagePreparation(temporaryImageKey, finalImageKey);
+        given(s3Service.getObjectMetadata(temporaryImageKey))
+                .willReturn(new S3ObjectMetadata(100L, "image/png", ETAG));
+        given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
+        org.mockito.BDDMockito.willThrow(new BusinessException(ErrorCode.FILE_UPLOAD_ERROR))
+                .given(s3Service)
+                .copyObjectIfUnchanged(temporaryImageKey, finalImageKey, ETAG);
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.FILE_UPLOAD_ERROR);
+
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(s3Service).should().deleteObject(finalImageKey);
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -597,6 +602,17 @@ class ChatServiceTest {
         given(groupRepository.findByGroupIdForUpdate(GROUP_ID)).willReturn(Optional.of(group));
         given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
         given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.of(chatRoom));
+    }
+
+    private void givenPresignedUrlAccess() {
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
+        given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.of(chatRoom));
+    }
+
+    private void givenImagePreparation(String temporaryImageKey, String finalImageKey) {
+        given(chatImageMessageTransactionService.prepare(GROUP_ID, userPK, temporaryImageKey))
+                .willReturn(new ChatImageMessageTransactionService.Preparation(finalImageKey, null));
     }
 
     private ChatMessage message(Long messageId) {
