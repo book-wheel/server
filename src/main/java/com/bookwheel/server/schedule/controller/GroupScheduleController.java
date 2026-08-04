@@ -106,6 +106,7 @@ public class GroupScheduleController {
     @Operation(
             summary = "미래 독서 일정 재생성",
             description = "진행 중(IN_PROGRESS)인 모임에서 오늘 시작했거나 이미 시작된 라운드는 보존하고 미래 라운드만 재생성합니다. " +
+                    "리더만 미래 일정을 최종 확정할 수 있습니다. " +
                     "멤버 변동 후에는 읽기 순서를 먼저 재확인해야 하며, 성공 시 일정 재확정 상태가 해제됩니다. " +
                     "totalRoundCount는 GET /schedule의 minTotalRoundCount 이상이어야 하며, 최대값은 멤버별 남은 미독서 책 수로 검증합니다. " +
                     "성공하면 변경된 전체 일정 응답을 반환합니다."
