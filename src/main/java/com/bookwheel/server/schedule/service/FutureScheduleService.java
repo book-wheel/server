@@ -5,6 +5,7 @@ import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
@@ -62,6 +63,10 @@ public class FutureScheduleService {
         findActiveUserById(userPK);
         memberPermissionValidator.validateLeader(groupId, userPK);
         validateFutureScheduleState(group.getGroupState());
+        if (group.getScheduleReconfigurationStatus()
+                == ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED) {
+            throw new BusinessException(ErrorCode.GROUP_READ_ORDER_RECONFIRMATION_REQUIRED);
+        }
 
         if (request == null || request.totalRoundCount() == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
@@ -160,6 +165,7 @@ public class FutureScheduleService {
                 serializeExcludedDates(request.excludedDates()),
                 serializeExcludedDateRanges(request.excludedDateRanges())
         );
+        group.completeScheduleReconfiguration();
 
     }
 

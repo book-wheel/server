@@ -91,6 +91,8 @@ public enum ErrorCode {
     GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED(HttpStatus.BAD_REQUEST, "GROUP_051", "일정의 목표 인원을 초과해 가입할 수 없습니다."),
     GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_052", "시작 당일에는 기존 일정을 교체할 수 없습니다."),
     GROUP_SCHEDULE_DURATION_EXCEEDED(HttpStatus.BAD_REQUEST, "GROUP_053", "일정은 계산 시작일로부터 3년 이내로 설정해야 합니다."),
+    GROUP_READ_ORDER_RECONFIRMATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "GROUP_054", "읽기 순서를 변경할 수 없는 상태입니다."),
+    GROUP_READ_ORDER_RECONFIRMATION_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_055", "읽기 순서를 먼저 재확인해야 합니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
