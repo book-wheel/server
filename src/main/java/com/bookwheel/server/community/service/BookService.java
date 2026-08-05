@@ -54,6 +54,7 @@ public class BookService {
     private final PostRepository postRepository;
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
+    private final BookSearchRankingService bookSearchRankingService;
     private final AladinService aladinService;
     private final LibraryNaruService libraryNaruService;
     private final S3Service s3Service;
@@ -292,7 +293,11 @@ public class BookService {
             .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
             .toList();
 
-        return new BookSearchListResponse(books, response.totalCount(), response.isEnd());
+        return new BookSearchListResponse(
+            bookSearchRankingService.rankByPopularity(books),
+            response.totalCount(),
+            response.isEnd()
+        );
     }
 
 

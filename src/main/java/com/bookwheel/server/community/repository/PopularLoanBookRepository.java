@@ -10,6 +10,10 @@ import java.util.Optional;
 
 public interface PopularLoanBookRepository extends JpaRepository<PopularLoanBook, Long> {
 
+    Optional<PopularLoanBook> findFirstBySourceOrderByEndDateDescStartDateDescCollectedAtDesc(
+        PopularLoanBookSource source
+    );
+
     Optional<PopularLoanBook> findByIsbnAndSourceAndStartDateAndEndDate(
         String isbn,
         PopularLoanBookSource source,

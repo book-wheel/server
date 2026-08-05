@@ -2,6 +2,7 @@ package com.bookwheel.server.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 
 import static org.mockito.Mockito.mock;
@@ -50,6 +51,7 @@ class BookServiceTest {
     @Mock private PostRepository postRepository;
     @Mock private CursorUtils cursorUtils;
     @Mock private KaKaoService kaKaoService;
+    @Mock private BookSearchRankingService bookSearchRankingService;
     @Mock private AladinService aladinService;
     @Mock private LibraryNaruService libraryNaruService;
     @Mock private S3Service s3Service;
@@ -87,6 +89,8 @@ class BookServiceTest {
         );
 
         given(kaKaoService.searchBooks(request)).willReturn(kakaoResponse);
+        given(bookSearchRankingService.rankByPopularity(anyList()))
+            .willAnswer(invocation -> invocation.getArgument(0));
         given(bookLikeRepository.findInterestedIsbns(
                 userPK,
                 List.of("9780132350884", "9780134757599")
