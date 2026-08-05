@@ -68,6 +68,8 @@ public class BookService {
     private static final int MAX_KAKAO_SEARCH_PAGE_SIZE = 50;
     // 인기순 재정렬이 적용되는 상위 구간의 크기. 이 구간을 넘어서면 카카오 검색 순서를 그대로 사용한다.
     private static final int RANKED_WINDOW_SIZE = MAX_KAKAO_SEARCH_PAGE_SIZE;
+    // 인기순 재정렬을 적용하는 정렬 기준. 최신순(latest)에는 적용하지 않는다.
+    private static final String SORT_ACCURACY = "accuracy";
 
 
     @Transactional
@@ -293,9 +295,11 @@ public class BookService {
         int size = Math.min(request.size(), MAX_KAKAO_SEARCH_PAGE_SIZE);
         long offset = (long) (request.page() - 1) * size;
 
-        SearchPage searchPage = offset < RANKED_WINDOW_SIZE
+        // 인기순 재정렬은 정확도순 검색에만 적용한다. 최신순(latest)은 요청한 정렬 기준이
+        // 지켜져야 하므로 재정렬도 제목 일치 병합도 하지 않고 카카오 결과를 그대로 반환한다.
+        SearchPage searchPage = isPopularityRankingEnabled(request) && offset < RANKED_WINDOW_SIZE
             ? searchWithinRankedWindow(request, (int) offset, size)
-            : searchBeyondRankedWindow(request, size);
+            : searchWithoutRanking(request, size);
 
         return new BookSearchListResponse(
             applyInterestedSearchBooks(searchPage.books(), userPK),
@@ -340,8 +344,12 @@ public class BookService {
         );
     }
 
-    // 재정렬 구간을 벗어난 페이지는 카카오 검색 순서를 그대로 사용한다. (재정렬/병합 미적용)
-    private SearchPage searchBeyondRankedWindow(BookSearchRequest request, int size) {
+    private boolean isPopularityRankingEnabled(BookSearchRequest request) {
+        return SORT_ACCURACY.equalsIgnoreCase(request.sort());
+    }
+
+    // 최신순 요청이거나 재정렬 구간을 벗어난 페이지는 카카오 검색 순서를 그대로 사용한다. (재정렬/병합 미적용)
+    private SearchPage searchWithoutRanking(BookSearchRequest request, int size) {
         BookSearchListResponse response = kaKaoService.searchBooks(
             new BookSearchRequest(request.query(), request.sort(), request.page(), size)
         );

@@ -7,7 +7,11 @@ public record BookSearchRequest(
     @Schema(description = "검색어 (제목/저자 등)", example = "달러구트")
     String query,
 
-    @Schema(description = "정렬 기준 (accuracy: 정확도순, latest: 최신순). 미지정 시 accuracy", example = "accuracy")
+    @Schema(
+        description = "정렬 기준 (accuracy: 정확도순, latest: 최신순). 미지정 시 accuracy. "
+            + "정보나루 인기순 재정렬은 accuracy에만 적용되며, latest는 카카오 최신순을 그대로 유지한다.",
+        example = "accuracy"
+    )
     String sort,
 
     @Schema(description = "페이지 번호 (1부터 시작). 미지정 시 1", example = "1")

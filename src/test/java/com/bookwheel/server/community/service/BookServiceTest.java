@@ -262,6 +262,41 @@ class BookServiceTest {
     }
 
     @Test
+    @DisplayName("최신순 요청은 인기순 재정렬 없이 카카오 검색 순서를 그대로 반환한다.")
+    void searchBooks_KeepsKakaoOrderWhenSortIsLatest() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", "latest", 1, 10);
+        List<BookSearchResponse> kakaoPage = kakaoBooks(10);
+
+        // 후보를 확장하지 않고 요청한 페이지/크기를 그대로 카카오에 전달한다.
+        given(kaKaoService.searchBooks(request))
+            .willReturn(new BookSearchListResponse(kakaoPage, 305, false));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(kakaoPage);
+        assertThat(response.totalCount()).isEqualTo(305);
+        assertThat(response.isEnd()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
+        verify(bookSearchRankingService, never()).rankByPopularity(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("최신순 요청은 페이지가 바뀌어도 정렬 기준이 유지된다.")
+    void searchBooks_KeepsKakaoOrderOnLaterPagesWhenSortIsLatest() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", "latest", 2, 10);
+        List<BookSearchResponse> kakaoPage = kakaoBooks(10);
+
+        given(kaKaoService.searchBooks(request))
+            .willReturn(new BookSearchListResponse(kakaoPage, 305, false));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(kakaoPage);
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
+        verify(bookSearchRankingService, never()).rankByPopularity(anyList(), any());
+    }
+
+    @Test
     @DisplayName("재정렬 구간에 걸친 페이지는 남는 건수를 카카오 다음 구간에서 이어 붙인다.")
     void searchBooks_AppendsKakaoResultsWhenPageStraddlesRankedWindow() {
         BookSearchRequest request = new BookSearchRequest("vegetarian", null, 2, 30);
