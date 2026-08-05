@@ -48,8 +48,7 @@ public class PopularLoanBookSyncScheduler {
             // 장애는 아니지만 확인이 필요한 상황이다.
             if (result.isSkippedEmpty()) {
                 log.warn(
-                    "Previous month popular loan book sync skipped because fetched data is empty"
-                        + " - startDate: {}, endDate: {}",
+                    "직전 달 인기대출도서 조회 결과가 비어 적재를 건너뜁니다 - startDate: {}, endDate: {}",
                     startDate,
                     endDate
                 );
@@ -57,14 +56,14 @@ public class PopularLoanBookSyncScheduler {
             }
 
             log.info(
-                "Previous month popular loan book sync finished - startDate: {}, endDate: {}, count: {}",
+                "직전 달 인기대출도서 적재 완료 - startDate: {}, endDate: {}, count: {}",
                 startDate,
                 endDate,
                 result.syncedCount()
             );
         } catch (RuntimeException exception) {
             log.error(
-                "Previous month popular loan book sync failed - startDate: {}, endDate: {}, error: {}",
+                "직전 달 인기대출도서 적재 실패 - startDate: {}, endDate: {}, error: {}",
                 startDate,
                 endDate,
                 exception.getMessage()

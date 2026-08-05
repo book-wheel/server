@@ -47,7 +47,7 @@ public class PopularLoanBookSyncService {
         // 해당 기간에 집계된 데이터가 없는 정상 케이스다. 기존 스냅샷은 그대로 둔다.
         if (popularLoanBooks.isEmpty()) {
             log.warn(
-                "Skip popular loan book sync because fetched data is empty - startDate: {}, endDate: {}",
+                "인기대출도서 조회 결과가 비어 적재를 건너뜁니다 - startDate: {}, endDate: {}",
                 startDate,
                 endDate
             );
@@ -59,7 +59,7 @@ public class PopularLoanBookSyncService {
         popularLoanBookRepository.saveAll(popularLoanBooks);
 
         log.info(
-            "Popular loan book sync completed - startDate: {}, endDate: {}, count: {}",
+            "인기대출도서 적재 완료 - startDate: {}, endDate: {}, count: {}",
             startDate,
             endDate,
             popularLoanBooks.size()
