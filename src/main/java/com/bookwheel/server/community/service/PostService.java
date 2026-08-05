@@ -177,11 +177,11 @@ public class PostService {
     }
 
     @Transactional
-    public PostCreateResponse create(PostCreateRequest request, String userPK) {
-        String isbn = request.isbn();
+    public PostCreateResponse create(String isbn, PostCreateRequest request, String userPK) {
+        String normalizedIsbn = requireIsbn(isbn);
         String bookTitle = requireBookTitle(request.title());
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(normalizedIsbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(normalizedIsbn).build()));
 
         // 상세 조회에서 외부 API 없이 제목을 내려줄 수 있도록 작성 시점에 저장해 둔다.
         bookInfo.applyTitleIfAbsent(bookTitle);
@@ -214,6 +214,13 @@ public class PostService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         return title.strip();
+    }
+
+    private String requireIsbn(String isbn) {
+        if (!StringUtils.hasText(isbn)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return isbn.strip();
     }
 
     @Transactional

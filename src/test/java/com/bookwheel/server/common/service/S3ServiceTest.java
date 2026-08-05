@@ -3,6 +3,8 @@ package com.bookwheel.server.common.service;
 import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.dto.PostImagePresignedRequest;
+import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -79,6 +81,50 @@ class S3ServiceTest {
         assertThat(request.putObjectRequest().key()).isEqualTo(objectKey);
         assertThat(request.putObjectRequest().contentType()).isEqualTo("image/png");
         assertThat(request.putObjectRequest().contentLength()).isEqualTo(123_456L);
+    }
+
+    @Test
+    @DisplayName("게시물 이미지 Presigned URL 발급 시 HEIC/HEIF 확장자를 허용하고 소문자로 정규화한다")
+    void getPostPresignedUrls_AcceptsHeicAndHeifExtensions() throws MalformedURLException {
+        String isbn = "9788966263158";
+        given(presignedPutObjectRequest.url()).willReturn(new URL("https://s3.example.com/upload"));
+        given(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class)))
+                .willReturn(presignedPutObjectRequest);
+
+        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, List.of(
+                new PostImagePresignedRequest.FileInfo(".HEIC", "image/heic"),
+                new PostImagePresignedRequest.FileInfo("HEIF", "image/heif")
+        ));
+
+        assertThat(response.presignedUrls()).hasSize(2);
+        assertThat(response.presignedUrls().get(0).presignedUrl()).isEqualTo("https://s3.example.com/upload");
+        assertThat(response.presignedUrls().get(0).contentType()).isEqualTo("image/heic");
+        assertThat(response.presignedUrls().get(0).objectKey())
+                .startsWith("posts/" + isbn + "/")
+                .endsWith("_image.heic");
+        assertThat(response.presignedUrls().get(1).contentType()).isEqualTo("image/heif");
+        assertThat(response.presignedUrls().get(1).objectKey())
+                .startsWith("posts/" + isbn + "/")
+                .endsWith("_image.heif");
+
+        ArgumentCaptor<PutObjectPresignRequest> captor = ArgumentCaptor.forClass(PutObjectPresignRequest.class);
+        then(s3Presigner).should(org.mockito.Mockito.times(2)).presignPutObject(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(request -> request.putObjectRequest().contentType())
+                .containsExactly("image/heic", "image/heif");
+    }
+
+    @Test
+    @DisplayName("게시글 이미지 Presigned URL 발급 시 확장자와 MIME 타입이 일치하지 않으면 거부한다")
+    void getPostPresignedUrls_RejectsMismatchedContentType() {
+        String isbn = "9788966263158";
+
+        assertThatThrownBy(() -> s3Service.getPostPresignedUrls(isbn, List.of(
+                new PostImagePresignedRequest.FileInfo("heic", "image/jpeg")
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
     }
 
     @Test

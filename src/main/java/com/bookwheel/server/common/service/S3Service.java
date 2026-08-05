@@ -4,6 +4,7 @@ import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.community.dto.PostImagePresignedRequest;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -42,7 +45,15 @@ public class S3Service {
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucket;
 
-    private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp");
+    private static final int MAX_POST_IMAGE_COUNT = 5;
+    private static final Map<String, String> POST_IMAGE_CONTENT_TYPE_BY_EXTENSION = Map.of(
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png", "image/png",
+            "webp", "image/webp",
+            "heic", "image/heic",
+            "heif", "image/heif"
+    );
 
     public String getPresignedGetUrl(String objectKey) {
         // 1. 방어 로직 - 키 값 없거나 공백이면 예외 발생
@@ -238,19 +249,24 @@ public class S3Service {
         return new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
     }
 
-    public PostImagePresignedResponse getPostPresignedUrls(String bookId, List<String> fileExtensions) {
-        String prefix = "posts/" + PathNormalizer.normalizeSegment(bookId);
-        List<PostImagePresignedResponse.PresignedInfo> presignedInfos = fileExtensions.stream().map(ext -> {
+    public PostImagePresignedResponse getPostPresignedUrls(
+            String bookId,
+            List<PostImagePresignedRequest.FileInfo> files
+    ) {
+        if (files == null || files.isEmpty() || files.size() > MAX_POST_IMAGE_COUNT) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
 
-            String normalizedExt = ext.toLowerCase().replace(".", "");
-            if (!ALLOWED_EXTENSIONS.contains(normalizedExt)) {
-                throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
-            }
-            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + normalizedExt;
+        String prefix = "posts/" + PathNormalizer.normalizeSegment(bookId);
+        List<PostImagePresignedResponse.PresignedInfo> presignedInfos = files.stream().map(file -> {
+
+            PostImageUploadInfo imageUploadInfo = validatePostImageUploadInfo(file);
+            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + imageUploadInfo.extension();
 
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucket)
                     .key(objectKey)
+                    .contentType(imageUploadInfo.contentType())
                     .build();
 
             PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
@@ -259,10 +275,68 @@ public class S3Service {
 
             String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
 
-            return new PostImagePresignedResponse.PresignedInfo(presignedUrl, objectKey);
+            return new PostImagePresignedResponse.PresignedInfo(
+                    presignedUrl,
+                    objectKey,
+                    imageUploadInfo.contentType()
+            );
         }).toList();
         return new PostImagePresignedResponse(presignedInfos);
     }
+
+    private PostImageUploadInfo validatePostImageUploadInfo(PostImagePresignedRequest.FileInfo file) {
+        if (file == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String extension = normalizePostImageExtension(file.fileExtension());
+        String contentType = normalizePostImageContentType(file.contentType());
+        String expectedContentType = POST_IMAGE_CONTENT_TYPE_BY_EXTENSION.get(extension);
+        if (expectedContentType == null || !expectedContentType.equals(contentType)) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        return new PostImageUploadInfo(extension, contentType);
+    }
+
+    private String normalizePostImageExtension(String extension) {
+        if (extension == null || extension.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        String normalizedExtension = extension.trim().toLowerCase(Locale.ROOT);
+        if (normalizedExtension.startsWith(".")) {
+            normalizedExtension = normalizedExtension.substring(1);
+        }
+
+        if (normalizedExtension.isBlank()
+                || normalizedExtension.contains(".")
+                || normalizedExtension.contains("/")
+                || normalizedExtension.contains("\\")) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        return normalizedExtension;
+    }
+
+    private String normalizePostImageContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        String normalizedContentType = contentType.trim();
+        if (!contentType.equals(normalizedContentType)
+                || !contentType.equals(contentType.toLowerCase(Locale.ROOT))) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        return normalizedContentType;
+    }
+
+    private record PostImageUploadInfo(
+            String extension,
+            String contentType
+    ) {}
 
     public void deleteObject(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
