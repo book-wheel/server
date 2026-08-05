@@ -36,4 +36,15 @@ public class RestClientConfig {
             .requestFactory(factory)
             .build();
     }
+
+    @Bean
+    public RestClient naruPopularLoanRestClient(RestClient.Builder builder) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(15000);
+
+        return builder
+            .requestFactory(factory)
+            .build();
+    }
 }

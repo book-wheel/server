@@ -1,12 +1,15 @@
 package com.bookwheel.server.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
 import java.io.IOException;
@@ -58,8 +61,9 @@ class LibraryNaruServiceTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
+        RestClient restClient = builder.build();
 
-        libraryNaruService = new LibraryNaruService(builder.build());
+        libraryNaruService = new LibraryNaruService(restClient, restClient);
         ReflectionTestUtils.setField(libraryNaruService, "naruApiKey", "test-key");
         ReflectionTestUtils.setField(libraryNaruService, "naruApiUrl", API_URL);
         ReflectionTestUtils.setField(libraryNaruService, "naruPopularLoanApiUrl", POPULAR_LOAN_API_URL);
@@ -228,38 +232,61 @@ class LibraryNaruServiceTest {
     }
 
     @Test
-    @DisplayName("정보나루 인기대출도서가 errCode를 내려주면 빈 목록을 반환한다")
-    void getPopularLoanBooks_ReturnsEmptyOnErrorCode() {
+    @DisplayName("정보나루 인기대출도서가 errCode를 내려주면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsOnErrorCode() {
         String body = """
             {"response": {"errCode": "authErr", "error": "invalid auth key"}}
             """;
         server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
             .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
-        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
-            LocalDate.of(2026, 7, 1),
-            LocalDate.of(2026, 7, 31),
-            1,
-            1000
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
         );
-
-        assertThat(result).isEmpty();
         server.verify();
     }
 
     @Test
-    @DisplayName("정보나루 인기대출도서 호출이 실패하면 빈 목록을 반환한다")
-    void getPopularLoanBooks_ReturnsEmptyOnServerError() {
+    @DisplayName("정보나루 인기대출도서 호출이 실패하면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsOnServerError() {
         server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL))).andRespond(withServerError());
 
-        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
-            LocalDate.of(2026, 7, 1),
-            LocalDate.of(2026, 7, 31),
-            1,
-            1000
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
         );
-
-        assertThat(result).isEmpty();
         server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 연결이 실패하면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsOnConnectionFailure() {
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(request -> {
+                throw new IOException("connect timed out");
+            });
+
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
+        );
+        server.verify();
+    }
+
+    private void assertData4LibraryApiError(Runnable action) {
+        assertThatThrownBy(action::run)
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(ErrorCode.DATA4LIBRARY_API_ERROR);
     }
 }

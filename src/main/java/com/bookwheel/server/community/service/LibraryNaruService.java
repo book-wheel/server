@@ -4,6 +4,8 @@ package com.bookwheel.server.community.service;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
 import com.bookwheel.server.community.dto.LibraryNaruUsageAnalysisResponse;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.config.CacheConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,10 +34,15 @@ public class LibraryNaruService {
     @Value("${naru.popular-loan.api.url:https://data4library.kr/api/loanItemSrch}")
     private String naruPopularLoanApiUrl;
 
-    private final RestClient restClient;
+    private final RestClient usageAnalysisRestClient;
+    private final RestClient popularLoanRestClient;
 
-    public LibraryNaruService(@Qualifier("naruRestClient") RestClient restClient) {
-        this.restClient = restClient;
+    public LibraryNaruService(
+        @Qualifier("naruRestClient") RestClient usageAnalysisRestClient,
+        @Qualifier("naruPopularLoanRestClient") RestClient popularLoanRestClient
+    ) {
+        this.usageAnalysisRestClient = usageAnalysisRestClient;
+        this.popularLoanRestClient = popularLoanRestClient;
     }
 
     /**
@@ -58,7 +65,7 @@ public class LibraryNaruService {
                 .build()
                 .toUri();
 
-            LibraryNaruUsageAnalysisResponse response = restClient.get()
+            LibraryNaruUsageAnalysisResponse response = usageAnalysisRestClient.get()
                 .uri(uri)
                 .retrieve()
                 .body(LibraryNaruUsageAnalysisResponse.class);
@@ -108,7 +115,7 @@ public class LibraryNaruService {
                 .build()
                 .toUri();
 
-            LibraryNaruPopularLoanResponse response = restClient.get()
+            LibraryNaruPopularLoanResponse response = popularLoanRestClient.get()
                 .uri(uri)
                 .retrieve()
                 .body(LibraryNaruPopularLoanResponse.class);
@@ -119,7 +126,7 @@ public class LibraryNaruService {
                     startDate,
                     endDate
                 );
-                return List.of();
+                throw new BusinessException(ErrorCode.DATA4LIBRARY_API_ERROR);
             }
 
             if (response.response().errCode() != null) {
@@ -129,7 +136,7 @@ public class LibraryNaruService {
                     endDate,
                     response.response().errCode()
                 );
-                return List.of();
+                throw new BusinessException(ErrorCode.DATA4LIBRARY_API_ERROR);
             }
 
             List<LibraryNaruPopularLoanResponse.DocItem> docs = response.response().docs();
@@ -144,13 +151,19 @@ public class LibraryNaruService {
                 .filter(doc -> doc.ranking() != null && doc.loanCount() != null)
                 .toList();
         } catch (Exception e) {
+            if (e instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            Throwable cause = e.getCause();
             log.warn(
-                "정보나루 인기대출도서 호출 실패 - startDate: {}, endDate: {}, 원인: {}",
+                "정보나루 인기대출도서 호출 실패 - startDate: {}, endDate: {}, 원인: {}, cause: {}, causeMessage: {}",
                 startDate,
                 endDate,
-                e.getClass().getSimpleName()
+                e.getClass().getSimpleName(),
+                cause != null ? cause.getClass().getSimpleName() : null,
+                cause != null ? cause.getMessage() : null
             );
-            return List.of();
+            throw new BusinessException(ErrorCode.DATA4LIBRARY_API_ERROR);
         }
     }
 }

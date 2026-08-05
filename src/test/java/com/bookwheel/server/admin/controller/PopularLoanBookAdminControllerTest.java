@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.service.PopularLoanBookSyncService;
 import java.time.Clock;
 import java.time.Instant;
@@ -97,5 +99,26 @@ class PopularLoanBookAdminControllerTest {
                 .with(csrf()))
             .andDo(print())
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("정보나루 호출 실패는 성공 응답으로 숨기지 않고 502를 반환한다")
+    void syncPopularLoanBooks_ReturnsBadGatewayWhenData4LibraryCallFails() throws Exception {
+        given(popularLoanBookSyncService.syncPopularLoanBooks(
+            LocalDate.of(2026, 6, 1),
+            LocalDate.of(2026, 6, 30),
+            500
+        )).willThrow(new BusinessException(ErrorCode.DATA4LIBRARY_API_ERROR));
+
+        mockMvc.perform(post("/api/v1/admin/books/popular-loans/sync")
+                .param("startDate", "2026-06-01")
+                .param("endDate", "2026-06-30")
+                .param("pageSize", "500")
+                .with(csrf()))
+            .andDo(print())
+            .andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("BOOK_008"));
     }
 }
