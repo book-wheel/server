@@ -14,13 +14,6 @@ public interface PopularLoanBookRepository extends JpaRepository<PopularLoanBook
         PopularLoanBookSource source
     );
 
-    Optional<PopularLoanBook> findByIsbnAndSourceAndStartDateAndEndDate(
-        String isbn,
-        PopularLoanBookSource source,
-        LocalDate startDate,
-        LocalDate endDate
-    );
-
     List<PopularLoanBook> findBySourceAndStartDateAndEndDateAndIsbnIn(
         PopularLoanBookSource source,
         LocalDate startDate,
