@@ -25,6 +25,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     int deleteAllByGroupId(@Param("groupId") String groupId);
 
     @Modifying
+    @Query("delete from Notification n where n.deepLink = :deepLink")
+    // 대상이 삭제되면 그 대상으로 이동하는 알림도 함께 제거한다. (열 수 없는 링크가 남지 않도록)
+    int deleteAllByDeepLink(@Param("deepLink") String deepLink);
+
+    @Modifying
     @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP " +
             "WHERE n.recipientUserPK = :recipientUserPK AND n.isRead = false")
     int markAllRead(@Param("recipientUserPK") String recipientUserPK);

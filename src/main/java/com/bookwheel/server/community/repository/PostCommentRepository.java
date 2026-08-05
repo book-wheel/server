@@ -4,6 +4,7 @@ import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostComment;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,7 +20,10 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     Optional<PostComment> findByPostCommentIdAndPost_PostId(Long postCommentId, Long postId);
 
-    void deleteByPost(Post post);
+    @Modifying(flushAutomatically = true)
+    @Query("delete from PostComment c where c.post = :post")
+    // 게시물 삭제 전에 해당 게시물의 댓글만 일괄 제거한다. (파생 삭제의 건별 DELETE를 피한다)
+    void deleteAllByPost(@Param("post") Post post);
 
     // 최신순 첫 페이지 (작성일 내림차순, 동일 시 댓글 ID 내림차순)
     @Query("""

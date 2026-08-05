@@ -13,6 +13,7 @@ import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
 import com.bookwheel.server.notification.push.FcmSender;
 import com.bookwheel.server.notification.repository.NotificationRepository;
+import com.bookwheel.server.notification.support.NotificationDeepLink;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -198,6 +199,12 @@ public class NotificationService {
         notificationRepository.findByGroupIdIsNull().stream()
                 .filter(notification -> groupId.equals(extractGroupId(notification.getPayload())))
                 .forEach(notificationRepository::delete);
+    }
+
+    @Transactional
+    public void deleteByPostId(Long postId) {
+        // 게시물이 삭제되면 해당 게시물로 이동하는 알림은 열 수 없는 링크가 되므로 함께 정리한다.
+        notificationRepository.deleteAllByDeepLink(NotificationDeepLink.post(postId));
     }
 
     @Transactional

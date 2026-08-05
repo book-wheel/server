@@ -16,7 +16,9 @@ import java.time.LocalDateTime;
         indexes = {
                 @Index(name = "idx_notification_recipient", columnList = "recipient_user_pk, created_at"),
                 @Index(name = "idx_notification_recipient_unread", columnList = "recipient_user_pk, is_read"),
-                @Index(name = "idx_notification_group_id", columnList = "group_id")
+                @Index(name = "idx_notification_group_id", columnList = "group_id"),
+                // 대상이 삭제될 때 딥링크로 관련 알림을 찾아 정리한다.
+                @Index(name = "idx_notification_deep_link", columnList = "deep_link")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
