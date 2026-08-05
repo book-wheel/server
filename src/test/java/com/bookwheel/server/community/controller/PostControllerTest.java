@@ -5,6 +5,7 @@ import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCommentResponse;
 import com.bookwheel.server.community.dto.PostCreateRequest;
+import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostImagePresignedRequest;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
@@ -28,6 +29,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -93,7 +95,7 @@ class PostControllerTest {
     @DisplayName("Community Gallery: create post requires book title")
     void createPost_RequiresBookTitle() throws Exception {
         String isbn = "9788966263158";
-        PostCreateRequest request = new PostCreateRequest(isbn, " ", "게시글 내용", List.of(), null);
+        PostCreateRequest request = new PostCreateRequest(" ", "게시글 내용", List.of(), null);
 
         mockMvc.perform(post("/api/v1/posts/{isbn}/save", isbn)
                         .with(csrf())
@@ -103,6 +105,33 @@ class PostControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.message").value("도서 제목은 필수입니다."));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("Community Gallery: create post passes path ISBN to service")
+    void createPost_PassesPathIsbnToService() throws Exception {
+        String isbn = "9788966263158";
+        PostCreateRequest request = new PostCreateRequest("Clean Code", "post content", List.of(), null);
+        PostCreateResponse response = new PostCreateResponse(
+                1L,
+                isbn,
+                "Clean Code",
+                "post content",
+                List.of(),
+                LocalDateTime.of(2026, 8, 5, 12, 0)
+        );
+        given(postService.create(eq(isbn), any(PostCreateRequest.class), any())).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/posts/{isbn}/save", isbn)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isbn").value(isbn));
+
+        then(postService).should().create(eq(isbn), any(PostCreateRequest.class), eq("user"));
     }
 
     @Test

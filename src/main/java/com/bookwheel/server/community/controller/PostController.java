@@ -34,11 +34,12 @@ public class PostController {
 
     @Operation(summary = "게시물 업로드(사진 + 글)")
     @PostMapping("/{isbn}/save")
-    public ApiResponse<PostCreateResponse> save(@Valid @RequestBody PostCreateRequest request,
+    public ApiResponse<PostCreateResponse> save(@PathVariable("isbn") String isbn,
+                                                @Valid @RequestBody PostCreateRequest request,
                                                 @AuthenticationPrincipal Object principal) {
 
         String userPK = getUserPK(principal);
-        PostCreateResponse response = postService.create(request,userPK);
+        PostCreateResponse response = postService.create(isbn, request, userPK);
         return ApiResponse.success(response);
     }
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 
 import com.bookwheel.server.common.exception.BusinessException;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -111,9 +113,9 @@ class PostServiceTest {
     void create_StoresRequestedTitle() {
         BookInfo bookInfo = stubCreate(BookInfo.builder().isbn(ISBN).build());
         PostCreateRequest request =
-            new PostCreateRequest(ISBN, "Clean Code", "post content", List.of(), null);
+            new PostCreateRequest("Clean Code", "post content", List.of(), null);
 
-        var response = postService.create(request, UUID.randomUUID().toString());
+        var response = postService.create(ISBN, request, UUID.randomUUID().toString());
 
         assertThat(response.title()).isEqualTo("Clean Code");
         assertThat(bookInfo.getTitle()).isEqualTo("Clean Code");
@@ -124,9 +126,9 @@ class PostServiceTest {
     void create_KeepsAlreadyStoredTitle() {
         BookInfo bookInfo = stubCreate(BookInfo.builder().isbn(ISBN).title("Clean Code").build());
         PostCreateRequest request =
-            new PostCreateRequest(ISBN, "오타난 제목", "post content", List.of(), null);
+            new PostCreateRequest("오타난 제목", "post content", List.of(), null);
 
-        var response = postService.create(request, UUID.randomUUID().toString());
+        var response = postService.create(ISBN, request, UUID.randomUUID().toString());
 
         assertThat(response.title()).isEqualTo("오타난 제목");
         assertThat(bookInfo.getTitle()).isEqualTo("Clean Code");
@@ -136,12 +138,31 @@ class PostServiceTest {
     @DisplayName("작성 요청의 도서 제목이 공백이면 INVALID_INPUT_VALUE 예외를 던진다.")
     void create_ThrowsWhenTitleIsBlank() {
         PostCreateRequest request =
-            new PostCreateRequest(ISBN, "   ", "post content", List.of(), null);
+            new PostCreateRequest("   ", "post content", List.of(), null);
 
-        assertThatThrownBy(() -> postService.create(request, UUID.randomUUID().toString()))
+        assertThatThrownBy(() -> postService.create(ISBN, request, UUID.randomUUID().toString()))
             .isInstanceOf(BusinessException.class)
             .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_INPUT_VALUE));
+    }
+
+    @Test
+    @DisplayName("게시글 작성 시 URL 경로의 ISBN으로 BookInfo를 생성한다")
+    void create_CreatesBookInfoWithPathIsbn() {
+        String pathIsbn = "9791161571188";
+        PostCreateRequest request =
+            new PostCreateRequest("Clean Code", "post content", List.of(), null);
+        given(bookInfoRepository.findByIsbn(pathIsbn)).willReturn(Optional.empty());
+        given(bookInfoRepository.save(any(BookInfo.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(userRepository.findById(anyString())).willReturn(Optional.of(mock(User.class)));
+        given(postRepository.save(any(Post.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        var response = postService.create(pathIsbn, request, UUID.randomUUID().toString());
+
+        assertThat(response.isbn()).isEqualTo(pathIsbn);
+        ArgumentCaptor<BookInfo> bookInfoCaptor = ArgumentCaptor.forClass(BookInfo.class);
+        then(bookInfoRepository).should().save(bookInfoCaptor.capture());
+        assertThat(bookInfoCaptor.getValue().getIsbn()).isEqualTo(pathIsbn);
     }
 
     @Test
