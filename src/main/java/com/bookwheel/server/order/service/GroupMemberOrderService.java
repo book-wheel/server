@@ -3,6 +3,7 @@ package com.bookwheel.server.order.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
@@ -48,9 +49,14 @@ public class GroupMemberOrderService {
         // 읽기 순서 저장과 모임 삭제가 같은 그룹의 자식 행을 동시에 변경하지 않도록 직렬화한다.
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
-        // 시작 후에는 이미 확정된 책바퀴와 멤버 순서가 달라지지 않도록 모집 중에만 변경한다.
-        if (group.getGroupState() != State.RECRUITING) {
+        if (group.getGroupState() != State.RECRUITING && group.getGroupState() != State.IN_PROGRESS) {
             throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+        }
+        ScheduleReconfigurationStatus reconfigurationStatus = group.getScheduleReconfigurationStatus();
+        // 진행 중인 모임에서 평소에는 읽기 순서 변경 불가능
+        if (group.getGroupState() == State.IN_PROGRESS
+                && reconfigurationStatus == ScheduleReconfigurationStatus.NONE) {
+            throw new BusinessException(ErrorCode.GROUP_READ_ORDER_RECONFIRMATION_NOT_ALLOWED);
         }
         validateManagerPermission(groupId, userPK);
         validateRequestShape(request);
@@ -66,7 +72,12 @@ public class GroupMemberOrderService {
         }
 
         memberRepository.saveAll(activeMembers);
-        recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
+        if (group.getGroupState() == State.RECRUITING) {
+            recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
+        } else {
+            // 진행 중에는 기존 미래 라운드를 보존하고, 순서 확인 다음 단계인 일정 확인만 요청한다.
+            group.requireFutureScheduleConfirmation();
+        }
 
         eventPublisher.publishEvent(new ReadOrderAssignedEvent(
                 group.getGroupId(),

@@ -3,6 +3,7 @@ package com.bookwheel.server.schedule.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
@@ -14,6 +15,7 @@ import com.bookwheel.server.schedule.dto.GroupSchedulePreviewResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleResponse;
 import com.bookwheel.server.schedule.dto.GroupScheduleStatus;
 import com.bookwheel.server.schedule.entity.Round;
+import com.bookwheel.server.schedule.event.GroupCompletedEvent;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -853,6 +855,61 @@ class GroupScheduleServiceTest {
                 org.mockito.ArgumentMatchers.any(),
                 anyList()
         );
+    }
+
+    @Test
+    @DisplayName("일정 재확정 중인 모임은 자동 완료 대상에서 제외한다")
+    void closeFinishedGroups_UsesOnlyGroupsWithoutPendingReconfiguration() {
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        given(groupRepository.findGroupsBecomingComplete(
+                State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
+                today
+        )).willReturn(List.of());
+
+        int updated = groupScheduleService.closeFinishedGroups();
+
+        assertThat(updated).isZero();
+        then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("잠금 조회한 모임만 완료 처리하고 같은 대상의 완료 이벤트를 발행한다")
+    void closeFinishedGroups_CompletesAndPublishesEventsForLockedGroupsOnly() {
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        Group completing = Group.builder()
+                .groupId("completing-group")
+                .groupName("완료 대상 모임")
+                .groupState(State.IN_PROGRESS)
+                .scheduleReconfigurationStatus(ScheduleReconfigurationStatus.NONE)
+                .build();
+        Group becameEligibleAfterQuery = Group.builder()
+                .groupId("late-group")
+                .groupName("뒤늦게 재확정된 모임")
+                .groupState(State.IN_PROGRESS)
+                .scheduleReconfigurationStatus(ScheduleReconfigurationStatus.FUTURE_SCHEDULE_CONFIRMATION_REQUIRED)
+                .build();
+        given(groupRepository.findGroupsBecomingComplete(
+                State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
+                today
+        )).willAnswer(invocation -> {
+            // 조회 대상 확정 직후 다른 트랜잭션의 재확정 완료 상황 재현
+            becameEligibleAfterQuery.completeScheduleReconfiguration();
+            return List.of(completing);
+        });
+
+        int updated = groupScheduleService.closeFinishedGroups();
+
+        assertThat(updated).isEqualTo(1);
+        assertThat(completing.getGroupState()).isEqualTo(State.COMPLETE);
+        assertThat(becameEligibleAfterQuery.getScheduleReconfigurationStatus())
+                .isEqualTo(ScheduleReconfigurationStatus.NONE);
+        assertThat(becameEligibleAfterQuery.getGroupState()).isEqualTo(State.IN_PROGRESS);
+        then(eventPublisher).should().publishEvent(
+                new GroupCompletedEvent(completing.getGroupId(), completing.getGroupName())
+        );
+        then(eventPublisher).shouldHaveNoMoreInteractions();
     }
 
     private User activeUser() {

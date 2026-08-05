@@ -5,6 +5,7 @@ import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
@@ -92,6 +93,34 @@ class FutureScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("읽기 순서 재확인 전에는 미래 일정을 교체할 수 없다")
+    void regenerateFutureSchedule_RejectsBeforeReadOrderConfirmation() {
+        String groupId = "group-1";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.IN_PROGRESS)
+                .scheduleReconfigurationStatus(ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED)
+                .build();
+
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser("리더")));
+
+        assertThatThrownBy(() -> futureScheduleService.regenerateFutureSchedule(
+                groupId,
+                new GroupScheduleFutureRequest(1, 7, null, List.of(), List.of()),
+                "leader-user-pk"
+        ))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GROUP_READ_ORDER_RECONFIRMATION_REQUIRED)
+                );
+
+        then(memberRepository).shouldHaveNoInteractions();
+        then(roundRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
     @DisplayName("미래 라운드 최대값은 이미 읽은 책을 제외한 멤버별 남은 책 수로 제한한다")
     void regenerateFutureSchedule_RejectsRoundsBeyondUnreadBookCapacity() {
         String groupId = "group-1";
@@ -166,6 +195,7 @@ class FutureScheduleServiceTest {
                 .groupRoundCount(2)
                 .startDate(today.minusDays(3))
                 .readingPeriod(7)
+                .scheduleReconfigurationStatus(ScheduleReconfigurationStatus.FUTURE_SCHEDULE_CONFIRMATION_REQUIRED)
                 .build();
         User firstUser = activeUser("첫째");
         User secondUser = activeUser("둘째");
@@ -267,6 +297,7 @@ class FutureScheduleServiceTest {
         assertThat(group.getScheduleExcludedDateRanges()).isEqualTo(
                 today.plusDays(4) + ":" + today.plusDays(5)
         );
+        assertThat(group.getScheduleReconfigurationStatus()).isEqualTo(ScheduleReconfigurationStatus.NONE);
         then(wheelReassignmentService).should()
                 .deleteReplaceableFutureAssignments(List.of(existingFutureRound));
         then(roundRepository).should().deleteByRoundIdIn(List.of("round-2"));
