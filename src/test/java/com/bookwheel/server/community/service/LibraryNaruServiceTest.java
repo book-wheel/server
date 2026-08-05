@@ -8,7 +8,10 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
+import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +27,7 @@ import org.springframework.web.client.RestClient;
 class LibraryNaruServiceTest {
 
     private static final String API_URL = "https://data4library.kr/api/usageAnalysisList";
+    private static final String POPULAR_LOAN_API_URL = "https://data4library.kr/api/loanItemSrch";
     private static final String ISBN = "9788954681179";
 
     // 실제 응답과 동일한 구조. 매핑하지 않는 항목(request, loanHistory, gender, ranking 등)도 함께 담아
@@ -58,6 +62,7 @@ class LibraryNaruServiceTest {
         libraryNaruService = new LibraryNaruService(builder.build());
         ReflectionTestUtils.setField(libraryNaruService, "naruApiKey", "test-key");
         ReflectionTestUtils.setField(libraryNaruService, "naruApiUrl", API_URL);
+        ReflectionTestUtils.setField(libraryNaruService, "naruPopularLoanApiUrl", POPULAR_LOAN_API_URL);
     }
 
     @Test
@@ -141,6 +146,120 @@ class LibraryNaruServiceTest {
             .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
 
         assertThat(libraryNaruService.getUsageAnalysis(ISBN)).isNull();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 응답을 파싱한다")
+    void getPopularLoanBooks_ParsesSuccessResponse() {
+        String body = """
+            {
+              "response": {
+                "resultNum": 2,
+                "numFound": 5000,
+                "docs": [
+                  {
+                    "doc": {
+                      "ranking": 1,
+                      "bookname": "Bright Night",
+                      "authors": "Author A",
+                      "publisher": "Publisher A",
+                      "publication_year": "2021",
+                      "isbn13": "9788954681179",
+                      "loan_count": "104490"
+                    }
+                  },
+                  {
+                    "doc": {
+                      "ranking": 2,
+                      "bookname": "Clean Code",
+                      "authors": "Robert C. Martin",
+                      "publisher": "Prentice Hall",
+                      "publication_year": "2008",
+                      "isbn13": "9780132350884",
+                      "loan_count": 90000
+                    }
+                  }
+                ]
+              }
+            }
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).ranking()).isEqualTo(1);
+        assertThat(result.get(0).isbn()).isEqualTo("9788954681179");
+        assertThat(result.get(0).loanCount()).isEqualTo(104490);
+        assertThat(result.get(1).ranking()).isEqualTo(2);
+        assertThat(result.get(1).loanCount()).isEqualTo(90000);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 조회에 기간과 JSON 응답 형식을 전달한다")
+    void getPopularLoanBooks_SendsRequiredQueryParams() {
+        String body = """
+            {"response": {"docs": []}}
+            """;
+        server.expect(requestTo(containsString("startDt=2026-07-01")))
+            .andExpect(requestTo(containsString("endDt=2026-07-31")))
+            .andExpect(requestTo(containsString("pageNo=1")))
+            .andExpect(requestTo(containsString("pageSize=1000")))
+            .andExpect(requestTo(containsString("format=json")))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서가 errCode를 내려주면 빈 목록을 반환한다")
+    void getPopularLoanBooks_ReturnsEmptyOnErrorCode() {
+        String body = """
+            {"response": {"errCode": "authErr", "error": "invalid auth key"}}
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 호출이 실패하면 빈 목록을 반환한다")
+    void getPopularLoanBooks_ReturnsEmptyOnServerError() {
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL))).andRespond(withServerError());
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).isEmpty();
         server.verify();
     }
 }

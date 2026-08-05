@@ -2,6 +2,7 @@ package com.bookwheel.server.community.service;
 
 
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
+import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
 import com.bookwheel.server.community.dto.LibraryNaruUsageAnalysisResponse;
 import com.bookwheel.server.config.CacheConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
 
 
 @Slf4j
@@ -24,6 +28,9 @@ public class LibraryNaruService {
 
     @Value("${naru.api.url}")
     private String naruApiUrl;
+
+    @Value("${naru.popular-loan.api.url:https://data4library.kr/api/loanItemSrch}")
+    private String naruPopularLoanApiUrl;
 
     private final RestClient restClient;
 
@@ -44,7 +51,7 @@ public class LibraryNaruService {
         log.info("도서관정보나루 이용 분석 조회 요청 - ISBN: {}", isbn);
 
         try {
-            URI uri = UriComponentsBuilder.fromHttpUrl(naruApiUrl)
+            URI uri = UriComponentsBuilder.fromUriString(naruApiUrl)
                 .queryParam("authKey", naruApiKey)
                 .queryParam("isbn13", isbn)
                 .queryParam("format", "json")
@@ -73,6 +80,77 @@ public class LibraryNaruService {
             // 인증키가 노출되지 않도록 요청 URI나 예외 메시지 대신 예외 타입만 남긴다.
             log.warn("도서관정보나루 호출 실패 - ISBN: {}, 원인: {}", isbn, e.getClass().getSimpleName());
             return null;
+        }
+    }
+
+    public List<LibraryNaruPopularLoanResponse.Doc> getPopularLoanBooks(
+        LocalDate startDate,
+        LocalDate endDate,
+        int pageNo,
+        int pageSize
+    ) {
+        log.info(
+            "정보나루 인기대출도서 조회 요청 - startDate: {}, endDate: {}, pageNo: {}, pageSize: {}",
+            startDate,
+            endDate,
+            pageNo,
+            pageSize
+        );
+
+        try {
+            URI uri = UriComponentsBuilder.fromUriString(naruPopularLoanApiUrl)
+                .queryParam("authKey", naruApiKey)
+                .queryParam("startDt", startDate)
+                .queryParam("endDt", endDate)
+                .queryParam("pageNo", pageNo)
+                .queryParam("pageSize", pageSize)
+                .queryParam("format", "json")
+                .build()
+                .toUri();
+
+            LibraryNaruPopularLoanResponse response = restClient.get()
+                .uri(uri)
+                .retrieve()
+                .body(LibraryNaruPopularLoanResponse.class);
+
+            if (response == null || response.response() == null) {
+                log.warn(
+                    "정보나루 인기대출도서 응답이 비어 있습니다 - startDate: {}, endDate: {}",
+                    startDate,
+                    endDate
+                );
+                return List.of();
+            }
+
+            if (response.response().errCode() != null) {
+                log.warn(
+                    "정보나루 인기대출도서 조회 실패 - startDate: {}, endDate: {}, errCode: {}",
+                    startDate,
+                    endDate,
+                    response.response().errCode()
+                );
+                return List.of();
+            }
+
+            List<LibraryNaruPopularLoanResponse.DocItem> docs = response.response().docs();
+            if (docs == null) {
+                return List.of();
+            }
+
+            return docs.stream()
+                .map(LibraryNaruPopularLoanResponse.DocItem::doc)
+                .filter(Objects::nonNull)
+                .filter(doc -> doc.isbn() != null && !doc.isbn().isBlank())
+                .filter(doc -> doc.ranking() != null && doc.loanCount() != null)
+                .toList();
+        } catch (Exception e) {
+            log.warn(
+                "정보나루 인기대출도서 호출 실패 - startDate: {}, endDate: {}, 원인: {}",
+                startDate,
+                endDate,
+                e.getClass().getSimpleName()
+            );
+            return List.of();
         }
     }
 }
