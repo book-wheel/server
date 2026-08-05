@@ -36,7 +36,9 @@ public class GroupMemberOrderController {
                     "isRandom=false면 memberIds 순서대로 결과를 반환하고, " +
                     "isRandom=true면 ACTIVE 멤버를 랜덤으로 섞어 반환합니다. " +
                     "응답 구조는 동일하며 data 배열의 순서 의미가 케이스별로 다릅니다. " +
-                    "모집 중 READY 일정의 PLANNED 배정은 새 순서로 재생성되므로 성공 후 GET /schedule을 다시 조회합니다."
+                    "모집 중에는 PLANNED 배정을 새 순서로 갱신합니다. " +
+                    "진행 중에는 멤버 변동으로 읽기 순서 재확인이 필요한 경우에만 호출할 수 있습니다. " +
+                    "읽기 순서 지정 및 재확인은 리더와 부리더가 할 수 있으며, 미래 일정 최종 확정은 리더만 할 수 있습니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -60,11 +62,11 @@ public class GroupMemberOrderController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "모집 상태·요청 형식 오류 또는 멤버 집합 불일치 (GROUP_035, GROUP_016, GROUP_017)"
+                    description = "상태·요청 형식 오류 또는 멤버 집합 불일치 (GROUP_035, GROUP_054, GROUP_016, GROUP_017)"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403",
-                    description = "순서 지정 권한 없음 (GROUP_015)"
+                    description = "리더 또는 부리더 권한 없음 (GROUP_015)"
             )
     })
     @PostMapping("/{groupId}/members/order")

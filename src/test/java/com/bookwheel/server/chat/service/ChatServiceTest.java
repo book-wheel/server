@@ -1,6 +1,8 @@
 package com.bookwheel.server.chat.service;
 
 import com.bookwheel.server.chat.dto.ChatMessageResponse;
+import com.bookwheel.server.chat.dto.ChatImagePresignedUrlRequest;
+import com.bookwheel.server.chat.dto.ChatImagePresignedUrlResponse;
 import com.bookwheel.server.chat.dto.ChatRoomReadResponse;
 import com.bookwheel.server.chat.entity.ChatMessage;
 import com.bookwheel.server.chat.entity.ChatMessageType;
@@ -11,6 +13,7 @@ import com.bookwheel.server.chat.repository.ChatRoomReadStateRepository;
 import com.bookwheel.server.chat.repository.ChatRoomRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.repository.GroupRepository;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -32,17 +36,25 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static com.bookwheel.server.chat.dto.ChatMessageSendRequest.MAX_CONTENT_LENGTH;
+import static com.bookwheel.server.chat.image.ChatImagePolicy.MAX_FILE_SIZE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
 
     private static final String GROUP_ID = "group-1";
+    private static final String ETAG = "\"image-etag\"";
+    private static final byte[] PNG_SIGNATURE = {
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0
+    };
 
     @Mock
     private ChatRoomRepository chatRoomRepository;
@@ -62,6 +74,9 @@ class ChatServiceTest {
     @Mock
     private S3Service s3Service;
 
+    @Mock
+    private ChatImageMessageTransactionService chatImageMessageTransactionService;
+
     private ChatService chatService;
     private Group group;
     private ChatRoom chatRoom;
@@ -77,7 +92,8 @@ class ChatServiceTest {
                 chatRoomReadStateRepository,
                 groupRepository,
                 memberRepository,
-                s3Service
+                s3Service,
+                chatImageMessageTransactionService
         );
 
         group = Group.builder()
@@ -231,6 +247,280 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("ACTIVE 멤버에게 채팅방 전용 이미지 Presigned URL을 발급한다")
+    void createImagePresignedUrl_ReturnsChatObjectKey() {
+        ChatImagePresignedUrlRequest request = new ChatImagePresignedUrlRequest(
+                "cat.png",
+                "image/png",
+                123_456L
+        );
+        givenPresignedUrlAccess();
+        given(s3Service.getPresignedPutUrl(anyString(), eq("image/png"), eq(123_456L)))
+                .willReturn("https://s3.example.com/upload");
+
+        ChatImagePresignedUrlResponse response = chatService.createImagePresignedUrl(
+                GROUP_ID,
+                userPK,
+                request
+        );
+
+        assertThat(response.presignedUrl()).isEqualTo("https://s3.example.com/upload");
+        assertThat(response.objectKey())
+                .startsWith("chat-temp/" + chatRoom.getChatRoomId() + "/" + userPK + "/")
+                .endsWith(".png");
+        then(s3Service).should().getPresignedPutUrl(response.objectKey(), "image/png", 123_456L);
+    }
+
+    @Test
+    @DisplayName("5MB를 초과한 이미지에는 Presigned URL을 발급하지 않는다")
+    void createImagePresignedUrl_RejectsOversizedFile() {
+        ChatImagePresignedUrlRequest request = new ChatImagePresignedUrlRequest(
+                "cat.png",
+                "image/png",
+                MAX_FILE_SIZE + 1
+        );
+
+        assertThatThrownBy(() -> chatService.createImagePresignedUrl(GROUP_ID, userPK, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.FILE_SIZE_EXCEEDED);
+
+        then(groupRepository).shouldHaveNoInteractions();
+        then(s3Service).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("확장자와 MIME 타입이 일치하지 않으면 Presigned URL을 발급하지 않는다")
+    void createImagePresignedUrl_RejectsMismatchedContentType() {
+        ChatImagePresignedUrlRequest request = new ChatImagePresignedUrlRequest(
+                "cat.png",
+                "image/jpeg",
+                100L
+        );
+
+        assertThatThrownBy(() -> chatService.createImagePresignedUrl(GROUP_ID, userPK, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
+
+        then(groupRepository).shouldHaveNoInteractions();
+        then(s3Service).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("비ACTIVE 멤버에게는 이미지 Presigned URL을 발급하지 않는다")
+    void createImagePresignedUrl_RejectsInactiveMember() {
+        ChatImagePresignedUrlRequest request = new ChatImagePresignedUrlRequest(
+                "cat.png",
+                "image/png",
+                100L
+        );
+        Member inactiveMember = Member.builder()
+                .memberId("inactive-member")
+                .group(group)
+                .user(user)
+                .memberRole(MemberRole.OUT)
+                .memberStatus(MemberStatus.EXITED)
+                .build();
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK))
+                .willReturn(Optional.of(inactiveMember));
+
+        assertThatThrownBy(() -> chatService.createImagePresignedUrl(GROUP_ID, userPK, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+
+        then(chatRoomRepository).shouldHaveNoInteractions();
+        then(s3Service).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("업로드된 이미지를 로그인 사용자 작성자의 IMAGE 메시지로 저장한다")
+    void sendImageMessage_SavesUploadedImageWithAuthenticatedUser() {
+        String temporaryImageKey = temporaryImageKey("png");
+        String finalImageKey = finalImageKey("png");
+        String imageUrl = "https://s3.example.com/image";
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 27, 12, 30);
+        ChatMessage savedMessage = ChatMessage.builder()
+                .chatMessageId(10L)
+                .chatRoom(chatRoom)
+                .sender(user)
+                .messageType(ChatMessageType.IMAGE)
+                .imageKey(finalImageKey)
+                .createdAt(createdAt)
+                .build();
+        givenImagePreparation(temporaryImageKey, finalImageKey);
+        given(s3Service.getObjectMetadata(temporaryImageKey))
+                .willReturn(new S3ObjectMetadata(123_456L, "image/png", ETAG));
+        given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
+        given(chatImageMessageTransactionService.persist(GROUP_ID, userPK, temporaryImageKey))
+                .willReturn(savedMessage);
+        given(s3Service.getPresignedGetUrl(finalImageKey)).willReturn(imageUrl);
+
+        ChatMessageResponse response = chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey);
+
+        assertThat(response.messageId()).isEqualTo(10L);
+        assertThat(response.sender().userPK()).isEqualTo(userPK);
+        assertThat(response.type()).isEqualTo(ChatMessageType.IMAGE);
+        assertThat(response.content()).isNull();
+        assertThat(response.imageKey()).isEqualTo(finalImageKey);
+        assertThat(response.imageUrl()).isEqualTo(imageUrl);
+        assertThat(response.createdAt()).isEqualTo(createdAt);
+        InOrder order = inOrder(chatImageMessageTransactionService, s3Service);
+        order.verify(chatImageMessageTransactionService).prepare(GROUP_ID, userPK, temporaryImageKey);
+        order.verify(s3Service).getObjectMetadata(temporaryImageKey);
+        order.verify(s3Service).getObjectSignature(temporaryImageKey, ETAG, 12);
+        order.verify(s3Service).copyObjectIfUnchanged(temporaryImageKey, finalImageKey, ETAG);
+        order.verify(chatImageMessageTransactionService).persist(GROUP_ID, userPK, temporaryImageKey);
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(s3Service).should(never()).deleteObject(finalImageKey);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 이미지 키로 메시지를 저장할 수 없다")
+    void sendImageMessage_RejectsAnotherUsersObjectKey() {
+        String imageKey = "chat-temp/" + chatRoom.getChatRoomId()
+                + "/another-user-pk/550e8400-e29b-41d4-a716-446655440000.png";
+        given(chatImageMessageTransactionService.prepare(GROUP_ID, userPK, imageKey))
+                .willThrow(new BusinessException(ErrorCode.INVALID_FILE_KEY));
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, imageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_KEY);
+
+        then(s3Service).shouldHaveNoInteractions();
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("S3에 업로드되지 않은 이미지 키로 메시지를 저장할 수 없다")
+    void sendImageMessage_RejectsMissingObject() {
+        String imageKey = temporaryImageKey("png");
+        givenImagePreparation(imageKey, finalImageKey("png"));
+        given(s3Service.getObjectMetadata(imageKey))
+                .willThrow(new BusinessException(ErrorCode.FILE_NOT_FOUND));
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, imageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.FILE_NOT_FOUND);
+
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+        then(s3Service).should().deleteObject(imageKey);
+        then(s3Service).should(never()).deleteObject(finalImageKey("png"));
+    }
+
+    @Test
+    @DisplayName("실제 업로드된 이미지의 MIME 타입이 키 확장자와 다르면 메시지를 저장하지 않는다")
+    void sendImageMessage_RejectsUploadedContentTypeMismatch() {
+        String imageKey = temporaryImageKey("png");
+        givenImagePreparation(imageKey, finalImageKey("png"));
+        given(s3Service.getObjectMetadata(imageKey))
+                .willReturn(new S3ObjectMetadata(100L, "image/jpeg", ETAG));
+        given(s3Service.getObjectSignature(imageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, imageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
+
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+        then(s3Service).should().deleteObject(imageKey);
+    }
+
+    @Test
+    @DisplayName("Content-Type만 위장하고 실제 이미지 시그니처가 아니면 메시지를 저장하지 않는다")
+    void sendImageMessage_RejectsInvalidBinarySignature() {
+        String temporaryImageKey = temporaryImageKey("png");
+        givenImagePreparation(temporaryImageKey, finalImageKey("png"));
+        given(s3Service.getObjectMetadata(temporaryImageKey))
+                .willReturn(new S3ObjectMetadata(100L, "image/png", ETAG));
+        given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12))
+                .willReturn("not-an-image".getBytes());
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
+
+        then(s3Service).should(never()).copyObjectIfUnchanged(anyString(), anyString(), anyString());
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+        then(s3Service).should().deleteObject(temporaryImageKey);
+    }
+
+    @Test
+    @DisplayName("같은 임시 키의 전송 요청이 재시도되면 기존 이미지 메시지를 반환한다")
+    void sendImageMessage_ReturnsExistingMessageOnRetry() {
+        String temporaryImageKey = temporaryImageKey("png");
+        String finalImageKey = finalImageKey("png");
+        ChatMessage existingMessage = ChatMessage.builder()
+                .chatMessageId(10L)
+                .chatRoom(chatRoom)
+                .sender(user)
+                .messageType(ChatMessageType.IMAGE)
+                .imageKey(finalImageKey)
+                .createdAt(LocalDateTime.of(2026, 7, 27, 12, 30))
+                .build();
+        given(chatImageMessageTransactionService.prepare(GROUP_ID, userPK, temporaryImageKey))
+                .willReturn(new ChatImageMessageTransactionService.Preparation(finalImageKey, existingMessage));
+        given(s3Service.getPresignedGetUrl(finalImageKey)).willReturn("https://s3.example.com/image");
+
+        ChatMessageResponse response = chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey);
+
+        assertThat(response.messageId()).isEqualTo(10L);
+        assertThat(response.imageKey()).isEqualTo(finalImageKey);
+        then(s3Service).should(never()).getObjectMetadata(anyString());
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("최종 객체 복사 후 DB 저장이 실패하면 임시 객체와 최종 객체를 정리한다")
+    void sendImageMessage_CleansUpCopiedObjectsWhenPersistenceFails() {
+        String temporaryImageKey = temporaryImageKey("png");
+        String finalImageKey = finalImageKey("png");
+        givenImagePreparation(temporaryImageKey, finalImageKey);
+        given(s3Service.getObjectMetadata(temporaryImageKey))
+                .willReturn(new S3ObjectMetadata(100L, "image/png", ETAG));
+        given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
+        given(chatImageMessageTransactionService.persist(GROUP_ID, userPK, temporaryImageKey))
+                .willThrow(new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(s3Service).should().deleteObject(finalImageKey);
+    }
+
+    @Test
+    @DisplayName("CopyObject가 실패해도 생성 여부가 불확실한 최종 객체와 임시 객체를 정리한다")
+    void sendImageMessage_CleansUpObjectsWhenCopyFails() {
+        String temporaryImageKey = temporaryImageKey("png");
+        String finalImageKey = finalImageKey("png");
+        givenImagePreparation(temporaryImageKey, finalImageKey);
+        given(s3Service.getObjectMetadata(temporaryImageKey))
+                .willReturn(new S3ObjectMetadata(100L, "image/png", ETAG));
+        given(s3Service.getObjectSignature(temporaryImageKey, ETAG, 12)).willReturn(PNG_SIGNATURE);
+        org.mockito.BDDMockito.willThrow(new BusinessException(ErrorCode.FILE_UPLOAD_ERROR))
+                .given(s3Service)
+                .copyObjectIfUnchanged(temporaryImageKey, finalImageKey, ETAG);
+
+        assertThatThrownBy(() -> chatService.sendImageMessage(GROUP_ID, userPK, temporaryImageKey))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.FILE_UPLOAD_ERROR);
+
+        then(s3Service).should().deleteObject(temporaryImageKey);
+        then(s3Service).should().deleteObject(finalImageKey);
+        then(chatImageMessageTransactionService).should(never()).persist(anyString(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("읽음 상태가 없으면 요청한 메시지로 새 상태를 생성한다")
     void updateReadState_CreatesInitialState() {
         ChatMessage requestedMessage = message(80L);
@@ -314,6 +604,17 @@ class ChatServiceTest {
         given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.of(chatRoom));
     }
 
+    private void givenPresignedUrlAccess() {
+        given(groupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(GROUP_ID, userPK)).willReturn(Optional.of(member));
+        given(chatRoomRepository.findByGroup_GroupId(GROUP_ID)).willReturn(Optional.of(chatRoom));
+    }
+
+    private void givenImagePreparation(String temporaryImageKey, String finalImageKey) {
+        given(chatImageMessageTransactionService.prepare(GROUP_ID, userPK, temporaryImageKey))
+                .willReturn(new ChatImageMessageTransactionService.Preparation(finalImageKey, null));
+    }
+
     private ChatMessage message(Long messageId) {
         return ChatMessage.builder()
                 .chatMessageId(messageId)
@@ -328,5 +629,19 @@ class ChatServiceTest {
                 .user(member.getUser())
                 .lastReadMessage(lastReadMessage)
                 .build();
+    }
+
+    private String temporaryImageKey(String extension) {
+        return "chat-temp/" + chatRoom.getChatRoomId()
+                + "/" + userPK
+                + "/550e8400-e29b-41d4-a716-446655440000."
+                + extension;
+    }
+
+    private String finalImageKey(String extension) {
+        return "chat/" + chatRoom.getChatRoomId()
+                + "/" + userPK
+                + "/550e8400-e29b-41d4-a716-446655440000."
+                + extension;
     }
 }

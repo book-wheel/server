@@ -55,6 +55,7 @@ public class BookService {
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
     private final AladinService aladinService;
+    private final LibraryNaruService libraryNaruService;
     private final S3Service s3Service;
 
     private static final int DEFAULT_GALLERY_SIZE = 18;
@@ -283,14 +284,24 @@ public class BookService {
     }
 
 
-    public BookSearchListResponse searchBooks(BookSearchRequest request) {
-        return kaKaoService.searchBooks(request);
+    public BookSearchListResponse searchBooks(BookSearchRequest request, String userPK) {
+        BookSearchListResponse response = kaKaoService.searchBooks(request);
+        Set<String> interestedIsbns = findInterestedSearchIsbns(response.books(), userPK);
+
+        List<BookSearchResponse> books = response.books().stream()
+            .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
+            .toList();
+
+        return new BookSearchListResponse(books, response.totalCount(), response.isEnd());
     }
 
 
     public BookDetailResponse getBookDetail(String isbn, String userPK) {
         boolean isInterested = bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK);
-        return aladinService.getBookDetailByIsbn(isbn, isInterested);
+        BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(isbn, isInterested);
+
+        // 이용 분석은 부가 정보이므로 조회에 실패하면 null이 되고, 도서 상세 조회 자체는 정상 응답한다.
+        return bookDetail.withUsageAnalysis(libraryNaruService.getUsageAnalysis(isbn));
     }
 
     @Transactional
@@ -432,6 +443,24 @@ public class BookService {
             cursor.bookId(),
             pageRequest
         );
+    }
+
+    private Set<String> findInterestedSearchIsbns(List<BookSearchResponse> books, String userPK) {
+        if (userPK == null || books.isEmpty()) {
+            return Set.of();
+        }
+
+        List<String> isbns = books.stream()
+            .map(BookSearchResponse::isbn)
+            .filter(StringUtils::hasText)
+            .distinct()
+            .toList();
+
+        if (isbns.isEmpty()) {
+            return Set.of();
+        }
+
+        return Set.copyOf(bookLikeRepository.findInterestedIsbns(userPK, isbns));
     }
 
     private String createNextInterestCursor(List<InterestBookResponseDto> books) {

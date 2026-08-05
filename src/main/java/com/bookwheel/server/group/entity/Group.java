@@ -1,6 +1,7 @@
 package com.bookwheel.server.group.entity;
 
 import com.bookwheel.server.group.enums.Region;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import jakarta.persistence.*;
 import lombok.*;
@@ -77,6 +78,11 @@ public class Group {
     @Builder.Default
     private State groupState = State.RECRUITING;
 
+    @Column(name = "schedule_reconfiguration_status", nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ScheduleReconfigurationStatus scheduleReconfigurationStatus = ScheduleReconfigurationStatus.NONE;
+
     // DB 컬럼이 아닌, 쿼리 실행 시 서브쿼리로 계산되는 가상 필드
     @Formula("(SELECT count(1) FROM member m WHERE m.group_id = group_id AND m.member_status = 'ACTIVE')")
     private int currentMembers;
@@ -150,10 +156,30 @@ public class Group {
         this.groupState = State.DELETED;
     }
 
+    // 자동 완료 대상으로 잠근 모임을 완료 상태로 전환
+    public void markComplete() {
+        this.groupState = State.COMPLETE;
+    }
+
+    public void requireReadOrderConfirmation() {
+        this.scheduleReconfigurationStatus = ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED;
+    }
+
+    public void requireFutureScheduleConfirmation() {
+        this.scheduleReconfigurationStatus = ScheduleReconfigurationStatus.FUTURE_SCHEDULE_CONFIRMATION_REQUIRED;
+    }
+
+    public void completeScheduleReconfiguration() {
+        this.scheduleReconfigurationStatus = ScheduleReconfigurationStatus.NONE;
+    }
+
     @PrePersist
     private void prePersist() {
         if (groupState == null) {
             groupState = State.RECRUITING;
+        }
+        if (scheduleReconfigurationStatus == null) {
+            scheduleReconfigurationStatus = ScheduleReconfigurationStatus.NONE;
         }
     }
 

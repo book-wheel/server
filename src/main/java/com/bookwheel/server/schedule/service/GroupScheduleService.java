@@ -3,6 +3,7 @@ package com.bookwheel.server.schedule.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
@@ -303,6 +304,7 @@ public class GroupScheduleService {
                 deserializeExcludedDates(group.getScheduleExcludedDates()),
                 deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
                 scheduleStatus,
+                group.getScheduleReconfigurationStatus(),
                 resolvedTargetMemberCount,
                 readiness.currentMemberCount(),
                 scheduleStatus == GroupScheduleStatus.READY,
@@ -754,18 +756,18 @@ public class GroupScheduleService {
     public int closeFinishedGroups() {
         LocalDate today = LocalDate.now(clock);
 
-        List<Group> completing = groupRepository.findGroupsBecomingComplete(State.IN_PROGRESS, today);
-
-        int updated = groupRepository.updateFinishedGroupsToComplete(
-                State.COMPLETE,
+        List<Group> completing = groupRepository.findGroupsBecomingComplete(
                 State.IN_PROGRESS,
+                ScheduleReconfigurationStatus.NONE,
                 today
         );
 
         for (Group group : completing) {
+            // 잠금 조회 대상만 완료 처리: 상태 변경 대상과 이벤트 발행 대상 일치
+            group.markComplete();
             eventPublisher.publishEvent(new GroupCompletedEvent(group.getGroupId(), group.getGroupName()));
         }
-        return updated;
+        return completing.size();
     }
 
     private Group findGroupByIdForUpdate(String groupId) {

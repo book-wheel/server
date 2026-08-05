@@ -1,7 +1,5 @@
 package com.bookwheel.server.community.service;
 
-import com.bookwheel.server.book.entity.Book;
-import com.bookwheel.server.book.repository.BookRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.cursor.CommentCursor;
@@ -40,7 +38,6 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BookInfoRepository bookInfoRepository;
-    private final BookRepository bookRepository;
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final PostLikeRepository postLikeRepository;
@@ -119,12 +116,8 @@ public class PostService {
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        String isbn = post.getBookInfo().getIsbn();
-
-        // 책 제목은 별도 Book 테이블에서 조회한다. (미등록 도서면 null)
-        String title = bookRepository.findByIsbn(isbn)
-            .map(Book::getTitle)
-            .orElse(null);
+        BookInfo bookInfo = post.getBookInfo();
+        String isbn = bookInfo.getIsbn();
 
         String profileImageUrl = getProfileImageUrl(post.getUploader().getProfileImageKey());
 
@@ -144,7 +137,7 @@ public class PostService {
             post.getUploader().getNickname(),
             profileImageUrl,
             groupName,
-            title,
+            post.getBookTitle(),
             post.getContent(),
             imageUrls,
             post.getLikeCount(),
@@ -184,17 +177,21 @@ public class PostService {
     }
 
     @Transactional
-    public PostCreateResponse create(PostCreateRequest request, String userPK) {
-        String isbn = request.isbn();
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+    public PostCreateResponse create(String isbn, PostCreateRequest request, String userPK) {
+        String normalizedIsbn = requireIsbn(isbn);
+        String bookTitle = requireBookTitle(request.title());
+        BookInfo bookInfo = bookInfoRepository.findByIsbn(normalizedIsbn)
+            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(normalizedIsbn).build()));
+
+        // 상세 조회에서 외부 API 없이 제목을 내려줄 수 있도록 작성 시점에 저장해 둔다.
+        bookInfo.applyTitleIfAbsent(bookTitle);
 
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Group group = resolveGroup(request.groupId(), userPK);
 
-        Post post = request.toEntity(bookInfo, user, group);
+        Post post = request.toEntity(bookInfo, user, group, bookTitle);
 
         if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
             for (String key : request.objectKeys()) {
@@ -210,6 +207,20 @@ public class PostService {
         return PostCreateResponse.from(savedPost);
 
 
+    }
+
+    private String requireBookTitle(String title) {
+        if (!StringUtils.hasText(title)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return title.strip();
+    }
+
+    private String requireIsbn(String isbn) {
+        if (!StringUtils.hasText(isbn)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return isbn.strip();
     }
 
     @Transactional

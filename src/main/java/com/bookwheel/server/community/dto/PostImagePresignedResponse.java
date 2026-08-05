@@ -15,6 +15,13 @@ public record PostImagePresignedResponse(
         String presignedUrl,
 
         @Schema(description = "업로드 완료 후 DB에 저장할 S3 객체 키 (Object Key)", example = "posts/105/abcd_image.jpg")
-        String objectKey
-    ) {}
+        String objectKey,
+
+        @Schema(description = "Presigned PUT 요청에 포함해야 하는 Content-Type", example = "image/heic")
+        String contentType
+    ) {
+        public PresignedInfo(String presignedUrl, String objectKey) {
+            this(presignedUrl, objectKey, null);
+        }
+    }
 }

@@ -42,6 +42,18 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     // 로그인한 '나(User)'의 정보를 기준으로 해당 그룹에서의 멤버 프로필을 찾는 용도
     Optional<Member> findByGroup_GroupIdAndUser_Id(String groupId, String userPK);
 
+    @EntityGraph(attributePaths = "user")
+    @Query("""
+            select m
+            from Member m
+            where m.group.groupId = :groupId
+              and m.user.id = :userPK
+            """)
+    Optional<Member> findWithUserByGroupIdAndUserPK(
+            @Param("groupId") String groupId,
+            @Param("userPK") String userPK
+    );
+
     // 목록 페이지의 그룹들에 대한 현재 사용자 멤버십만 한 번에 조회한다.
     @Query("""
             select m.group.groupId as groupId,

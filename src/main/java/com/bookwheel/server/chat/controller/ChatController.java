@@ -1,5 +1,8 @@
 package com.bookwheel.server.chat.controller;
 
+import com.bookwheel.server.chat.dto.ChatImageMessageSendRequest;
+import com.bookwheel.server.chat.dto.ChatImagePresignedUrlRequest;
+import com.bookwheel.server.chat.dto.ChatImagePresignedUrlResponse;
 import com.bookwheel.server.chat.dto.ChatMessageListResponse;
 import com.bookwheel.server.chat.dto.ChatMessageResponse;
 import com.bookwheel.server.chat.dto.ChatMessageSendRequest;
@@ -48,6 +51,24 @@ public class ChatController {
     }
 
     @Operation(
+            summary = "채팅 이미지 Presigned URL 발급",
+            description = "ACTIVE 멤버에게 최대 5MB 이미지의 S3 임시 업로드용 Presigned PUT URL을 발급합니다. 응답받은 URL로 요청과 동일한 Content-Type 및 파일 크기로 PUT 요청을 보내세요."
+    )
+    @PostMapping("/images/presigned-url")
+    public ApiResponse<ChatImagePresignedUrlResponse> createImagePresignedUrl(
+            @PathVariable String groupId,
+            @Valid @RequestBody ChatImagePresignedUrlRequest request,
+            @AuthenticationPrincipal Object principal
+    ) {
+        ChatImagePresignedUrlResponse response = chatService.createImagePresignedUrl(
+                groupId,
+                getUserPK(principal),
+                request
+        );
+        return ApiResponse.success(response);
+    }
+
+    @Operation(
             summary = "채팅 텍스트 메시지 전송",
             description = "ACTIVE 멤버가 그룹 채팅방에 최대 1000자의 텍스트 메시지를 전송합니다."
     )
@@ -61,6 +82,24 @@ public class ChatController {
                 groupId,
                 getUserPK(principal),
                 request.content()
+        );
+        return ApiResponse.success(response);
+    }
+
+    @Operation(
+            summary = "채팅 이미지 메시지 전송",
+            description = "Presigned URL로 임시 업로드를 완료한 뒤 objectKey를 전달합니다. 서버가 이미지 형식과 크기를 검증해 변경 불가능한 최종 객체로 확정한 후 IMAGE 메시지를 저장합니다."
+    )
+    @PostMapping("/messages/images")
+    public ApiResponse<ChatMessageResponse> sendImageMessage(
+            @PathVariable String groupId,
+            @Valid @RequestBody ChatImageMessageSendRequest request,
+            @AuthenticationPrincipal Object principal
+    ) {
+        ChatMessageResponse response = chatService.sendImageMessage(
+                groupId,
+                getUserPK(principal),
+                request.imageKey()
         );
         return ApiResponse.success(response);
     }

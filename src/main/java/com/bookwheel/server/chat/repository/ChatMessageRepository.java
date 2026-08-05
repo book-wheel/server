@@ -30,6 +30,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     Optional<ChatMessage> findByChatMessageIdAndChatRoom(Long chatMessageId, ChatRoom chatRoom);
 
+    @EntityGraph(attributePaths = "sender")
+    Optional<ChatMessage> findByImageKey(String imageKey);
+
     long countByChatRoom(ChatRoom chatRoom);
 
     long countByChatRoomAndChatMessageIdGreaterThan(ChatRoom chatRoom, Long chatMessageId);

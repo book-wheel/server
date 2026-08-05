@@ -3,6 +3,7 @@ package com.bookwheel.server.schedule.dto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.bookwheel.server.group.enums.ScheduleReconfigurationStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +67,7 @@ class GroupScheduleApiContractTest {
                 List.of(),
                 List.of(),
                 GroupScheduleStatus.CONFIGURED,
+                ScheduleReconfigurationStatus.NONE,
                 12,
                 1,
                 false,
@@ -83,6 +85,7 @@ class GroupScheduleApiContractTest {
         JsonNode json = objectMapper.valueToTree(response);
 
         assertThat(json.get("endDate").asText()).isEqualTo("2026-10-31");
+        assertThat(json.get("scheduleReconfigurationStatus").asText()).isEqualTo("NONE");
         assertThat(json.has("scheduleDeadline")).isFalse();
     }
 }

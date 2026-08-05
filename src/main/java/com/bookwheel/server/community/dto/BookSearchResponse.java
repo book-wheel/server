@@ -21,9 +21,10 @@ public record BookSearchResponse(
     String thumbnail,
 
     @Schema(description = "도서 고유 식별자 (ISBN)", example = "9791161571188")
-    String isbn
+    String isbn,
 
-    // boolean isLiked // TODO: 찜 기능 추가 시 주석 해제
+    @Schema(description = "현재 로그인한 사용자의 관심 도서 여부", example = "true")
+    boolean isInterested
 )
 {
     public static BookSearchResponse of(KakaoBookSearchResponse.Document doc, String isbn13) {
@@ -35,7 +36,20 @@ public record BookSearchResponse(
             doc.publisher(),
             processedDate,
             doc.thumbnail(),
-            isbn13
+            isbn13,
+            false
+        );
+    }
+
+    public BookSearchResponse withIsInterested(boolean isInterested) {
+        return new BookSearchResponse(
+            title,
+            author,
+            publisher,
+            publishedDate,
+            thumbnail,
+            isbn,
+            isInterested
         );
     }
 

@@ -52,7 +52,8 @@ public class GroupSettingController {
 
     @Operation(
             summary = "멤버 강퇴",
-            description = "리더가 그룹의 멤버를 강제 탈퇴시킵니다. 모집 중에는 라운드 날짜를 유지하고 PLANNED 배정만 다시 판단하므로 성공 후 GET /schedule을 다시 조회합니다. 진행 중에는 완료·현재 라운드를 유지한 채 미래 라운드만 재배정하며, 불가능하면 GROUP_036을 반환합니다."
+            description = "리더가 그룹의 멤버를 강제 탈퇴시킵니다. 모집 중에는 PLANNED 배정을 다시 판단합니다. " +
+                    "진행 중에는 기존 미래 라운드를 보존·비활성화하고 읽기 순서 재확인 상태로 전환합니다."
     )
     @DeleteMapping("/members/{targetUserPK}")
     public ResponseEntity<ApiResponse<MemberKickResponse>> kickMember(
@@ -89,7 +90,8 @@ public class GroupSettingController {
 
     @Operation(
             summary = "중도 하차",
-            description = "멤버가 그룹에서 하차합니다. 모집 중에는 라운드 날짜를 유지하고 PLANNED 배정만 다시 판단하므로 성공 후 GET /schedule을 다시 조회합니다. 진행 중에는 현재 라운드를 완독한 경우에만 미래 라운드를 재배정하며, 불가능하면 GROUP_036을 반환합니다."
+            description = "멤버가 그룹에서 하차합니다. 모집 중에는 PLANNED 배정을 다시 판단합니다. " +
+                    "진행 중에는 현재 라운드를 완독한 경우 기존 미래 라운드를 보존·비활성화하고 읽기 순서 재확인 상태로 전환합니다."
     )
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<MemberExitResponse>> exitGroup(

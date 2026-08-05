@@ -1,23 +1,37 @@
 package com.bookwheel.server.common.service;
 
+import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import com.bookwheel.server.common.util.PathNormalizer;
+import com.bookwheel.server.community.dto.PostImagePresignedRequest;
+import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -31,7 +45,15 @@ public class S3Service {
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucket;
 
-    private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp");
+    private static final int MAX_POST_IMAGE_COUNT = 5;
+    private static final Map<String, String> POST_IMAGE_CONTENT_TYPE_BY_EXTENSION = Map.of(
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png", "image/png",
+            "webp", "image/webp",
+            "heic", "image/heic",
+            "heif", "image/heif"
+    );
 
     public String getPresignedGetUrl(String objectKey) {
         // 1. 방어 로직 - 키 값 없거나 공백이면 예외 발생
@@ -83,19 +105,168 @@ public class S3Service {
         return s3Presigner.presignPutObject(presignRequest).url().toString();
     }
 
-    public PostImagePresignedResponse getPostPresignedUrls(String bookId, List<String> fileExtensions) {
-        String prefix = "posts/" + PathNormalizer.normalizeSegment(bookId);
-        List<PostImagePresignedResponse.PresignedInfo> presignedInfos = fileExtensions.stream().map(ext -> {
+    public String getPresignedPutUrl(String objectKey, String contentType, long contentLength) {
+        if (objectKey == null || objectKey.isBlank()
+                || contentType == null || contentType.isBlank()
+                || contentLength <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
 
-            String normalizedExt = ext.toLowerCase().replace(".", "");
-            if (!ALLOWED_EXTENSIONS.contains(normalizedExt)) {
-                throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .contentType(contentType)
+                .contentLength(contentLength)
+                .build();
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(5))
+                .putObjectRequest(putObjectRequest)
+                .build();
+
+        try {
+            return s3Presigner.presignPutObject(presignRequest).url().toString();
+        } catch (RuntimeException exception) {
+            log.error("S3 Presigned PUT URL 발급 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public S3ObjectMetadata getObjectMetadata(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_KEY);
+        }
+
+        try {
+            HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .build());
+            return new S3ObjectMetadata(response.contentLength(), response.contentType(), response.eTag());
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
             }
-            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + normalizedExt;
+            log.error("S3 객체 정보 조회 실패: key={}, status={}, error={}",
+                    objectKey, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 정보 조회 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public byte[] getObjectSignature(String objectKey, String expectedETag, int length) {
+        if (objectKey == null || objectKey.isBlank()
+                || expectedETag == null || expectedETag.isBlank()
+                || length <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .ifMatch(expectedETag)
+                    .range("bytes=0-" + (length - 1))
+                    .build());
+            return response.asByteArray();
+        } catch (S3Exception exception) {
+            throw mapObjectValidationException(objectKey, exception);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 시그니처 조회 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public void copyObjectIfUnchanged(String sourceKey, String destinationKey, String expectedETag) {
+        if (sourceKey == null || sourceKey.isBlank()
+                || destinationKey == null || destinationKey.isBlank()
+                || expectedETag == null || expectedETag.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            s3Client.copyObject(CopyObjectRequest.builder()
+                    .sourceBucket(bucket)
+                    .sourceKey(sourceKey)
+                    .destinationBucket(bucket)
+                    .destinationKey(destinationKey)
+                    .copySourceIfMatch(expectedETag)
+                    .build());
+        } catch (S3Exception exception) {
+            throw mapObjectValidationException(sourceKey, exception);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 확정 복사 실패: sourceKey={}, destinationKey={}, error={}",
+                    sourceKey, destinationKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    public List<String> findObjectKeysOlderThan(String prefix, Instant cutoff) {
+        if (prefix == null || prefix.isBlank() || cutoff == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        List<String> objectKeys = new ArrayList<>();
+        String continuationToken = null;
+        try {
+            do {
+                ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+                        .bucket(bucket)
+                        .prefix(prefix)
+                        .continuationToken(continuationToken)
+                        .build());
+                response.contents().stream()
+                        .filter(object -> object.lastModified() != null)
+                        .filter(object -> object.lastModified().isBefore(cutoff))
+                        .map(software.amazon.awssdk.services.s3.model.S3Object::key)
+                        .forEach(objectKeys::add);
+                continuationToken = Boolean.TRUE.equals(response.isTruncated())
+                        ? response.nextContinuationToken()
+                        : null;
+            } while (continuationToken != null);
+            return objectKeys;
+        } catch (S3Exception exception) {
+            log.error("S3 만료 객체 조회 실패: prefix={}, status={}, error={}",
+                    prefix, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 만료 객체 조회 실패: prefix={}, error={}", prefix, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    private BusinessException mapObjectValidationException(String objectKey, S3Exception exception) {
+        if (exception.statusCode() == 404) {
+            return new BusinessException(ErrorCode.FILE_NOT_FOUND);
+        }
+        if (exception.statusCode() == 412) {
+            return new BusinessException(ErrorCode.FILE_CHANGED_DURING_VALIDATION);
+        }
+        log.error("S3 객체 검증 실패: key={}, status={}, error={}",
+                objectKey, exception.statusCode(), exception.getMessage());
+        return new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+    }
+
+    public PostImagePresignedResponse getPostPresignedUrls(
+            String bookId,
+            List<PostImagePresignedRequest.FileInfo> files
+    ) {
+        if (files == null || files.isEmpty() || files.size() > MAX_POST_IMAGE_COUNT) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String prefix = "posts/" + PathNormalizer.normalizeSegment(bookId);
+        List<PostImagePresignedResponse.PresignedInfo> presignedInfos = files.stream().map(file -> {
+
+            PostImageUploadInfo imageUploadInfo = validatePostImageUploadInfo(file);
+            String objectKey = prefix + "/" + UUID.randomUUID() + "_image." + imageUploadInfo.extension();
 
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucket)
                     .key(objectKey)
+                    .contentType(imageUploadInfo.contentType())
                     .build();
 
             PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
@@ -104,10 +275,68 @@ public class S3Service {
 
             String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
 
-            return new PostImagePresignedResponse.PresignedInfo(presignedUrl, objectKey);
+            return new PostImagePresignedResponse.PresignedInfo(
+                    presignedUrl,
+                    objectKey,
+                    imageUploadInfo.contentType()
+            );
         }).toList();
         return new PostImagePresignedResponse(presignedInfos);
     }
+
+    private PostImageUploadInfo validatePostImageUploadInfo(PostImagePresignedRequest.FileInfo file) {
+        if (file == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String extension = normalizePostImageExtension(file.fileExtension());
+        String contentType = normalizePostImageContentType(file.contentType());
+        String expectedContentType = POST_IMAGE_CONTENT_TYPE_BY_EXTENSION.get(extension);
+        if (expectedContentType == null || !expectedContentType.equals(contentType)) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        return new PostImageUploadInfo(extension, contentType);
+    }
+
+    private String normalizePostImageExtension(String extension) {
+        if (extension == null || extension.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        String normalizedExtension = extension.trim().toLowerCase(Locale.ROOT);
+        if (normalizedExtension.startsWith(".")) {
+            normalizedExtension = normalizedExtension.substring(1);
+        }
+
+        if (normalizedExtension.isBlank()
+                || normalizedExtension.contains(".")
+                || normalizedExtension.contains("/")
+                || normalizedExtension.contains("\\")) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        return normalizedExtension;
+    }
+
+    private String normalizePostImageContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        String normalizedContentType = contentType.trim();
+        if (!contentType.equals(normalizedContentType)
+                || !contentType.equals(contentType.toLowerCase(Locale.ROOT))) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        return normalizedContentType;
+    }
+
+    private record PostImageUploadInfo(
+            String extension,
+            String contentType
+    ) {}
 
     public void deleteObject(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
