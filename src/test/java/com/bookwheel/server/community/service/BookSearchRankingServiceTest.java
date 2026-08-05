@@ -144,6 +144,52 @@ class BookSearchRankingServiceTest {
         assertThat(result.ranking().source()).isEqualTo("KAKAO");
     }
 
+    @Test
+    @DisplayName("Popular title matches from Data4Library are merged into Kakao search results")
+    void rankByPopularity_MergesData4LibraryTitleMatches() {
+        List<BookSearchResponse> books = List.of(
+            book("Vegetarian recipe", "9780000000001"),
+            book("Vegetarian diet", "9780000000002")
+        );
+        PopularLoanBook snapshot = popularity("9780000000009", 1, 1000);
+        PopularLoanBook vegetarian = popularity(
+            "9788936433598",
+            "채식주의자",
+            "한강",
+            "창비",
+            "2007",
+            "https://example.com/vegetarian.jpg",
+            138,
+            1396
+        );
+        given(popularLoanBookRepository.findFirstBySourceOrderByEndDateDescStartDateDescCollectedAtDesc(SOURCE))
+            .willReturn(Optional.of(snapshot));
+        given(popularLoanBookRepository.findBySourceAndStartDateAndEndDateAndIsbnIn(
+            SOURCE,
+            START_DATE,
+            END_DATE,
+            List.of("9780000000001", "9780000000002")
+        )).willReturn(List.of());
+        given(popularLoanBookRepository
+            .findTop50BySourceAndStartDateAndEndDateAndTitleContainingIgnoreCaseOrderByRankAscLoanCountDesc(
+                SOURCE,
+                START_DATE,
+                END_DATE,
+                "채식"
+            )).willReturn(List.of(vegetarian));
+
+        BookSearchRankingResult result = rankingService.rankByPopularity(books, "채식");
+
+        assertThat(result.books()).extracting(BookSearchResponse::isbn)
+            .containsExactly("9788936433598", "9780000000001", "9780000000002");
+        assertThat(result.books().get(0).title()).isEqualTo("채식주의자");
+        assertThat(result.books().get(0).author()).isEqualTo("한강");
+        assertThat(result.books().get(0).publisher()).isEqualTo("창비");
+        assertThat(result.books().get(0).publishedDate()).isEqualTo("2007");
+        assertThat(result.books().get(0).thumbnail()).isEqualTo("https://example.com/vegetarian.jpg");
+        assertThat(result.ranking().source()).isEqualTo("DATA4LIBRARY");
+    }
+
     private BookSearchResponse book(String title, String isbn) {
         return new BookSearchResponse(
             title,
@@ -159,6 +205,32 @@ class BookSearchRankingServiceTest {
     private PopularLoanBook popularity(String isbn, int rank, int loanCount) {
         return PopularLoanBook.builder()
             .isbn(isbn)
+            .rank(rank)
+            .loanCount(loanCount)
+            .collectedAt(COLLECTED_AT)
+            .startDate(START_DATE)
+            .endDate(END_DATE)
+            .source(SOURCE)
+            .build();
+    }
+
+    private PopularLoanBook popularity(
+        String isbn,
+        String title,
+        String author,
+        String publisher,
+        String publishedDate,
+        String thumbnail,
+        int rank,
+        int loanCount
+    ) {
+        return PopularLoanBook.builder()
+            .isbn(isbn)
+            .title(title)
+            .author(author)
+            .publisher(publisher)
+            .publishedDate(publishedDate)
+            .thumbnail(thumbnail)
             .rank(rank)
             .loanCount(loanCount)
             .collectedAt(COLLECTED_AT)

@@ -290,17 +290,18 @@ public class BookService {
     public BookSearchListResponse searchBooks(BookSearchRequest request, String userPK) {
         BookSearchRequest candidateRequest = resolveRankingCandidateRequest(request);
         BookSearchListResponse response = kaKaoService.searchBooks(candidateRequest);
-        Set<String> interestedIsbns = findInterestedSearchIsbns(response.books(), userPK);
-
-        List<BookSearchResponse> books = response.books().stream()
-            .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
-            .toList();
-        BookSearchRankingResult rankingResult = bookSearchRankingService.rankByPopularity(books);
-        List<BookSearchResponse> responseBooks = limitSearchBooks(rankingResult.books(), request, candidateRequest);
+        BookSearchRankingResult rankingResult = bookSearchRankingService.rankByPopularity(
+            response.books(),
+            request.query()
+        );
+        List<BookSearchResponse> responseBooks = applyInterestedSearchBooks(
+            limitSearchBooks(rankingResult.books(), request, candidateRequest),
+            userPK
+        );
 
         return new BookSearchListResponse(
             responseBooks,
-            response.totalCount(),
+            resolveSearchTotalCount(response, rankingResult.books()),
             resolveSearchIsEnd(response, responseBooks, request, candidateRequest),
             rankingResult.ranking()
         );
@@ -337,6 +338,13 @@ public class BookService {
             .toList();
     }
 
+    private long resolveSearchTotalCount(
+        BookSearchListResponse response,
+        List<BookSearchResponse> rankedBooks
+    ) {
+        return Math.max(response.totalCount(), rankedBooks.size());
+    }
+
     private boolean resolveSearchIsEnd(
         BookSearchListResponse response,
         List<BookSearchResponse> responseBooks,
@@ -355,6 +363,20 @@ public class BookService {
         BookSearchRequest candidateRequest
     ) {
         return candidateRequest.size() > request.size();
+    }
+
+    private List<BookSearchResponse> applyInterestedSearchBooks(
+        List<BookSearchResponse> books,
+        String userPK
+    ) {
+        Set<String> interestedIsbns = findInterestedSearchIsbns(books, userPK);
+        if (interestedIsbns.isEmpty()) {
+            return books;
+        }
+
+        return books.stream()
+            .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
+            .toList();
     }
 
 

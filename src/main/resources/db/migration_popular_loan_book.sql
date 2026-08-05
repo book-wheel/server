@@ -7,6 +7,11 @@
 CREATE TABLE IF NOT EXISTS popular_loan_book (
     popular_loan_book_id BIGINT NOT NULL AUTO_INCREMENT,
     isbn VARCHAR(20) NOT NULL,
+    title VARCHAR(500),
+    author VARCHAR(500),
+    publisher VARCHAR(200),
+    published_date VARCHAR(20),
+    thumbnail VARCHAR(1000),
     ranking INT NOT NULL,
     loan_count INT NOT NULL,
     collected_at DATETIME(6) NOT NULL,
@@ -16,5 +21,6 @@ CREATE TABLE IF NOT EXISTS popular_loan_book (
     PRIMARY KEY (popular_loan_book_id),
     UNIQUE KEY uk_popular_loan_book_snapshot (isbn, source, start_date, end_date),
     KEY idx_popular_loan_book_isbn (isbn),
-    KEY idx_popular_loan_book_snapshot (source, start_date, end_date)
+    KEY idx_popular_loan_book_snapshot (source, start_date, end_date),
+    KEY idx_popular_loan_book_title (title)
 );

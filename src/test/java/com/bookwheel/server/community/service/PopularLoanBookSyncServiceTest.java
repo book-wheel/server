@@ -70,6 +70,16 @@ class PopularLoanBookSyncServiceTest {
         List<PopularLoanBook> savedBooks = capturedSavedBooks();
         assertThat(savedBooks).extracting(PopularLoanBook::getIsbn)
             .containsExactly("9788954681179", "9780132350884");
+        assertThat(savedBooks).extracting(PopularLoanBook::getTitle)
+            .containsExactly("book", "book");
+        assertThat(savedBooks).extracting(PopularLoanBook::getAuthor)
+            .containsExactly("author", "author");
+        assertThat(savedBooks).extracting(PopularLoanBook::getPublisher)
+            .containsExactly("publisher", "publisher");
+        assertThat(savedBooks).extracting(PopularLoanBook::getPublishedDate)
+            .containsExactly("2026", "2026");
+        assertThat(savedBooks).extracting(PopularLoanBook::getThumbnail)
+            .containsExactly("https://example.com/book.jpg", "https://example.com/book.jpg");
         assertThat(savedBooks).extracting(PopularLoanBook::getRank)
             .containsExactly(1, 2);
         assertThat(savedBooks).extracting(PopularLoanBook::getLoanCount)
@@ -167,7 +177,8 @@ class PopularLoanBookSyncServiceTest {
             "book",
             "author",
             "publisher",
-            "2026"
+            "2026",
+            "https://example.com/book.jpg"
         );
     }
 

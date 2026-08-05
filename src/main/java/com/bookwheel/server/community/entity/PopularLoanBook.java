@@ -32,7 +32,8 @@ import java.time.LocalDateTime;
     ),
     indexes = {
         @Index(name = "idx_popular_loan_book_isbn", columnList = "isbn"),
-        @Index(name = "idx_popular_loan_book_snapshot", columnList = "source, start_date, end_date")
+        @Index(name = "idx_popular_loan_book_snapshot", columnList = "source, start_date, end_date"),
+        @Index(name = "idx_popular_loan_book_title", columnList = "title")
     }
 )
 public class PopularLoanBook {
@@ -44,6 +45,21 @@ public class PopularLoanBook {
 
     @Column(name = "isbn", nullable = false, length = 20)
     private String isbn;
+
+    @Column(name = "title", length = 500)
+    private String title;
+
+    @Column(name = "author", length = 500)
+    private String author;
+
+    @Column(name = "publisher", length = 200)
+    private String publisher;
+
+    @Column(name = "published_date", length = 20)
+    private String publishedDate;
+
+    @Column(name = "thumbnail", length = 1000)
+    private String thumbnail;
 
     @Column(name = "ranking", nullable = false)
     private Integer rank;

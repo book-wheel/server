@@ -19,6 +19,11 @@ class PopularLoanBookTest {
 
         PopularLoanBook popularLoanBook = PopularLoanBook.builder()
             .isbn("9788954681179")
+            .title("Bright Night")
+            .author("Author")
+            .publisher("Publisher")
+            .publishedDate("2021")
+            .thumbnail("https://example.com/book.jpg")
             .rank(1)
             .loanCount(104490)
             .collectedAt(collectedAt)
@@ -28,6 +33,11 @@ class PopularLoanBookTest {
             .build();
 
         assertThat(popularLoanBook.getIsbn()).isEqualTo("9788954681179");
+        assertThat(popularLoanBook.getTitle()).isEqualTo("Bright Night");
+        assertThat(popularLoanBook.getAuthor()).isEqualTo("Author");
+        assertThat(popularLoanBook.getPublisher()).isEqualTo("Publisher");
+        assertThat(popularLoanBook.getPublishedDate()).isEqualTo("2021");
+        assertThat(popularLoanBook.getThumbnail()).isEqualTo("https://example.com/book.jpg");
         assertThat(popularLoanBook.getRank()).isEqualTo(1);
         assertThat(popularLoanBook.getLoanCount()).isEqualTo(104490);
         assertThat(popularLoanBook.getCollectedAt()).isEqualTo(collectedAt);

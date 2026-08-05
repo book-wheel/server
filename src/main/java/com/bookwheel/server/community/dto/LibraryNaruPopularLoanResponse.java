@@ -30,6 +30,8 @@ public record LibraryNaruPopularLoanResponse(
         String authors,
         String publisher,
         @JsonAlias({"publication_year", "publicationYear"})
-        String publicationYear
+        String publicationYear,
+        @JsonAlias({"bookImageURL", "bookImageUrl", "book_image_url"})
+        String bookImageUrl
     ) {}
 }

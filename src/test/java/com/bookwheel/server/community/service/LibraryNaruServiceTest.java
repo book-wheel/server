@@ -170,6 +170,7 @@ class LibraryNaruServiceTest {
                       "publisher": "Publisher A",
                       "publication_year": "2021",
                       "isbn13": "9788954681179",
+                      "bookImageURL": "https://example.com/bright-night.jpg",
                       "loan_count": "104490"
                     }
                   },
@@ -202,6 +203,11 @@ class LibraryNaruServiceTest {
         assertThat(result.get(0).ranking()).isEqualTo(1);
         assertThat(result.get(0).isbn()).isEqualTo("9788954681179");
         assertThat(result.get(0).loanCount()).isEqualTo(104490);
+        assertThat(result.get(0).bookname()).isEqualTo("Bright Night");
+        assertThat(result.get(0).authors()).isEqualTo("Author A");
+        assertThat(result.get(0).publisher()).isEqualTo("Publisher A");
+        assertThat(result.get(0).publicationYear()).isEqualTo("2021");
+        assertThat(result.get(0).bookImageUrl()).isEqualTo("https://example.com/bright-night.jpg");
         assertThat(result.get(1).ranking()).isEqualTo(2);
         assertThat(result.get(1).loanCount()).isEqualTo(90000);
         server.verify();

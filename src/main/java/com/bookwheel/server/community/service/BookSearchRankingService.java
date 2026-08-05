@@ -9,11 +9,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,53 +28,54 @@ public class BookSearchRankingService {
     private final PopularLoanBookRepository popularLoanBookRepository;
 
     public BookSearchRankingResult rankByPopularity(List<BookSearchResponse> books) {
-        if (books == null || books.isEmpty()) {
+        return rankByPopularity(books, null);
+    }
+
+    public BookSearchRankingResult rankByPopularity(List<BookSearchResponse> books, String query) {
+        List<BookSearchResponse> kakaoBooks = books == null ? List.of() : books;
+        boolean hasSearchQuery = StringUtils.hasText(query);
+
+        if (kakaoBooks.isEmpty() && !hasSearchQuery) {
             return BookSearchRankingResult.kakao(List.of());
         }
 
-        List<String> isbns = books.stream()
+        List<String> isbns = kakaoBooks.stream()
             .map(BookSearchResponse::isbn)
             .filter(StringUtils::hasText)
             .map(String::trim)
             .distinct()
             .toList();
 
-        if (isbns.isEmpty()) {
-            return BookSearchRankingResult.kakao(books);
+        if (isbns.isEmpty() && !hasSearchQuery) {
+            return BookSearchRankingResult.kakao(kakaoBooks);
         }
 
         return popularLoanBookRepository.findFirstBySourceOrderByEndDateDescStartDateDescCollectedAtDesc(SOURCE)
-            .map(snapshot -> rankBySnapshot(books, isbns, snapshot))
-            .orElseGet(() -> BookSearchRankingResult.kakao(books));
+            .map(snapshot -> rankBySnapshot(kakaoBooks, isbns, query, snapshot))
+            .orElseGet(() -> BookSearchRankingResult.kakao(kakaoBooks));
     }
 
     private BookSearchRankingResult rankBySnapshot(
         List<BookSearchResponse> books,
         List<String> isbns,
+        String query,
         PopularLoanBook snapshot
     ) {
-        Map<String, PopularLoanBook> popularityByIsbn = popularLoanBookRepository
-            .findBySourceAndStartDateAndEndDateAndIsbnIn(
-                SOURCE,
-                snapshot.getStartDate(),
-                snapshot.getEndDate(),
-                isbns
-            )
-            .stream()
-            .filter(popularLoanBook -> StringUtils.hasText(popularLoanBook.getIsbn()))
-            .collect(java.util.stream.Collectors.toMap(
-                popularLoanBook -> popularLoanBook.getIsbn().trim(),
-                Function.identity(),
-                this::chooseHigherPopularity
-            ));
+        Map<String, PopularLoanBook> popularityByIsbn = findPopularityByIsbn(isbns, snapshot);
+        List<BookSearchResponse> mergedBooks = mergeTitleMatchedBooks(
+            books,
+            query,
+            snapshot,
+            popularityByIsbn
+        );
 
         if (popularityByIsbn.isEmpty()) {
             return BookSearchRankingResult.kakao(books);
         }
 
-        List<BookSearchResponse> rankedBooks = IntStream.range(0, books.size())
+        List<BookSearchResponse> rankedBooks = IntStream.range(0, mergedBooks.size())
             .mapToObj(index -> {
-                BookSearchResponse book = books.get(index);
+                BookSearchResponse book = mergedBooks.get(index);
                 String isbn = normalizeIsbn(book.isbn());
                 return new RankedBook(book, popularityByIsbn.get(isbn), index);
             })
@@ -83,6 +88,69 @@ public class BookSearchRankingService {
             snapshot.getStartDate(),
             snapshot.getEndDate()
         );
+    }
+
+    private Map<String, PopularLoanBook> findPopularityByIsbn(
+        List<String> isbns,
+        PopularLoanBook snapshot
+    ) {
+        if (isbns.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+
+        return new LinkedHashMap<>(popularLoanBookRepository
+            .findBySourceAndStartDateAndEndDateAndIsbnIn(
+                SOURCE,
+                snapshot.getStartDate(),
+                snapshot.getEndDate(),
+                isbns
+            )
+            .stream()
+            .filter(popularLoanBook -> StringUtils.hasText(popularLoanBook.getIsbn()))
+            .collect(java.util.stream.Collectors.toMap(
+                popularLoanBook -> popularLoanBook.getIsbn().trim(),
+                Function.identity(),
+                this::chooseHigherPopularity
+            )));
+    }
+
+    private List<BookSearchResponse> mergeTitleMatchedBooks(
+        List<BookSearchResponse> books,
+        String query,
+        PopularLoanBook snapshot,
+        Map<String, PopularLoanBook> popularityByIsbn
+    ) {
+        if (!StringUtils.hasText(query)) {
+            return books;
+        }
+
+        List<BookSearchResponse> mergedBooks = new ArrayList<>(books);
+        Set<String> includedIsbns = books.stream()
+            .map(BookSearchResponse::isbn)
+            .map(this::normalizeIsbn)
+            .filter(StringUtils::hasText)
+            .collect(Collectors.toSet());
+
+        popularLoanBookRepository
+            .findTop50BySourceAndStartDateAndEndDateAndTitleContainingIgnoreCaseOrderByRankAscLoanCountDesc(
+                SOURCE,
+                snapshot.getStartDate(),
+                snapshot.getEndDate(),
+                query.trim()
+            )
+            .forEach(popularLoanBook -> {
+                String isbn = normalizeIsbn(popularLoanBook.getIsbn());
+                if (!StringUtils.hasText(isbn)) {
+                    return;
+                }
+
+                popularityByIsbn.merge(isbn, popularLoanBook, this::chooseHigherPopularity);
+                if (includedIsbns.add(isbn) && StringUtils.hasText(popularLoanBook.getTitle())) {
+                    mergedBooks.add(toBookSearchResponse(popularLoanBook));
+                }
+            });
+
+        return mergedBooks;
     }
 
     private Comparator<RankedBook> rankedBookComparator() {
@@ -109,6 +177,18 @@ public class BookSearchRankingService {
             return null;
         }
         return isbn.trim();
+    }
+
+    private BookSearchResponse toBookSearchResponse(PopularLoanBook popularLoanBook) {
+        return new BookSearchResponse(
+            popularLoanBook.getTitle(),
+            popularLoanBook.getAuthor(),
+            popularLoanBook.getPublisher(),
+            popularLoanBook.getPublishedDate(),
+            popularLoanBook.getThumbnail(),
+            popularLoanBook.getIsbn(),
+            false
+        );
     }
 
     private record RankedBook(

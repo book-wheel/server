@@ -96,6 +96,11 @@ public class PopularLoanBookSyncService {
                 isbn,
                 PopularLoanBook.builder()
                     .isbn(isbn)
+                    .title(normalizeText(doc.bookname()))
+                    .author(normalizeText(doc.authors()))
+                    .publisher(normalizeText(doc.publisher()))
+                    .publishedDate(normalizeText(doc.publicationYear()))
+                    .thumbnail(normalizeText(doc.bookImageUrl()))
                     .rank(doc.ranking())
                     .loanCount(doc.loanCount())
                     .collectedAt(collectedAt)
@@ -114,5 +119,12 @@ public class PopularLoanBookSyncService {
             return null;
         }
         return isbn.trim();
+    }
+
+    private String normalizeText(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        return text.trim();
     }
 }
