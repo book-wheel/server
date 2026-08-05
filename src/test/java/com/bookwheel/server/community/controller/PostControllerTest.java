@@ -4,6 +4,7 @@ import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCommentResponse;
+import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostImagePresignedRequest;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
@@ -85,6 +86,23 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.presignedUrls[0].objectKey").value("posts/1/abc.jpg"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("Community Gallery: create post requires book title")
+    void createPost_RequiresBookTitle() throws Exception {
+        String isbn = "9788966263158";
+        PostCreateRequest request = new PostCreateRequest(isbn, " ", "게시글 내용", List.of(), null);
+
+        mockMvc.perform(post("/api/v1/posts/{isbn}/save", isbn)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.message").value("도서 제목은 필수입니다."));
     }
 
     @Test

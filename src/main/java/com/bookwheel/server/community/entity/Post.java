@@ -29,6 +29,9 @@ public class Post {
     @JoinColumn(name = "book_info_id", nullable = false)
     private BookInfo bookInfo;
 
+    @Column(name = "book_title", nullable = false, length = 255)
+    private String bookTitle;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private User uploader;
