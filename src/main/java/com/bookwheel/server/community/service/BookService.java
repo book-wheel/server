@@ -34,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,7 +66,8 @@ public class BookService {
     private static final int MAX_GALLERY_PAGE_SIZE = 50;
     private static final int MAX_INTEREST_PAGE_SIZE = 50;
     private static final int MAX_KAKAO_SEARCH_PAGE_SIZE = 50;
-    private static final int RANKING_CANDIDATE_MULTIPLIER = 5;
+    // 인기순 재정렬이 적용되는 상위 구간의 크기. 이 구간을 넘어서면 카카오 검색 순서를 그대로 사용한다.
+    private static final int RANKED_WINDOW_SIZE = MAX_KAKAO_SEARCH_PAGE_SIZE;
 
 
     @Transactional
@@ -288,81 +290,109 @@ public class BookService {
 
 
     public BookSearchListResponse searchBooks(BookSearchRequest request, String userPK) {
-        BookSearchRequest candidateRequest = resolveRankingCandidateRequest(request);
-        BookSearchListResponse response = kaKaoService.searchBooks(candidateRequest);
+        int size = Math.min(request.size(), MAX_KAKAO_SEARCH_PAGE_SIZE);
+        long offset = (long) (request.page() - 1) * size;
+
+        SearchPage searchPage = offset < RANKED_WINDOW_SIZE
+            ? searchWithinRankedWindow(request, (int) offset, size)
+            : searchBeyondRankedWindow(request, size);
+
+        return new BookSearchListResponse(
+            applyInterestedSearchBooks(searchPage.books(), userPK),
+            searchPage.totalCount(),
+            searchPage.isEnd(),
+            searchPage.ranking()
+        );
+    }
+
+    /*
+     * 상위 RANKED_WINDOW_SIZE 건을 하나의 재정렬 구간으로 고정한다.
+     * 요청 페이지와 무관하게 항상 같은 후보(카카오 1페이지)를 같은 기준으로 정렬하므로,
+     * 정렬된 구간을 그대로 잘라내면 페이지 간 중복이나 누락이 발생하지 않는다.
+     */
+    private SearchPage searchWithinRankedWindow(BookSearchRequest request, int offset, int size) {
+        BookSearchListResponse response = kaKaoService.searchBooks(
+            new BookSearchRequest(request.query(), request.sort(), 1, RANKED_WINDOW_SIZE)
+        );
         BookSearchRankingResult rankingResult = bookSearchRankingService.rankByPopularity(
             response.books(),
             request.query()
         );
-        List<BookSearchResponse> responseBooks = applyInterestedSearchBooks(
-            limitSearchBooks(rankingResult.books(), request, candidateRequest),
-            userPK
-        );
 
-        return new BookSearchListResponse(
-            responseBooks,
-            resolveSearchTotalCount(response, rankingResult.books()),
-            resolveSearchIsEnd(response, responseBooks, request, candidateRequest),
+        // 제목 일치 도서가 병합돼 후보가 늘어나도 구간 크기는 유지한다.
+        // 그래야 구간 밖의 전역 순번이 카카오 검색 순번과 어긋나지 않는다.
+        List<BookSearchResponse> rankedWindow = rankingResult.books().stream()
+            .limit(RANKED_WINDOW_SIZE)
+            .toList();
+        long totalCount = resolveRankedWindowTotalCount(response, rankedWindow);
+
+        List<BookSearchResponse> books = new ArrayList<>(sliceRankedWindow(rankedWindow, offset, size));
+        // 요청 구간이 재정렬 구간 밖까지 걸쳐 있으면 나머지는 카카오 순서 그대로 이어 붙인다.
+        if (books.size() < size && offset + size > RANKED_WINDOW_SIZE && !response.isEnd()) {
+            books.addAll(fetchNextKakaoWindow(request, size - books.size()));
+        }
+
+        return new SearchPage(
+            List.copyOf(books),
+            totalCount,
+            offset + books.size() >= totalCount,
             rankingResult.ranking()
         );
     }
 
-    private BookSearchRequest resolveRankingCandidateRequest(BookSearchRequest request) {
-        if (request.page() != 1 || request.size() >= MAX_KAKAO_SEARCH_PAGE_SIZE) {
-            return request;
-        }
-
-        int candidateSize = Math.min(
-            MAX_KAKAO_SEARCH_PAGE_SIZE,
-            request.size() * RANKING_CANDIDATE_MULTIPLIER
+    // 재정렬 구간을 벗어난 페이지는 카카오 검색 순서를 그대로 사용한다. (재정렬/병합 미적용)
+    private SearchPage searchBeyondRankedWindow(BookSearchRequest request, int size) {
+        BookSearchListResponse response = kaKaoService.searchBooks(
+            new BookSearchRequest(request.query(), request.sort(), request.page(), size)
         );
 
-        if (candidateSize == request.size()) {
-            return request;
-        }
-
-        return new BookSearchRequest(request.query(), request.sort(), request.page(), candidateSize);
+        return new SearchPage(
+            response.books(),
+            response.totalCount(),
+            response.isEnd(),
+            BookSearchRankingInfo.kakao()
+        );
     }
 
-    private List<BookSearchResponse> limitSearchBooks(
-        List<BookSearchResponse> books,
-        BookSearchRequest request,
-        BookSearchRequest candidateRequest
-    ) {
-        if (!isExpandedRankingCandidateRequest(request, candidateRequest)) {
-            return books;
-        }
-
-        return books.stream()
-            .limit(request.size())
+    // 재정렬 구간 바로 다음 구간(카카오 2페이지)에서 부족한 건수만큼만 가져온다.
+    private List<BookSearchResponse> fetchNextKakaoWindow(BookSearchRequest request, int count) {
+        return kaKaoService.searchBooks(
+                new BookSearchRequest(request.query(), request.sort(), 2, MAX_KAKAO_SEARCH_PAGE_SIZE)
+            )
+            .books()
+            .stream()
+            .limit(count)
             .toList();
     }
 
-    private long resolveSearchTotalCount(
-        BookSearchListResponse response,
-        List<BookSearchResponse> rankedBooks
+    private List<BookSearchResponse> sliceRankedWindow(
+        List<BookSearchResponse> rankedWindow,
+        int offset,
+        int size
     ) {
-        return Math.max(response.totalCount(), rankedBooks.size());
-    }
-
-    private boolean resolveSearchIsEnd(
-        BookSearchListResponse response,
-        List<BookSearchResponse> responseBooks,
-        BookSearchRequest request,
-        BookSearchRequest candidateRequest
-    ) {
-        if (!isExpandedRankingCandidateRequest(request, candidateRequest)) {
-            return response.isEnd();
+        if (offset >= rankedWindow.size()) {
+            return List.of();
         }
-
-        return responseBooks.size() < request.size() || request.size() >= response.totalCount();
+        return rankedWindow.subList(offset, Math.min(offset + size, rankedWindow.size()));
     }
 
-    private boolean isExpandedRankingCandidateRequest(
-        BookSearchRequest request,
-        BookSearchRequest candidateRequest
+    // 카카오 결과가 재정렬 구간 안에서 끝났다면 병합된 제목 일치 도서까지가 전체 결과다.
+    private long resolveRankedWindowTotalCount(
+        BookSearchListResponse response,
+        List<BookSearchResponse> rankedWindow
     ) {
-        return candidateRequest.size() > request.size();
+        if (response.isEnd()) {
+            return rankedWindow.size();
+        }
+        return Math.max(response.totalCount(), rankedWindow.size());
+    }
+
+    private record SearchPage(
+        List<BookSearchResponse> books,
+        long totalCount,
+        boolean isEnd,
+        BookSearchRankingInfo ranking
+    ) {
     }
 
     private List<BookSearchResponse> applyInterestedSearchBooks(

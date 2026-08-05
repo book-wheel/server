@@ -49,7 +49,10 @@ public class BookController {
         description = "카카오 API를 사용해 후보 도서 목록을 검색한 뒤, "
             + "도서관 정보나루 인기대출도서 데이터와 ISBN이 매칭되는 도서는 정보나루 순위와 대출횟수를 기준으로 재정렬합니다. "
             + "정보나루 데이터가 없는 도서는 카카오 검색 결과의 기존 순서를 유지하며, "
-            + "응답의 ranking 필드에 실제 정렬 출처와 정보나루 집계 기간을 제공합니다.")
+            + "응답의 ranking 필드에 실제 정렬 출처와 정보나루 집계 기간을 제공합니다. "
+            + "재정렬은 검색 결과 상위 50건 구간에만 적용되며, 이 구간은 요청 페이지와 무관하게 동일한 기준으로 정렬되므로 "
+            + "페이지를 넘겨도 도서가 중복되거나 누락되지 않습니다. 51번째 결과부터는 카카오 검색 순서를 그대로 사용합니다. "
+            + "size는 최대 50까지 지원하며 초과 시 50으로 조정됩니다.")
     @GetMapping("/search")
     public ApiResponse<BookSearchListResponse> searchBooks(
         @ModelAttribute BookSearchRequest request,
