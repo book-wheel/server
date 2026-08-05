@@ -278,6 +278,18 @@ public class PostService {
     }
 
     @Transactional
+    public void deletePostComment(Long postId, Long commentId, String userPK) {
+        PostComment comment = postCommentRepository.findByPostCommentIdAndPost_PostId(commentId, postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_COMMENT_NOT_FOUND));
+
+        if (!comment.getUser().getId().equals(userPK)) {
+            throw new BusinessException(ErrorCode.POST_COMMENT_DELETE_FORBIDDEN);
+        }
+
+        postCommentRepository.delete(comment);
+    }
+
+    @Transactional
     public void reportPost(Long postId, PostReportRequest request, String userPK) {
 
         Post post = postRepository.findById(postId)

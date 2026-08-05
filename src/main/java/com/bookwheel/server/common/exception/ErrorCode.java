@@ -127,6 +127,8 @@ public enum ErrorCode {
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_001", "해당 게시물을 찾을 수 없습니다."),
     ALREADY_REPORTED(HttpStatus.BAD_REQUEST, "POST_002", "이미 신고한 게시물입니다."),
     CANNOT_REPORT_OWN_POST(HttpStatus.BAD_REQUEST, "POST_003", "자신의 게시물은 신고할 수 없습니다."),
+    POST_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_004", "해당 댓글을 찾을 수 없습니다."),
+    POST_COMMENT_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "POST_005", "본인이 작성한 댓글만 삭제할 수 있습니다."),
 
     //리뷰 관련 에러
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "해당 리뷰를 찾을 수 없습니다."),

@@ -9,12 +9,15 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface PostCommentRepository extends JpaRepository<PostComment, Long> {
 
     List<PostComment> findAllByPost(Post post);
 
     long countByPost(Post post);
+
+    Optional<PostComment> findByPostCommentIdAndPost_PostId(Long postCommentId, Long postId);
 
     // 최신순 첫 페이지 (작성일 내림차순, 동일 시 댓글 ID 내림차순)
     @Query("""

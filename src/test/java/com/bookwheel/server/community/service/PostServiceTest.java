@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 
 import com.bookwheel.server.common.exception.BusinessException;
@@ -16,6 +17,7 @@ import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
+import com.bookwheel.server.community.entity.PostComment;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
@@ -177,5 +179,46 @@ class PostServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.INVALID_INPUT_VALUE));
+    }
+
+    @Test
+    @DisplayName("게시물 댓글 삭제는 작성자 본인이면 댓글을 삭제한다")
+    void deletePostComment_DeletesWhenOwner() {
+        Long postId = 7L;
+        Long commentId = 3L;
+        String userPK = UUID.randomUUID().toString();
+        PostComment comment = mock(PostComment.class);
+        User user = mock(User.class);
+
+        given(postCommentRepository.findByPostCommentIdAndPost_PostId(commentId, postId))
+                .willReturn(Optional.of(comment));
+        given(comment.getUser()).willReturn(user);
+        given(user.getId()).willReturn(userPK);
+
+        postService.deletePostComment(postId, commentId, userPK);
+
+        then(postCommentRepository).should().delete(comment);
+    }
+
+    @Test
+    @DisplayName("게시물 댓글 삭제는 작성자 본인이 아니면 예외가 발생한다")
+    void deletePostComment_ThrowsWhenNotOwner() {
+        Long postId = 7L;
+        Long commentId = 3L;
+        String userPK = UUID.randomUUID().toString();
+        PostComment comment = mock(PostComment.class);
+        User user = mock(User.class);
+
+        given(postCommentRepository.findByPostCommentIdAndPost_PostId(commentId, postId))
+                .willReturn(Optional.of(comment));
+        given(comment.getUser()).willReturn(user);
+        given(user.getId()).willReturn(UUID.randomUUID().toString());
+
+        assertThatThrownBy(() -> postService.deletePostComment(postId, commentId, userPK))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.POST_COMMENT_DELETE_FORBIDDEN));
+
+        then(postCommentRepository).should(never()).delete(any(PostComment.class));
     }
 }

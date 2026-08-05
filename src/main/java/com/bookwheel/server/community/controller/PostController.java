@@ -99,6 +99,17 @@ public class PostController {
         return ApiResponse.success("댓글이 성공적으로 작성되었습니다.");
     }
 
+    @Operation(summary = "게시물 댓글 삭제", description = "작성자 본인이 자신의 게시물 댓글을 삭제합니다.")
+    @DeleteMapping("/{postId}/comments/{commentId}")
+    public ApiResponse<Void> deletePostComment(
+        @PathVariable("postId") Long postId,
+        @PathVariable("commentId") Long commentId,
+        @AuthenticationPrincipal Object principal) {
+
+        postService.deletePostComment(postId, commentId, getUserPK(principal));
+        return ApiResponse.success(null);
+    }
+
 
     @Operation(summary = "게시물 신고")
     @PostMapping("/{postId}/reports")
