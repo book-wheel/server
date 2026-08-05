@@ -29,9 +29,12 @@ import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.user.repository.UserRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +68,7 @@ class BookServiceTest {
     void searchBooks_MarksInterestedBooks() {
         String userPK = UUID.randomUUID().toString();
         BookSearchRequest request = new BookSearchRequest("clean code", null, null, null);
+        BookSearchRequest expandedRequest = new BookSearchRequest("clean code", "accuracy", 1, 50);
         BookSearchResponse interestedBook = new BookSearchResponse(
                 "Clean Code",
                 "Robert C. Martin",
@@ -89,7 +93,7 @@ class BookServiceTest {
                 true
         );
 
-        given(kaKaoService.searchBooks(request)).willReturn(kakaoResponse);
+        given(kaKaoService.searchBooks(expandedRequest)).willReturn(kakaoResponse);
         given(bookSearchRankingService.rankByPopularity(anyList()))
             .willAnswer(invocation -> BookSearchRankingResult.kakao(invocation.getArgument(0)));
         given(bookLikeRepository.findInterestedIsbns(
@@ -105,6 +109,39 @@ class BookServiceTest {
         assertThat(response.books().get(1).isbn()).isEqualTo("9780134757599");
         assertThat(response.books().get(1).isInterested()).isFalse();
         assertThat(response.ranking().source()).isEqualTo("KAKAO");
+    }
+
+    @Test
+    @DisplayName("Search expands Kakao candidates before ranking and returns only requested size")
+    void searchBooks_ExpandsKakaoCandidatesBeforeRanking() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", null, null, null);
+        BookSearchRequest expandedRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        List<BookSearchResponse> kakaoCandidates = IntStream.rangeClosed(1, 50)
+            .mapToObj(index -> searchBook("Kakao book " + index, "9780000000" + String.format("%03d", index)))
+            .toList();
+        BookSearchResponse popularBook = kakaoCandidates.get(24);
+        List<BookSearchResponse> rankedBooks = Stream.concat(
+                Stream.of(popularBook),
+                kakaoCandidates.stream().filter(book -> !book.equals(popularBook))
+            )
+            .toList();
+
+        given(kaKaoService.searchBooks(expandedRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 305, false));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates))
+            .willReturn(BookSearchRankingResult.data4Library(
+                rankedBooks,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(rankedBooks.subList(0, 10));
+        assertThat(response.books().get(0)).isEqualTo(popularBook);
+        assertThat(response.totalCount()).isEqualTo(305);
+        assertThat(response.isEnd()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("DATA4LIBRARY");
     }
 
     @Test
@@ -188,6 +225,18 @@ class BookServiceTest {
                 isbn,
                 true,
                 null
+        );
+    }
+
+    private BookSearchResponse searchBook(String title, String isbn) {
+        return new BookSearchResponse(
+            title,
+            "author",
+            "publisher",
+            "2026-01-01",
+            "https://example.com/book.jpg",
+            isbn,
+            false
         );
     }
 

@@ -64,6 +64,8 @@ public class BookService {
     private static final int MAX_REVIEW_PAGE_SIZE = 50;
     private static final int MAX_GALLERY_PAGE_SIZE = 50;
     private static final int MAX_INTEREST_PAGE_SIZE = 50;
+    private static final int MAX_KAKAO_SEARCH_PAGE_SIZE = 50;
+    private static final int RANKING_CANDIDATE_MULTIPLIER = 5;
 
 
     @Transactional
@@ -286,20 +288,73 @@ public class BookService {
 
 
     public BookSearchListResponse searchBooks(BookSearchRequest request, String userPK) {
-        BookSearchListResponse response = kaKaoService.searchBooks(request);
+        BookSearchRequest candidateRequest = resolveRankingCandidateRequest(request);
+        BookSearchListResponse response = kaKaoService.searchBooks(candidateRequest);
         Set<String> interestedIsbns = findInterestedSearchIsbns(response.books(), userPK);
 
         List<BookSearchResponse> books = response.books().stream()
             .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
             .toList();
         BookSearchRankingResult rankingResult = bookSearchRankingService.rankByPopularity(books);
+        List<BookSearchResponse> responseBooks = limitSearchBooks(rankingResult.books(), request, candidateRequest);
 
         return new BookSearchListResponse(
-            rankingResult.books(),
+            responseBooks,
             response.totalCount(),
-            response.isEnd(),
+            resolveSearchIsEnd(response, responseBooks, request, candidateRequest),
             rankingResult.ranking()
         );
+    }
+
+    private BookSearchRequest resolveRankingCandidateRequest(BookSearchRequest request) {
+        if (request.page() != 1 || request.size() >= MAX_KAKAO_SEARCH_PAGE_SIZE) {
+            return request;
+        }
+
+        int candidateSize = Math.min(
+            MAX_KAKAO_SEARCH_PAGE_SIZE,
+            request.size() * RANKING_CANDIDATE_MULTIPLIER
+        );
+
+        if (candidateSize == request.size()) {
+            return request;
+        }
+
+        return new BookSearchRequest(request.query(), request.sort(), request.page(), candidateSize);
+    }
+
+    private List<BookSearchResponse> limitSearchBooks(
+        List<BookSearchResponse> books,
+        BookSearchRequest request,
+        BookSearchRequest candidateRequest
+    ) {
+        if (!isExpandedRankingCandidateRequest(request, candidateRequest)) {
+            return books;
+        }
+
+        return books.stream()
+            .limit(request.size())
+            .toList();
+    }
+
+    private boolean resolveSearchIsEnd(
+        BookSearchListResponse response,
+        List<BookSearchResponse> responseBooks,
+        BookSearchRequest request,
+        BookSearchRequest candidateRequest
+    ) {
+        if (!isExpandedRankingCandidateRequest(request, candidateRequest)) {
+            return response.isEnd();
+        }
+
+        return responseBooks.size() < request.size() || request.size() >= response.totalCount();
+    }
+
+    private boolean isExpandedRankingCandidateRequest(
+        BookSearchRequest request,
+        BookSearchRequest candidateRequest
+    ) {
+        return candidateRequest.size() > request.size();
     }
 
 
