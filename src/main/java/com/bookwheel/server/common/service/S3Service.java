@@ -42,7 +42,7 @@ public class S3Service {
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucket;
 
-    private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp");
+    private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "webp", "heic", "heif");
 
     public String getPresignedGetUrl(String objectKey) {
         // 1. 방어 로직 - 키 값 없거나 공백이면 예외 발생

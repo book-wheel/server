@@ -3,6 +3,7 @@ package com.bookwheel.server.common.service;
 import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.dto.PostImagePresignedResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,28 @@ class S3ServiceTest {
         assertThat(request.putObjectRequest().key()).isEqualTo(objectKey);
         assertThat(request.putObjectRequest().contentType()).isEqualTo("image/png");
         assertThat(request.putObjectRequest().contentLength()).isEqualTo(123_456L);
+    }
+
+    @Test
+    @DisplayName("게시물 이미지 Presigned URL 발급 시 HEIC/HEIF 확장자를 허용하고 소문자로 정규화한다")
+    void getPostPresignedUrls_AcceptsHeicAndHeifExtensions() throws MalformedURLException {
+        String isbn = "9788966263158";
+        given(presignedPutObjectRequest.url()).willReturn(new URL("https://s3.example.com/upload"));
+        given(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class)))
+                .willReturn(presignedPutObjectRequest);
+
+        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, List.of(".HEIC", "HEIF"));
+
+        assertThat(response.presignedUrls()).hasSize(2);
+        assertThat(response.presignedUrls().get(0).presignedUrl()).isEqualTo("https://s3.example.com/upload");
+        assertThat(response.presignedUrls().get(0).objectKey())
+                .startsWith("posts/" + isbn + "/")
+                .endsWith("_image.heic");
+        assertThat(response.presignedUrls().get(1).objectKey())
+                .startsWith("posts/" + isbn + "/")
+                .endsWith("_image.heif");
+        then(s3Presigner).should(org.mockito.Mockito.times(2))
+                .presignPutObject(any(PutObjectPresignRequest.class));
     }
 
     @Test
