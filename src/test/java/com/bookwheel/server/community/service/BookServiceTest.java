@@ -207,6 +207,42 @@ class BookServiceTest {
     }
 
     @Test
+    @DisplayName("카카오 결과가 적고 제목 일치 도서가 병합된 경우에도 isEnd를 병합 결과 기준으로 계산한다.")
+    void searchBooks_CalculatesIsEndFromMergedResults() {
+        BookSearchRequest windowRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        List<BookSearchResponse> kakaoCandidates = kakaoBooks(2);
+        // 카카오는 2건에서 끝났지만 제목 일치 도서 50건이 병합된 상황
+        List<BookSearchResponse> rankedBooks = Stream.concat(
+                naruBooks(50).stream(),
+                kakaoCandidates.stream()
+            )
+            .toList();
+
+        given(kaKaoService.searchBooks(windowRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 2, true));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates, "vegetarian"))
+            .willReturn(BookSearchRankingResult.data4Library(
+                rankedBooks,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse firstPage = bookService.searchBooks(
+            new BookSearchRequest("vegetarian", null, 1, 10), null);
+
+        // 카카오 totalCount(2)가 아니라 병합된 전체 결과를 기준으로 남은 페이지가 있음을 알린다.
+        assertThat(firstPage.books()).hasSize(10);
+        assertThat(firstPage.totalCount()).isEqualTo(50);
+        assertThat(firstPage.isEnd()).isFalse();
+
+        BookSearchListResponse lastPage = bookService.searchBooks(
+            new BookSearchRequest("vegetarian", null, 5, 10), null);
+
+        assertThat(lastPage.books()).containsExactlyElementsOf(rankedBooks.subList(40, 50));
+        assertThat(lastPage.isEnd()).isTrue();
+    }
+
+    @Test
     @DisplayName("재정렬 구간을 벗어난 페이지는 카카오 검색 순서를 그대로 반환한다.")
     void searchBooks_UsesKakaoOrderBeyondRankedWindow() {
         BookSearchRequest request = new BookSearchRequest("vegetarian", null, 6, 10);
