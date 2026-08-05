@@ -156,6 +156,11 @@ public class Group {
         this.groupState = State.DELETED;
     }
 
+    // 자동 완료 대상으로 잠근 모임을 완료 상태로 전환
+    public void markComplete() {
+        this.groupState = State.COMPLETE;
+    }
+
     public void requireReadOrderConfirmation() {
         this.scheduleReconfigurationStatus = ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED;
     }

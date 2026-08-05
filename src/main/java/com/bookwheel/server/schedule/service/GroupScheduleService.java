@@ -762,17 +762,12 @@ public class GroupScheduleService {
                 today
         );
 
-        int updated = groupRepository.updateFinishedGroupsToComplete(
-                State.COMPLETE,
-                State.IN_PROGRESS,
-                ScheduleReconfigurationStatus.NONE,
-                today
-        );
-
         for (Group group : completing) {
+            // 잠금 조회 대상만 완료 처리: 상태 변경 대상과 이벤트 발행 대상 일치
+            group.markComplete();
             eventPublisher.publishEvent(new GroupCompletedEvent(group.getGroupId(), group.getGroupName()));
         }
-        return updated;
+        return completing.size();
     }
 
     private Group findGroupByIdForUpdate(String groupId) {
