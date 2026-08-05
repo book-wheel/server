@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.then;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
 import com.bookwheel.server.community.service.PopularLoanBookSyncService;
 import java.time.Clock;
 import java.time.Instant;
@@ -37,7 +38,37 @@ class PopularLoanBookSyncSchedulerTest {
             PAGE_SIZE
         );
 
+        given(popularLoanBookSyncService.syncPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            PAGE_SIZE
+        )).willReturn(PopularLoanBookSyncResult.synced(1000));
+
         scheduler.syncPreviousMonthPopularLoanBooks();
+
+        then(popularLoanBookSyncService).should().syncPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            PAGE_SIZE
+        );
+    }
+
+    @Test
+    @DisplayName("Scheduler completes without failure when the sync is skipped for empty data")
+    void syncPreviousMonthPopularLoanBooks_HandlesSkippedEmptyResult() {
+        Clock clock = Clock.fixed(Instant.parse("2026-08-01T00:00:00Z"), SEOUL_ZONE);
+        PopularLoanBookSyncScheduler scheduler = new PopularLoanBookSyncScheduler(
+            popularLoanBookSyncService,
+            clock,
+            PAGE_SIZE
+        );
+        given(popularLoanBookSyncService.syncPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            PAGE_SIZE
+        )).willReturn(PopularLoanBookSyncResult.skippedEmpty());
+
+        assertThatCode(scheduler::syncPreviousMonthPopularLoanBooks).doesNotThrowAnyException();
 
         then(popularLoanBookSyncService).should().syncPopularLoanBooks(
             LocalDate.of(2026, 7, 1),

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
 import com.bookwheel.server.community.service.PopularLoanBookSyncService;
 import java.time.Clock;
 import java.time.Instant;
@@ -47,7 +48,7 @@ class PopularLoanBookAdminControllerTest {
             LocalDate.of(2026, 7, 1),
             LocalDate.of(2026, 7, 31),
             1000
-        )).willReturn(1000);
+        )).willReturn(PopularLoanBookSyncResult.synced(1000));
 
         mockMvc.perform(post("/api/v1/admin/books/popular-loans/sync")
                 .with(csrf()))
@@ -58,7 +59,29 @@ class PopularLoanBookAdminControllerTest {
             .andExpect(jsonPath("$.data.startDate").value("2026-07-01"))
             .andExpect(jsonPath("$.data.endDate").value("2026-07-31"))
             .andExpect(jsonPath("$.data.pageSize").value(1000))
+            .andExpect(jsonPath("$.data.status").value("SYNCED"))
             .andExpect(jsonPath("$.data.syncedCount").value(1000));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("조회 결과가 비어 적재를 건너뛰면 SKIPPED_EMPTY 상태를 응답한다")
+    void syncPopularLoanBooks_ReportsSkippedEmptyStatus() throws Exception {
+        given(popularLoanBookSyncService.syncPopularLoanBooks(
+            LocalDate.of(2026, 6, 1),
+            LocalDate.of(2026, 6, 30),
+            500
+        )).willReturn(PopularLoanBookSyncResult.skippedEmpty());
+
+        mockMvc.perform(post("/api/v1/admin/books/popular-loans/sync")
+                .param("startDate", "2026-06-01")
+                .param("endDate", "2026-06-30")
+                .param("pageSize", "500")
+                .with(csrf()))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("SKIPPED_EMPTY"))
+            .andExpect(jsonPath("$.data.syncedCount").value(0));
     }
 
     @Test
@@ -69,7 +92,7 @@ class PopularLoanBookAdminControllerTest {
             LocalDate.of(2026, 6, 1),
             LocalDate.of(2026, 6, 30),
             500
-        )).willReturn(500);
+        )).willReturn(PopularLoanBookSyncResult.synced(500));
 
         mockMvc.perform(post("/api/v1/admin/books/popular-loans/sync")
                 .param("startDate", "2026-06-01")

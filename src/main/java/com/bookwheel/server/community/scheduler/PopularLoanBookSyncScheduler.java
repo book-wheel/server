@@ -1,5 +1,6 @@
 package com.bookwheel.server.community.scheduler;
 
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
 import com.bookwheel.server.community.service.PopularLoanBookSyncService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,12 +38,29 @@ public class PopularLoanBookSyncScheduler {
         LocalDate endDate = today.withDayOfMonth(1).minusDays(1);
 
         try {
-            int syncedCount = popularLoanBookSyncService.syncPopularLoanBooks(startDate, endDate, pageSize);
+            PopularLoanBookSyncResult result = popularLoanBookSyncService.syncPopularLoanBooks(
+                startDate,
+                endDate,
+                pageSize
+            );
+
+            // 적재를 건너뛴 경우는 정상 완료와 구분해 기록한다. 직전 달 데이터가 비어 있는 것은
+            // 장애는 아니지만 확인이 필요한 상황이다.
+            if (result.isSkippedEmpty()) {
+                log.warn(
+                    "Previous month popular loan book sync skipped because fetched data is empty"
+                        + " - startDate: {}, endDate: {}",
+                    startDate,
+                    endDate
+                );
+                return;
+            }
+
             log.info(
                 "Previous month popular loan book sync finished - startDate: {}, endDate: {}, count: {}",
                 startDate,
                 endDate,
-                syncedCount
+                result.syncedCount()
             );
         } catch (RuntimeException exception) {
             log.error(

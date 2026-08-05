@@ -3,6 +3,7 @@ package com.bookwheel.server.community.service;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
 import com.bookwheel.server.community.entity.PopularLoanBook;
 import com.bookwheel.server.community.entity.PopularLoanBookSource;
 import com.bookwheel.server.community.repository.PopularLoanBookRepository;
@@ -31,7 +32,7 @@ public class PopularLoanBookSyncService {
     private final Clock clock;
 
     @Transactional
-    public int syncPopularLoanBooks(LocalDate startDate, LocalDate endDate, int pageSize) {
+    public PopularLoanBookSyncResult syncPopularLoanBooks(LocalDate startDate, LocalDate endDate, int pageSize) {
         validateSyncRequest(startDate, endDate, pageSize);
 
         List<LibraryNaruPopularLoanResponse.Doc> docs = libraryNaruService.getPopularLoanBooks(
@@ -42,13 +43,15 @@ public class PopularLoanBookSyncService {
         );
         List<PopularLoanBook> popularLoanBooks = toPopularLoanBooks(docs, startDate, endDate);
 
+        // 조회 자체가 실패하면 LibraryNaruService가 예외를 던지므로, 여기 도달한 빈 결과는
+        // 해당 기간에 집계된 데이터가 없는 정상 케이스다. 기존 스냅샷은 그대로 둔다.
         if (popularLoanBooks.isEmpty()) {
             log.warn(
                 "Skip popular loan book sync because fetched data is empty - startDate: {}, endDate: {}",
                 startDate,
                 endDate
             );
-            return 0;
+            return PopularLoanBookSyncResult.skippedEmpty();
         }
 
         popularLoanBookRepository.deleteBySourceAndStartDateAndEndDate(SOURCE, startDate, endDate);
@@ -61,7 +64,7 @@ public class PopularLoanBookSyncService {
             endDate,
             popularLoanBooks.size()
         );
-        return popularLoanBooks.size();
+        return PopularLoanBookSyncResult.synced(popularLoanBooks.size());
     }
 
     private void validateSyncRequest(LocalDate startDate, LocalDate endDate, int pageSize) {

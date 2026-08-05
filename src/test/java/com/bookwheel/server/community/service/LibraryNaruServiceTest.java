@@ -238,6 +238,69 @@ class LibraryNaruServiceTest {
     }
 
     @Test
+    @DisplayName("응답에 레코드가 있는데 전부 해석하지 못하면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsWhenEveryDocIsUnparsable() {
+        // 응답 스키마가 바뀌어 필수 필드가 매핑되지 않는 상황.
+        // 빈 결과로 돌려주면 적재 건수 0으로 성공 처리돼 장애가 드러나지 않는다.
+        String body = """
+            {
+              "response": {
+                "docs": [
+                  {"doc": {"no": 1, "book_isbn": "9788954681179", "loanCount": 104490}},
+                  {"doc": {"no": 2, "book_isbn": "9780132350884", "loanCount": 90000}}
+                ]
+              }
+            }
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
+        );
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("일부 레코드만 해석하지 못하면 유효한 레코드만 반환한다")
+    void getPopularLoanBooks_ReturnsValidDocsWhenSomeAreUnparsable() {
+        String body = """
+            {
+              "response": {
+                "docs": [
+                  {"doc": {"no": 1, "book_isbn": "9788954681179", "loanCount": 104490}},
+                  {
+                    "doc": {
+                      "ranking": 2,
+                      "bookname": "Clean Code",
+                      "isbn13": "9780132350884",
+                      "loan_count": 90000
+                    }
+                  }
+                ]
+              }
+            }
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isbn()).isEqualTo("9780132350884");
+        server.verify();
+    }
+
+    @Test
     @DisplayName("정보나루 인기대출도서가 errCode를 내려주면 DATA4LIBRARY_API_ERROR를 던진다")
     void getPopularLoanBooks_ThrowsOnErrorCode() {
         String body = """

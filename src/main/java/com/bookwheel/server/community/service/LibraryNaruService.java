@@ -140,16 +140,40 @@ public class LibraryNaruService {
             }
 
             List<LibraryNaruPopularLoanResponse.DocItem> docs = response.response().docs();
-            if (docs == null) {
+            if (docs == null || docs.isEmpty()) {
                 return List.of();
             }
 
-            return docs.stream()
+            List<LibraryNaruPopularLoanResponse.Doc> popularLoanBooks = docs.stream()
                 .map(LibraryNaruPopularLoanResponse.DocItem::doc)
                 .filter(Objects::nonNull)
                 .filter(doc -> doc.isbn() != null && !doc.isbn().isBlank())
                 .filter(doc -> doc.ranking() != null && doc.loanCount() != null)
                 .toList();
+
+            // 원본 레코드가 있는데 하나도 해석하지 못했다면 응답 스키마가 바뀐 것으로 본다.
+            // 이 경우를 빈 결과로 돌려주면 적재 건수 0으로 성공 처리돼 장애가 드러나지 않는다.
+            if (popularLoanBooks.isEmpty()) {
+                log.warn(
+                    "정보나루 인기대출도서 응답을 해석하지 못했습니다 - startDate: {}, endDate: {}, docCount: {}",
+                    startDate,
+                    endDate,
+                    docs.size()
+                );
+                throw new BusinessException(ErrorCode.DATA4LIBRARY_API_ERROR);
+            }
+
+            if (popularLoanBooks.size() < docs.size()) {
+                log.warn(
+                    "정보나루 인기대출도서 일부 레코드를 건너뛰었습니다 - startDate: {}, endDate: {}, docCount: {}, validCount: {}",
+                    startDate,
+                    endDate,
+                    docs.size(),
+                    popularLoanBooks.size()
+                );
+            }
+
+            return popularLoanBooks;
         } catch (Exception e) {
             if (e instanceof BusinessException businessException) {
                 throw businessException;

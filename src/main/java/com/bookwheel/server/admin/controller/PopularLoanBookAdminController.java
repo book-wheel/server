@@ -4,6 +4,7 @@ import com.bookwheel.server.admin.dto.PopularLoanBookSyncResponse;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.ApiResponse;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
 import com.bookwheel.server.community.service.PopularLoanBookSyncService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -61,7 +62,7 @@ public class PopularLoanBookAdminController {
     ) {
         SyncPeriod period = resolvePeriod(startDate, endDate);
         int resolvedPageSize = resolvePageSize(pageSize);
-        int syncedCount = popularLoanBookSyncService.syncPopularLoanBooks(
+        PopularLoanBookSyncResult result = popularLoanBookSyncService.syncPopularLoanBooks(
             period.startDate(),
             period.endDate(),
             resolvedPageSize
@@ -71,7 +72,7 @@ public class PopularLoanBookAdminController {
             period.startDate(),
             period.endDate(),
             resolvedPageSize,
-            syncedCount
+            result
         ));
     }
 

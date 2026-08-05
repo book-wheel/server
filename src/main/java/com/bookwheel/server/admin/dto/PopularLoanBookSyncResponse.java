@@ -1,5 +1,7 @@
 package com.bookwheel.server.admin.dto;
 
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -22,6 +24,13 @@ public record PopularLoanBookSyncResponse(
     @Schema(description = "정보나루 조회 건수", example = "1000")
     int pageSize,
 
+    @Schema(
+        description = "적재 결과 상태. SYNCED는 스냅샷을 새로 적재했음을, "
+            + "SKIPPED_EMPTY는 조회 결과가 비어 있어 적재를 건너뛰고 기존 스냅샷을 유지했음을 의미한다.",
+        example = "SYNCED"
+    )
+    PopularLoanBookSyncStatus status,
+
     @Schema(description = "DB에 저장한 도서 수", example = "1000")
     int syncedCount
 ) {
@@ -30,7 +39,7 @@ public record PopularLoanBookSyncResponse(
         LocalDate startDate,
         LocalDate endDate,
         int pageSize,
-        int syncedCount
+        PopularLoanBookSyncResult result
     ) {
         return new PopularLoanBookSyncResponse(
             "DATA4LIBRARY",
@@ -38,7 +47,8 @@ public record PopularLoanBookSyncResponse(
             startDate,
             endDate,
             pageSize,
-            syncedCount
+            result.status(),
+            result.syncedCount()
         );
     }
 }

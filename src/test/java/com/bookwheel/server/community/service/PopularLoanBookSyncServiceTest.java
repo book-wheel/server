@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncResult;
+import com.bookwheel.server.community.dto.PopularLoanBookSyncStatus;
 import com.bookwheel.server.community.entity.PopularLoanBook;
 import com.bookwheel.server.community.entity.PopularLoanBookSource;
 import com.bookwheel.server.community.repository.PopularLoanBookRepository;
@@ -60,9 +62,10 @@ class PopularLoanBookSyncServiceTest {
             doc(2, " 9780132350884 ", 90000)
         ));
 
-        int savedCount = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
+        PopularLoanBookSyncResult result = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
 
-        assertThat(savedCount).isEqualTo(2);
+        assertThat(result.status()).isEqualTo(PopularLoanBookSyncStatus.SYNCED);
+        assertThat(result.syncedCount()).isEqualTo(2);
         then(popularLoanBookRepository).should()
             .deleteBySourceAndStartDateAndEndDate(PopularLoanBookSource.DATA4LIBRARY, START_DATE, END_DATE);
         then(popularLoanBookRepository).should().flush();
@@ -102,9 +105,9 @@ class PopularLoanBookSyncServiceTest {
             doc(1, "9788954681179", 104490)
         ));
 
-        int savedCount = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
+        PopularLoanBookSyncResult result = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
 
-        assertThat(savedCount).isEqualTo(1);
+        assertThat(result.syncedCount()).isEqualTo(1);
         List<PopularLoanBook> savedBooks = capturedSavedBooks();
         assertThat(savedBooks).hasSize(1);
         assertThat(savedBooks.get(0).getIsbn()).isEqualTo("9788954681179");
@@ -123,9 +126,9 @@ class PopularLoanBookSyncServiceTest {
             doc(4, "9788966262281", 80000)
         ));
 
-        int savedCount = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
+        PopularLoanBookSyncResult result = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
 
-        assertThat(savedCount).isEqualTo(1);
+        assertThat(result.syncedCount()).isEqualTo(1);
         List<PopularLoanBook> savedBooks = capturedSavedBooks();
         assertThat(savedBooks).hasSize(1);
         assertThat(savedBooks.get(0).getIsbn()).isEqualTo("9788966262281");
@@ -134,13 +137,16 @@ class PopularLoanBookSyncServiceTest {
     }
 
     @Test
-    @DisplayName("Empty fetched data does not delete the previous snapshot")
+    @DisplayName("Empty fetched data is reported as SKIPPED_EMPTY and keeps the previous snapshot")
     void syncPopularLoanBooks_SkipsReplacementWhenFetchedDataIsEmpty() {
         given(libraryNaruService.getPopularLoanBooks(START_DATE, END_DATE, 1, PAGE_SIZE)).willReturn(List.of());
 
-        int savedCount = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
+        PopularLoanBookSyncResult result = syncService.syncPopularLoanBooks(START_DATE, END_DATE, PAGE_SIZE);
 
-        assertThat(savedCount).isZero();
+        // 조회 실패(예외)와 구분되도록 상태로 표시하고, 적재 건수 0을 성공처럼 남기지 않는다.
+        assertThat(result.status()).isEqualTo(PopularLoanBookSyncStatus.SKIPPED_EMPTY);
+        assertThat(result.isSkippedEmpty()).isTrue();
+        assertThat(result.syncedCount()).isZero();
         then(popularLoanBookRepository).should(never())
             .deleteBySourceAndStartDateAndEndDate(PopularLoanBookSource.DATA4LIBRARY, START_DATE, END_DATE);
         then(popularLoanBookRepository).should(never()).flush();
