@@ -79,10 +79,4 @@ public class PopularLoanBook {
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 30)
     private PopularLoanBookSource source;
-
-    public void updatePopularity(Integer rank, Integer loanCount, LocalDateTime collectedAt) {
-        this.rank = rank;
-        this.loanCount = loanCount;
-        this.collectedAt = collectedAt;
-    }
 }

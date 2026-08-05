@@ -45,25 +45,4 @@ class PopularLoanBookTest {
         assertThat(popularLoanBook.getEndDate()).isEqualTo(endDate);
         assertThat(popularLoanBook.getSource()).isEqualTo(PopularLoanBookSource.DATA4LIBRARY);
     }
-
-    @Test
-    @DisplayName("동일 ISBN 스냅샷의 인기 순위와 대출횟수를 갱신한다")
-    void updatePopularity_UpdatesRankLoanCountAndCollectedAt() {
-        PopularLoanBook popularLoanBook = PopularLoanBook.builder()
-            .isbn("9788954681179")
-            .rank(10)
-            .loanCount(100)
-            .collectedAt(LocalDateTime.of(2026, 8, 1, 4, 0))
-            .startDate(LocalDate.of(2026, 7, 1))
-            .endDate(LocalDate.of(2026, 7, 31))
-            .source(PopularLoanBookSource.DATA4LIBRARY)
-            .build();
-        LocalDateTime newCollectedAt = LocalDateTime.of(2026, 8, 2, 4, 0);
-
-        popularLoanBook.updatePopularity(1, 200, newCollectedAt);
-
-        assertThat(popularLoanBook.getRank()).isEqualTo(1);
-        assertThat(popularLoanBook.getLoanCount()).isEqualTo(200);
-        assertThat(popularLoanBook.getCollectedAt()).isEqualTo(newCollectedAt);
-    }
 }
