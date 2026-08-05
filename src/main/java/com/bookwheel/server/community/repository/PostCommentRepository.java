@@ -19,6 +19,8 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     Optional<PostComment> findByPostCommentIdAndPost_PostId(Long postCommentId, Long postId);
 
+    void deleteByPost(Post post);
+
     // 최신순 첫 페이지 (작성일 내림차순, 동일 시 댓글 ID 내림차순)
     @Query("""
         select c from PostComment c

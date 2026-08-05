@@ -173,6 +173,21 @@ class PostControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user-pk")
+    @DisplayName("Community Gallery: delete own post success")
+    void deletePost_Success() throws Exception {
+        Long postId = 10L;
+
+        mockMvc.perform(delete("/api/v1/posts/{postId}", postId)
+                        .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        then(postService).should().deletePost(postId, "user-pk");
+    }
+
+    @Test
     @WithMockUser
     @DisplayName("Community Gallery: get post comments success")
     void getPostComments_Success() throws Exception {

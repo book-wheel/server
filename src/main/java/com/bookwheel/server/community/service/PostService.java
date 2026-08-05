@@ -43,6 +43,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
     private final PostReportRepository postReportRepository;
+    private final PostDeletionService postDeletionService;
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
     private final CursorUtils cursorUtils;
@@ -287,6 +288,18 @@ public class PostService {
         }
 
         postCommentRepository.delete(comment);
+    }
+
+    @Transactional
+    public void deletePost(Long postId, String userPK) {
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        if (!post.getUploader().getId().equals(userPK)) {
+            throw new BusinessException(ErrorCode.POST_DELETE_FORBIDDEN);
+        }
+
+        postDeletionService.delete(post);
     }
 
     @Transactional

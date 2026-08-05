@@ -51,6 +51,7 @@ class PostServiceTest {
     @Mock private PostLikeRepository postLikeRepository;
     @Mock private PostCommentRepository postCommentRepository;
     @Mock private PostReportRepository postReportRepository;
+    @Mock private PostDeletionService postDeletionService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private S3Service s3Service;
     @Mock private CursorUtils cursorUtils;
@@ -220,5 +221,40 @@ class PostServiceTest {
                         .isEqualTo(ErrorCode.POST_COMMENT_DELETE_FORBIDDEN));
 
         then(postCommentRepository).should(never()).delete(any(PostComment.class));
+    }
+
+    @Test
+    @DisplayName("게시물 삭제는 작성자 본인이면 게시물을 삭제한다")
+    void deletePost_DeletesWhenOwner() {
+        String userPK = UUID.randomUUID().toString();
+        Post post = mock(Post.class);
+        User uploader = mock(User.class);
+
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(post.getUploader()).willReturn(uploader);
+        given(uploader.getId()).willReturn(userPK);
+
+        postService.deletePost(POST_ID, userPK);
+
+        then(postDeletionService).should().delete(post);
+    }
+
+    @Test
+    @DisplayName("게시물 삭제는 작성자 본인이 아니면 예외가 발생한다")
+    void deletePost_ThrowsWhenNotOwner() {
+        String userPK = UUID.randomUUID().toString();
+        Post post = mock(Post.class);
+        User uploader = mock(User.class);
+
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(post.getUploader()).willReturn(uploader);
+        given(uploader.getId()).willReturn(UUID.randomUUID().toString());
+
+        assertThatThrownBy(() -> postService.deletePost(POST_ID, userPK))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.POST_DELETE_FORBIDDEN));
+
+        then(postDeletionService).should(never()).delete(any(Post.class));
     }
 }

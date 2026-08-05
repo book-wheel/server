@@ -62,6 +62,16 @@ public class PostController {
         return ApiResponse.success(response);
     }
 
+    @Operation(summary = "게시물 삭제", description = "작성자 본인이 자신의 갤러리 게시물을 삭제합니다.")
+    @DeleteMapping("/{postId}")
+    public ApiResponse<Void> deletePost(
+        @PathVariable("postId") Long postId,
+        @AuthenticationPrincipal Object principal) {
+
+        postService.deletePost(postId, getUserPK(principal));
+        return ApiResponse.success(null);
+    }
+
     @Operation(summary = "게시물 좋아요")
     @PostMapping("/{postId}/likes")
     public ApiResponse<String> togglePostLike(
