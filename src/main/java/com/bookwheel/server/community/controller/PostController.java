@@ -25,14 +25,14 @@ public class PostController {
 
     @Operation(
         summary = "게시물 사진 업로드용 Presigned URL 다중 발급",
-        description = "도서 ISBN 경로 아래에 게시물 이미지 업로드용 Presigned URL을 발급합니다. 허용 확장자는 jpg, jpeg, png, webp, heic, heif이며 대소문자는 구분하지 않습니다."
+        description = "도서 ISBN 경로 아래에 게시물 이미지 업로드용 Presigned URL을 발급합니다. 확장자와 MIME 타입 매핑을 검증하며, 응답의 contentType과 동일한 Content-Type 헤더로 PUT 요청해야 합니다. 허용 확장자는 jpg, jpeg, png, webp, heic, heif입니다."
     )
     @PostMapping("/{isbn}/images/presigned-urls")
     public ApiResponse<PostImagePresignedResponse> getPresignedUrls(
         @Parameter(description = "게시물 이미지가 연결될 도서 ISBN", example = "9788966263158")
         @PathVariable("isbn") String isbn,
         @RequestBody PostImagePresignedRequest request) {
-        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, request.fileExtensions());
+        PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, request.files());
         return ApiResponse.success(response);
     }
 

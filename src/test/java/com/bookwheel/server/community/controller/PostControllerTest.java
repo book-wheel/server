@@ -71,15 +71,18 @@ class PostControllerTest {
     @DisplayName("Community Gallery: get presigned urls success")
     void getPresignedUrls_Success() throws Exception {
         String isbn = "9788966263158";
-        PostImagePresignedRequest request = new PostImagePresignedRequest(List.of("jpg"));
+        PostImagePresignedRequest request = new PostImagePresignedRequest(List.of(
+                new PostImagePresignedRequest.FileInfo("jpg", "image/jpeg")
+        ));
         PostImagePresignedResponse response = new PostImagePresignedResponse(
                 List.of(new PostImagePresignedResponse.PresignedInfo(
                         "https://example.com/presigned",
-                        "posts/1/abc.jpg"
+                        "posts/1/abc.jpg",
+                        "image/jpeg"
                 ))
         );
 
-        given(s3Service.getPostPresignedUrls(eq(isbn), any(List.class))).willReturn(response);
+        given(s3Service.getPostPresignedUrls(eq(isbn), eq(request.files()))).willReturn(response);
 
         mockMvc.perform(post("/api/v1/posts/{isbn}/images/presigned-urls", isbn)
                         .with(csrf())
@@ -87,7 +90,8 @@ class PostControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.presignedUrls[0].objectKey").value("posts/1/abc.jpg"));
+                .andExpect(jsonPath("$.data.presignedUrls[0].objectKey").value("posts/1/abc.jpg"))
+                .andExpect(jsonPath("$.data.presignedUrls[0].contentType").value("image/jpeg"));
     }
 
     @Test
