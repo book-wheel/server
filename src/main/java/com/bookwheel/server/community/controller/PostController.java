@@ -23,18 +23,26 @@ public class PostController {
     private final S3Service s3Service;
     private final PostService postService;
 
-    @Operation(summary = "게시물 사진 업로드용 Presigned URL 다중 발급")
+    @Operation(
+        summary = "게시물 사진 업로드용 Presigned URL 다중 발급",
+        description = "도서 ISBN 경로 아래에 게시물 이미지 업로드용 Presigned URL을 발급합니다. 허용 확장자는 jpg, jpeg, png, webp, heic, heif이며 대소문자는 구분하지 않습니다."
+    )
     @PostMapping("/{isbn}/images/presigned-urls")
     public ApiResponse<PostImagePresignedResponse> getPresignedUrls(
+        @Parameter(description = "게시물 이미지가 연결될 도서 ISBN", example = "9788966263158")
         @PathVariable("isbn") String isbn,
         @RequestBody PostImagePresignedRequest request) {
         PostImagePresignedResponse response = s3Service.getPostPresignedUrls(isbn, request.fileExtensions());
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "게시물 업로드(사진 + 글)")
+    @Operation(
+        summary = "게시물 업로드(사진 + 글)",
+        description = "게시물에 연결할 도서 ISBN은 URL 경로로 전달합니다. 요청 본문에는 isbn 필드를 포함하지 않습니다."
+    )
     @PostMapping("/{isbn}/save")
-    public ApiResponse<PostCreateResponse> save(@PathVariable("isbn") String isbn,
+    public ApiResponse<PostCreateResponse> save(@Parameter(description = "게시물에 연결할 도서 ISBN", example = "9788966263158")
+                                                @PathVariable("isbn") String isbn,
                                                 @Valid @RequestBody PostCreateRequest request,
                                                 @AuthenticationPrincipal Object principal) {
 

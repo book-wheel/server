@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-@Schema(description = "도서 게시물(감상평+사진) 최종 등록 요청")
+@Schema(description = "도서 게시물(감상평+사진) 최종 등록 요청. ISBN은 URL 경로로 전달한다.")
 public record PostCreateRequest(
 
     @Schema(
