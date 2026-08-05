@@ -11,9 +11,11 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.util.CursorUtils;
+import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.BookSearchResponse;
+import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
@@ -49,6 +51,7 @@ class BookServiceTest {
     @Mock private CursorUtils cursorUtils;
     @Mock private KaKaoService kaKaoService;
     @Mock private AladinService aladinService;
+    @Mock private LibraryNaruService libraryNaruService;
     @Mock private S3Service s3Service;
 
     @InjectMocks
@@ -166,5 +169,64 @@ class BookServiceTest {
 
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).thumbnailUrl()).isEqualTo(presignedUrl);
+    }
+
+    private BookDetailResponse sampleBookDetail(String isbn) {
+        return new BookDetailResponse(
+                "밝은 밤",
+                "최은영",
+                "문학동네",
+                "책 소개",
+                "https://image.aladin.co.kr/cover.jpg",
+                340,
+                isbn,
+                true,
+                null
+        );
+    }
+
+    private BookUsageAnalysisResponse sampleUsageAnalysis() {
+        return new BookUsageAnalysisResponse(104490, "40대", List.of("최은영"));
+    }
+
+    @Test
+    @DisplayName("도서 상세 조회 응답에 도서관정보나루 이용 분석 정보가 함께 담긴다.")
+    void getBookDetail_IncludesUsageAnalysis() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+
+        given(bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK)).willReturn(true);
+        given(aladinService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
+        given(libraryNaruService.getUsageAnalysis(isbn)).willReturn(sampleUsageAnalysis());
+
+        BookDetailResponse response = bookService.getBookDetail(isbn, userPK);
+
+        BookUsageAnalysisResponse usageAnalysis = response.usageAnalysis();
+        assertThat(usageAnalysis).isNotNull();
+        assertThat(usageAnalysis.totalLoanCount()).isEqualTo(104490);
+        assertThat(usageAnalysis.mostLoanedAgeGroup()).isEqualTo("40대");
+        assertThat(usageAnalysis.keywords()).containsExactly("최은영");
+    }
+
+    @Test
+    @DisplayName("도서관정보나루 조회에 실패해도 도서 상세 조회는 성공하고 usageAnalysis만 null이 된다.")
+    void getBookDetail_SucceedsWhenUsageAnalysisUnavailable() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+
+        given(bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK)).willReturn(true);
+        given(aladinService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
+        // 외부 API 호출 실패, 타임아웃, 데이터 없음은 모두 null로 넘어온다.
+        given(libraryNaruService.getUsageAnalysis(isbn)).willReturn(null);
+
+        BookDetailResponse response = bookService.getBookDetail(isbn, userPK);
+
+        assertThat(response.usageAnalysis()).isNull();
+        // 기존 도서 상세 필드는 그대로 유지되어야 한다.
+        assertThat(response.title()).isEqualTo("밝은 밤");
+        assertThat(response.author()).isEqualTo("최은영");
+        assertThat(response.isbn()).isEqualTo(isbn);
+        assertThat(response.itemPage()).isEqualTo(340);
+        assertThat(response.isInterested()).isTrue();
     }
 }

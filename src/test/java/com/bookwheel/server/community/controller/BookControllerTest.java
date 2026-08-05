@@ -1,8 +1,10 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchResponse;
+import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewLikeResponse;
@@ -26,10 +28,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -73,6 +77,60 @@ class BookControllerTest {
                 true,
                 LocalDateTime.of(2024, 1, 1, 10, 0)
         );
+    }
+
+    private BookDetailResponse sampleBookDetail(String isbn, BookUsageAnalysisResponse usageAnalysis) {
+        return new BookDetailResponse(
+                "밝은 밤",
+                "최은영",
+                "문학동네",
+                "책 소개",
+                "https://image.aladin.co.kr/cover.jpg",
+                340,
+                isbn,
+                true,
+                usageAnalysis
+        );
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("도서 상세 조회 응답에 이용 분석 정보가 포함된다.")
+    void getBookDetail_WithUsageAnalysis() throws Exception {
+        String isbn = "9788954681179";
+        BookUsageAnalysisResponse usageAnalysis =
+                new BookUsageAnalysisResponse(10879, "40대", List.of("역사", "소설", "광주민주화운동"));
+        given(bookService.getBookDetail(eq(isbn), any())).willReturn(sampleBookDetail(isbn, usageAnalysis));
+
+        mockMvc.perform(get("/api/v1/books/{isbn}", isbn))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.usageAnalysis.totalLoanCount").value(10879))
+                .andExpect(jsonPath("$.data.usageAnalysis.mostLoanedAgeGroup").value("40대"))
+                .andExpect(jsonPath("$.data.usageAnalysis.keywords.length()").value(3))
+                .andExpect(jsonPath("$.data.usageAnalysis.keywords[0]").value("역사"))
+                .andExpect(jsonPath("$.data.usageAnalysis.keywords[2]").value("광주민주화운동"))
+                // 목차 영역은 이용 분석으로 대체되었으므로 toc 필드는 더 이상 내려가지 않는다.
+                .andExpect(jsonPath("$.data.toc").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("이용 분석 정보가 없어도 도서 상세 조회는 성공하고 usageAnalysis는 null로 내려간다.")
+    void getBookDetail_WithoutUsageAnalysis() throws Exception {
+        String isbn = "9788954681179";
+        given(bookService.getBookDetail(eq(isbn), any())).willReturn(sampleBookDetail(isbn, null));
+
+        mockMvc.perform(get("/api/v1/books/{isbn}", isbn))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                // 기존 도서 상세 필드는 그대로 유지된다.
+                .andExpect(jsonPath("$.data.title").value("밝은 밤"))
+                .andExpect(jsonPath("$.data.isbn").value(isbn))
+                // 필드가 생략되지 않고 null로 내려가야 프론트에서 데이터 없음을 구분할 수 있다.
+                .andExpect(content().string(containsString("\"usageAnalysis\":null")));
     }
 
     @Test
