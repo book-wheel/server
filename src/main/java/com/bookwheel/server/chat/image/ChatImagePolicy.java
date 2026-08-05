@@ -21,7 +21,9 @@ public final class ChatImagePolicy {
             "jpg", "image/jpeg",
             "jpeg", "image/jpeg",
             "png", "image/png",
-            "webp", "image/webp"
+            "webp", "image/webp",
+            "heic", "image/heic",
+            "heif", "image/heif"
     );
 
     private ChatImagePolicy() {
@@ -135,11 +137,25 @@ public final class ChatImagePolicy {
             case "png" -> hasBytes(signature, 0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
             case "webp" -> hasBytes(signature, 0, 'R', 'I', 'F', 'F')
                     && hasBytes(signature, 8, 'W', 'E', 'B', 'P');
+            case "heic" -> hasFileTypeBrand(signature, "heic", "heix", "hevc", "hevx");
+            case "heif" -> hasFileTypeBrand(signature, "mif1", "msf1");
             default -> false;
         };
         if (!validSignature) {
             throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
         }
+    }
+
+    private static boolean hasFileTypeBrand(byte[] signature, String... brands) {
+        if (!hasBytes(signature, 4, 'f', 't', 'y', 'p')) {
+            return false;
+        }
+        for (String brand : brands) {
+            if (hasBytes(signature, 8, brand.charAt(0), brand.charAt(1), brand.charAt(2), brand.charAt(3))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasBytes(byte[] actual, int offset, int... expected) {

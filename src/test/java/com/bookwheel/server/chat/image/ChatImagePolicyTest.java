@@ -18,13 +18,21 @@ class ChatImagePolicyTest {
     private static final byte[] PNG_SIGNATURE = {
             (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0
     };
+    private static final byte[] HEIC_SIGNATURE = {
+            0, 0, 0, 24, 'f', 't', 'y', 'p', 'h', 'e', 'i', 'c'
+    };
+    private static final byte[] HEIF_SIGNATURE = {
+            0, 0, 0, 24, 'f', 't', 'y', 'p', 'm', 'i', 'f', '1'
+    };
 
     @ParameterizedTest
     @CsvSource({
             "photo.jpg,image/jpeg,jpg",
             "photo.JPEG,image/jpeg,jpeg",
             "photo.png,image/png,png",
-            "photo.webp,image/webp,webp"
+            "photo.webp,image/webp,webp",
+            "photo.HEIC,image/heic,heic",
+            "photo.heif,image/heif,heif"
     })
     @DisplayName("지원 확장자와 MIME 타입 조합을 허용한다")
     void validateUploadRequest_AcceptsSupportedCombination(
@@ -165,6 +173,34 @@ class ChatImagePolicyTest {
                         imageKey,
                         new S3ObjectMetadata(100L, "image/png", ETAG),
                         PNG_SIGNATURE
+                )
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("실제 업로드된 HEIC 객체의 MIME 타입과 시그니처가 일치하면 허용한다")
+    void validateUploadedObject_AcceptsValidHeicImage() {
+        String imageKey = "chat-temp/chat-room-1/user-pk/550e8400-e29b-41d4-a716-446655440000.heic";
+
+        org.assertj.core.api.Assertions.assertThatCode(() ->
+                ChatImagePolicy.validateUploadedObject(
+                        imageKey,
+                        new S3ObjectMetadata(100L, "image/heic", ETAG),
+                        HEIC_SIGNATURE
+                )
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("실제 업로드된 HEIF 객체의 MIME 타입과 시그니처가 일치하면 허용한다")
+    void validateUploadedObject_AcceptsValidHeifImage() {
+        String imageKey = "chat-temp/chat-room-1/user-pk/550e8400-e29b-41d4-a716-446655440000.heif";
+
+        org.assertj.core.api.Assertions.assertThatCode(() ->
+                ChatImagePolicy.validateUploadedObject(
+                        imageKey,
+                        new S3ObjectMetadata(100L, "image/heif", ETAG),
+                        HEIF_SIGNATURE
                 )
         ).doesNotThrowAnyException();
     }
