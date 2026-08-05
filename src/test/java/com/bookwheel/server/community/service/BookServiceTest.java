@@ -14,6 +14,7 @@ import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
+import com.bookwheel.server.community.dto.BookSearchRankingResult;
 import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
@@ -90,7 +91,7 @@ class BookServiceTest {
 
         given(kaKaoService.searchBooks(request)).willReturn(kakaoResponse);
         given(bookSearchRankingService.rankByPopularity(anyList()))
-            .willAnswer(invocation -> invocation.getArgument(0));
+            .willAnswer(invocation -> BookSearchRankingResult.kakao(invocation.getArgument(0)));
         given(bookLikeRepository.findInterestedIsbns(
                 userPK,
                 List.of("9780132350884", "9780134757599")
@@ -103,6 +104,7 @@ class BookServiceTest {
         assertThat(response.books().get(0).isInterested()).isTrue();
         assertThat(response.books().get(1).isbn()).isEqualTo("9780134757599");
         assertThat(response.books().get(1).isInterested()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.bookwheel.server.community.service;
 
+import com.bookwheel.server.community.dto.BookSearchRankingResult;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.entity.PopularLoanBook;
 import com.bookwheel.server.community.entity.PopularLoanBookSource;
@@ -22,9 +23,9 @@ public class BookSearchRankingService {
 
     private final PopularLoanBookRepository popularLoanBookRepository;
 
-    public List<BookSearchResponse> rankByPopularity(List<BookSearchResponse> books) {
+    public BookSearchRankingResult rankByPopularity(List<BookSearchResponse> books) {
         if (books == null || books.isEmpty()) {
-            return List.of();
+            return BookSearchRankingResult.kakao(List.of());
         }
 
         List<String> isbns = books.stream()
@@ -35,15 +36,15 @@ public class BookSearchRankingService {
             .toList();
 
         if (isbns.isEmpty()) {
-            return books;
+            return BookSearchRankingResult.kakao(books);
         }
 
         return popularLoanBookRepository.findFirstBySourceOrderByEndDateDescStartDateDescCollectedAtDesc(SOURCE)
             .map(snapshot -> rankBySnapshot(books, isbns, snapshot))
-            .orElse(books);
+            .orElseGet(() -> BookSearchRankingResult.kakao(books));
     }
 
-    private List<BookSearchResponse> rankBySnapshot(
+    private BookSearchRankingResult rankBySnapshot(
         List<BookSearchResponse> books,
         List<String> isbns,
         PopularLoanBook snapshot
@@ -56,17 +57,18 @@ public class BookSearchRankingService {
                 isbns
             )
             .stream()
+            .filter(popularLoanBook -> StringUtils.hasText(popularLoanBook.getIsbn()))
             .collect(java.util.stream.Collectors.toMap(
-                PopularLoanBook::getIsbn,
+                popularLoanBook -> popularLoanBook.getIsbn().trim(),
                 Function.identity(),
                 this::chooseHigherPopularity
             ));
 
         if (popularityByIsbn.isEmpty()) {
-            return books;
+            return BookSearchRankingResult.kakao(books);
         }
 
-        return IntStream.range(0, books.size())
+        List<BookSearchResponse> rankedBooks = IntStream.range(0, books.size())
             .mapToObj(index -> {
                 BookSearchResponse book = books.get(index);
                 String isbn = normalizeIsbn(book.isbn());
@@ -75,6 +77,12 @@ public class BookSearchRankingService {
             .sorted(rankedBookComparator())
             .map(RankedBook::book)
             .toList();
+
+        return BookSearchRankingResult.data4Library(
+            rankedBooks,
+            snapshot.getStartDate(),
+            snapshot.getEndDate()
+        );
     }
 
     private Comparator<RankedBook> rankedBookComparator() {

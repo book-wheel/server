@@ -157,7 +157,9 @@ class BookControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].isbn").value("9780132350884"))
-                .andExpect(jsonPath("$.data.books[0].isInterested").value(true));
+                .andExpect(jsonPath("$.data.books[0].isInterested").value(true))
+                .andExpect(jsonPath("$.data.ranking.source").value("KAKAO"))
+                .andExpect(jsonPath("$.data.ranking.sourceName").value("카카오 도서 검색 API"));
     }
 
     @Test

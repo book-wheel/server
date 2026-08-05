@@ -5,6 +5,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
 import com.bookwheel.server.community.dto.BookSearchResponse;
+import com.bookwheel.server.community.dto.BookSearchRankingResult;
 import com.bookwheel.server.community.entity.PopularLoanBook;
 import com.bookwheel.server.community.entity.PopularLoanBookSource;
 import com.bookwheel.server.community.repository.PopularLoanBookRepository;
@@ -59,10 +60,14 @@ class BookSearchRankingServiceTest {
             popularity("9780000000003", 1, 1000)
         ));
 
-        List<BookSearchResponse> result = rankingService.rankByPopularity(books);
+        BookSearchRankingResult result = rankingService.rankByPopularity(books);
 
-        assertThat(result).extracting(BookSearchResponse::isbn)
+        assertThat(result.books()).extracting(BookSearchResponse::isbn)
             .containsExactly("9780000000003", "9780000000002", "9780000000001", "9780000000004");
+        assertThat(result.ranking().source()).isEqualTo("DATA4LIBRARY");
+        assertThat(result.ranking().sourceName()).isEqualTo("도서관 정보나루 인기대출도서");
+        assertThat(result.ranking().startDate()).isEqualTo(START_DATE);
+        assertThat(result.ranking().endDate()).isEqualTo(END_DATE);
     }
 
     @Test
@@ -87,10 +92,11 @@ class BookSearchRankingServiceTest {
             popularity("9780000000003", 1, 700)
         ));
 
-        List<BookSearchResponse> result = rankingService.rankByPopularity(books);
+        BookSearchRankingResult result = rankingService.rankByPopularity(books);
 
-        assertThat(result).extracting(BookSearchResponse::isbn)
+        assertThat(result.books()).extracting(BookSearchResponse::isbn)
             .containsExactly("9780000000002", "9780000000001", "9780000000003");
+        assertThat(result.ranking().source()).isEqualTo("DATA4LIBRARY");
     }
 
     @Test
@@ -103,9 +109,13 @@ class BookSearchRankingServiceTest {
         given(popularLoanBookRepository.findFirstBySourceOrderByEndDateDescStartDateDescCollectedAtDesc(SOURCE))
             .willReturn(Optional.empty());
 
-        List<BookSearchResponse> result = rankingService.rankByPopularity(books);
+        BookSearchRankingResult result = rankingService.rankByPopularity(books);
 
-        assertThat(result).containsExactlyElementsOf(books);
+        assertThat(result.books()).containsExactlyElementsOf(books);
+        assertThat(result.ranking().source()).isEqualTo("KAKAO");
+        assertThat(result.ranking().sourceName()).isEqualTo("카카오 도서 검색 API");
+        assertThat(result.ranking().startDate()).isNull();
+        assertThat(result.ranking().endDate()).isNull();
         then(popularLoanBookRepository).should()
             .findFirstBySourceOrderByEndDateDescStartDateDescCollectedAtDesc(SOURCE);
         then(popularLoanBookRepository).shouldHaveNoMoreInteractions();
@@ -128,9 +138,10 @@ class BookSearchRankingServiceTest {
             List.of("9780000000001", "9780000000002")
         )).willReturn(List.of());
 
-        List<BookSearchResponse> result = rankingService.rankByPopularity(books);
+        BookSearchRankingResult result = rankingService.rankByPopularity(books);
 
-        assertThat(result).containsExactlyElementsOf(books);
+        assertThat(result.books()).containsExactlyElementsOf(books);
+        assertThat(result.ranking().source()).isEqualTo("KAKAO");
     }
 
     private BookSearchResponse book(String title, String isbn) {

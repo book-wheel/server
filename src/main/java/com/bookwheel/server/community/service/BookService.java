@@ -292,11 +292,13 @@ public class BookService {
         List<BookSearchResponse> books = response.books().stream()
             .map(book -> book.withIsInterested(interestedIsbns.contains(book.isbn())))
             .toList();
+        BookSearchRankingResult rankingResult = bookSearchRankingService.rankByPopularity(books);
 
         return new BookSearchListResponse(
-            bookSearchRankingService.rankByPopularity(books),
+            rankingResult.books(),
             response.totalCount(),
-            response.isEnd()
+            response.isEnd(),
+            rankingResult.ranking()
         );
     }
 

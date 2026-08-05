@@ -45,7 +45,11 @@ public class BookController {
 
     private final BookService bookService;
 
-    @Operation(summary = "도서 검색(목록 조회)", description = "카카오 API를 사용해 도서 목록을 검색합니다.")
+    @Operation(summary = "도서 검색(목록 조회)",
+        description = "카카오 API를 사용해 후보 도서 목록을 검색한 뒤, "
+            + "도서관 정보나루 인기대출도서 데이터와 ISBN이 매칭되는 도서는 정보나루 순위와 대출횟수를 기준으로 재정렬합니다. "
+            + "정보나루 데이터가 없는 도서는 카카오 검색 결과의 기존 순서를 유지하며, "
+            + "응답의 ranking 필드에 실제 정렬 출처와 정보나루 집계 기간을 제공합니다.")
     @GetMapping("/search")
     public ApiResponse<BookSearchListResponse> searchBooks(
         @ModelAttribute BookSearchRequest request,
