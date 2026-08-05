@@ -45,16 +45,17 @@ public class PostDeletionService {
         registerPostCommitImageCleanup(imageObjectKeys);
     }
 
+    // 트랜잭션이 실제 커밋된 뒤 수집된 S3 객체만 best-effort로 삭제한다.
     private void registerPostCommitImageCleanup(List<String> objectKeys) {
         if (objectKeys.isEmpty()) {
             return;
         }
 
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            objectKeys.forEach(s3Service::deleteObject);
-            return;
+            throw new IllegalStateException("게시물 이미지 정리는 트랜잭션 커밋 이후에만 실행할 수 있습니다.");
         }
 
+        // DB가 롤백되면 이미지도 남겨야 하므로 커밋이 성공한 뒤에만 S3 삭제를 시작한다.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

@@ -14,9 +14,11 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
@@ -44,14 +46,23 @@ class PostDeletionServiceTest {
         given(post.getImages()).willReturn(List.of(image));
         given(image.getObjectKey()).willReturn("posts/10/image.jpg");
 
-        postDeletionService.delete(post);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            postDeletionService.delete(post);
 
-        InOrder inOrder = inOrder(notificationService, postCommentRepository, postLikeRepository, postRepository);
-        inOrder.verify(notificationService).deleteByPostId(10L);
-        inOrder.verify(postCommentRepository).deleteAllByPost(post);
-        inOrder.verify(postLikeRepository).deleteAllByPost(post);
-        inOrder.verify(postRepository).delete(post);
-        then(s3Service).should().deleteObject("posts/10/image.jpg");
+            InOrder inOrder = inOrder(notificationService, postCommentRepository, postLikeRepository, postRepository);
+            inOrder.verify(notificationService).deleteByPostId(10L);
+            inOrder.verify(postCommentRepository).deleteAllByPost(post);
+            inOrder.verify(postLikeRepository).deleteAllByPost(post);
+            inOrder.verify(postRepository).delete(post);
+
+            // 커밋이 끝나기 전에는 S3 객체를 건드리지 않는다.
+            then(s3Service).shouldHaveNoInteractions();
+            TransactionSynchronizationManager.getSynchronizations().forEach(synchronization -> synchronization.afterCommit());
+            then(s3Service).should().deleteObject("posts/10/image.jpg");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test
@@ -67,9 +78,31 @@ class PostDeletionServiceTest {
         given(duplicateImage.getObjectKey()).willReturn("posts/10/image.jpg");
         given(blankImage.getObjectKey()).willReturn(" ");
 
-        postDeletionService.delete(post);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            postDeletionService.delete(post);
 
-        then(s3Service).should().deleteObject("posts/10/image.jpg");
-        then(s3Service).shouldHaveNoMoreInteractions();
+            TransactionSynchronizationManager.getSynchronizations().forEach(synchronization -> synchronization.afterCommit());
+            then(s3Service).should().deleteObject("posts/10/image.jpg");
+            then(s3Service).shouldHaveNoMoreInteractions();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("게시물 삭제는 트랜잭션 동기화가 없으면 이미지를 지우지 않고 실패한다")
+    void delete_FailsWhenTransactionSynchronizationIsNotActive() {
+        Post post = mock(Post.class);
+        PostImage image = mock(PostImage.class);
+
+        given(post.getImages()).willReturn(List.of(image));
+        given(image.getObjectKey()).willReturn("posts/10/image.jpg");
+
+        // 커밋 여부를 알 수 없는 상태에서 S3를 지우면 롤백된 게시물의 이미지까지 잃는다.
+        assertThatThrownBy(() -> postDeletionService.delete(post))
+                .isInstanceOf(IllegalStateException.class);
+
+        then(s3Service).shouldHaveNoInteractions();
     }
 }

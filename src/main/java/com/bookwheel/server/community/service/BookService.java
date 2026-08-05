@@ -21,6 +21,7 @@ import com.bookwheel.server.community.repository.BookReviewRepository;
 import com.bookwheel.server.community.repository.BookVoteRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
+import com.bookwheel.server.notification.service.NotificationService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,7 @@ public class BookService {
     private final BookReviewRepository bookReviewRepository;
     private final BookVoteRepository bookVoteRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
     private final BookLikeRepository bookLikeRepository;
     private final PostRepository postRepository;
@@ -141,7 +143,9 @@ public class BookService {
             throw new BusinessException(ErrorCode.REVIEW_DELETE_FORBIDDEN);
         }
 
-        reviewLikeRepository.deleteByReview(review);
+        // 리뷰를 가리키는 알림은 리뷰가 사라지면 열 수 없는 링크가 되므로 함께 정리한다.
+        notificationService.deleteByReviewId(reviewId);
+        reviewLikeRepository.deleteAllByReview(review);
         bookReviewRepository.delete(review);
     }
 

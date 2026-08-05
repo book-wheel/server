@@ -4,6 +4,7 @@ import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.ReviewLike;
 import com.bookwheel.server.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,8 +15,11 @@ public interface ReviewLikeRepository extends JpaRepository<ReviewLike, Long> {
     Optional<ReviewLike> findByReviewAndUser(BookReview review, User user);
     boolean existsByReviewAndUser(BookReview review, User user);
 
+    @Modifying(flushAutomatically = true)
+    @Query("delete from ReviewLike rl where rl.review = :review")
     // 리뷰 삭제 시 해당 리뷰에 달린 공감(하트)을 먼저 제거한다. (review_id FK 제약 위반 방지)
-    void deleteByReview(BookReview review);
+    // 파생 삭제의 건별 DELETE를 피해 한 번의 쿼리로 처리한다.
+    void deleteAllByReview(@Param("review") BookReview review);
 
     // 주어진 리뷰 목록 중 해당 사용자가 공감한 리뷰 ID만 한 번에 조회한다. (리뷰별 exists N+1 방지)
     @Query("select rl.review.reviewId from ReviewLike rl where rl.user = :user and rl.review.reviewId in :reviewIds")

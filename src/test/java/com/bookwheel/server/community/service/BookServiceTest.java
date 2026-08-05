@@ -2,9 +2,13 @@ package com.bookwheel.server.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.bookwheel.server.common.cursor.GalleryCursor;
 import com.bookwheel.server.common.exception.BusinessException;
@@ -24,15 +28,20 @@ import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
 import com.bookwheel.server.community.repository.PostRepository;
+import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.common.service.S3Service;
+import com.bookwheel.server.notification.service.NotificationService;
+import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,6 +54,7 @@ class BookServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private BookReviewRepository bookReviewRepository;
     @Mock private ReviewLikeRepository reviewLikeRepository;
+    @Mock private NotificationService notificationService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private BookLikeRepository bookLikeRepository;
     @Mock private PostRepository postRepository;
@@ -228,5 +238,47 @@ class BookServiceTest {
         assertThat(response.isbn()).isEqualTo(isbn);
         assertThat(response.itemPage()).isEqualTo(340);
         assertThat(response.isInterested()).isTrue();
+    }
+
+    @Test
+    @DisplayName("리뷰 삭제는 작성자 본인이면 알림과 공감을 먼저 정리한 뒤 리뷰를 삭제한다")
+    void deleteReview_RemovesRelatedRowsBeforeReview() {
+        Long reviewId = 5L;
+        String userPK = UUID.randomUUID().toString();
+        BookReview review = mock(BookReview.class);
+        User reviewer = mock(User.class);
+
+        given(bookReviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+        given(review.getReviewer()).willReturn(reviewer);
+        given(reviewer.getId()).willReturn(userPK);
+
+        bookService.deleteReview(reviewId, userPK);
+
+        InOrder inOrder = inOrder(notificationService, reviewLikeRepository, bookReviewRepository);
+        inOrder.verify(notificationService).deleteByReviewId(reviewId);
+        inOrder.verify(reviewLikeRepository).deleteAllByReview(review);
+        inOrder.verify(bookReviewRepository).delete(review);
+    }
+
+    @Test
+    @DisplayName("리뷰 삭제는 작성자 본인이 아니면 예외가 발생하고 아무것도 정리하지 않는다")
+    void deleteReview_ThrowsWhenNotOwner() {
+        Long reviewId = 5L;
+        String userPK = UUID.randomUUID().toString();
+        BookReview review = mock(BookReview.class);
+        User reviewer = mock(User.class);
+
+        given(bookReviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+        given(review.getReviewer()).willReturn(reviewer);
+        given(reviewer.getId()).willReturn(UUID.randomUUID().toString());
+
+        assertThatThrownBy(() -> bookService.deleteReview(reviewId, userPK))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.REVIEW_DELETE_FORBIDDEN));
+
+        then(notificationService).shouldHaveNoInteractions();
+        then(reviewLikeRepository).shouldHaveNoInteractions();
+        then(bookReviewRepository).should(never()).delete(any(BookReview.class));
     }
 }

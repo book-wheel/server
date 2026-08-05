@@ -208,6 +208,12 @@ public class NotificationService {
     }
 
     @Transactional
+    public void deleteByReviewId(Long reviewId) {
+        // 리뷰가 삭제되면 해당 리뷰로 이동하는 알림은 열 수 없는 링크가 되므로 함께 정리한다.
+        notificationRepository.deleteAllByDeepLink(NotificationDeepLink.review(reviewId));
+    }
+
+    @Transactional
     public int backfillGroupIds() {
         // 기존 알림 중 실제로 존재하는 모임을 가리키는 행만 안전하게 새 컬럼에 채운다.
         int updated = 0;
