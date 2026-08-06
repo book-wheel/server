@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -172,6 +173,21 @@ class PostControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user-pk")
+    @DisplayName("Community Gallery: delete own post success")
+    void deletePost_Success() throws Exception {
+        Long postId = 10L;
+
+        mockMvc.perform(delete("/api/v1/posts/{postId}", postId)
+                        .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        then(postService).should().deletePost(postId, "user-pk");
+    }
+
+    @Test
     @WithMockUser
     @DisplayName("Community Gallery: get post comments success")
     void getPostComments_Success() throws Exception {
@@ -240,6 +256,22 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @WithMockUser(username = "user-pk")
+    @DisplayName("Community Gallery: delete own comment success")
+    void deletePostComment_Success() throws Exception {
+        Long postId = 7L;
+        Long commentId = 3L;
+
+        mockMvc.perform(delete("/api/v1/posts/{postId}/comments/{commentId}", postId, commentId)
+                        .with(csrf()))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        then(postService).should().deletePostComment(postId, commentId, "user-pk");
     }
 
 }

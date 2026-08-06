@@ -5,6 +5,7 @@ import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.notification.enums.NotificationType;
 import com.bookwheel.server.notification.event.NotificationEvent;
+import com.bookwheel.server.notification.support.NotificationDeepLink;
 import com.bookwheel.server.notification.support.NotificationText;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -29,7 +30,7 @@ public class CommunityNotificationListener {
                 .type(NotificationType.POST_LIKED)
                 .title("게시물 좋아요")
                 .body(nick + "님이 회원님의 게시물에 좋아요를 눌렀어요.")
-                .deepLink("/posts/" + event.postId())
+                .deepLink(NotificationDeepLink.post(event.postId()))
                 .payload(Map.of("postId", event.postId(), "likerUserPK", event.likerUserPK()))
                 .build());
     }
@@ -50,7 +51,7 @@ public class CommunityNotificationListener {
                 .title("게시물 댓글")
                 .body(nick + "님이 댓글을 남겼어요"
                         + (preview != null && !preview.isEmpty() ? ": " + preview : "."))
-                .deepLink("/posts/" + event.postId())
+                .deepLink(NotificationDeepLink.post(event.postId()))
                 .payload(payload)
                 .build());
     }
@@ -63,7 +64,7 @@ public class CommunityNotificationListener {
                 .type(NotificationType.REVIEW_LIKED)
                 .title("리뷰 공감")
                 .body(nick + "님이 회원님의 리뷰에 공감했어요.")
-                .deepLink("/reviews/" + event.reviewId())
+                .deepLink(NotificationDeepLink.review(event.reviewId()))
                 .payload(Map.of("reviewId", event.reviewId(), "likerUserPK", event.likerUserPK()))
                 .build());
     }
