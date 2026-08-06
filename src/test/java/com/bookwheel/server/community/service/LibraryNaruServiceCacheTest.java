@@ -62,7 +62,7 @@ class LibraryNaruServiceCacheTest {
         return new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
             .withUserConfiguration(CachingTestConfig.class)
-            .withBean(LibraryNaruService.class, () -> new LibraryNaruService(restClient))
+            .withBean(LibraryNaruService.class, () -> new LibraryNaruService(restClient, restClient))
             .withPropertyValues("naru.api.key=test-key", "naru.api.url=" + API_URL);
     }
 

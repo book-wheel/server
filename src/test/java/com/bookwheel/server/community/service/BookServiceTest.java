@@ -2,9 +2,14 @@ package com.bookwheel.server.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.bookwheel.server.common.cursor.GalleryCursor;
 import com.bookwheel.server.common.exception.BusinessException;
@@ -13,6 +18,7 @@ import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
+import com.bookwheel.server.community.dto.BookSearchRankingResult;
 import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
@@ -27,9 +33,12 @@ import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.user.repository.UserRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +59,7 @@ class BookServiceTest {
     @Mock private PostRepository postRepository;
     @Mock private CursorUtils cursorUtils;
     @Mock private KaKaoService kaKaoService;
+    @Mock private BookSearchRankingService bookSearchRankingService;
     @Mock private AladinService aladinService;
     @Mock private LibraryNaruService libraryNaruService;
     @Mock private S3Service s3Service;
@@ -62,6 +72,7 @@ class BookServiceTest {
     void searchBooks_MarksInterestedBooks() {
         String userPK = UUID.randomUUID().toString();
         BookSearchRequest request = new BookSearchRequest("clean code", null, null, null);
+        BookSearchRequest expandedRequest = new BookSearchRequest("clean code", "accuracy", 1, 50);
         BookSearchResponse interestedBook = new BookSearchResponse(
                 "Clean Code",
                 "Robert C. Martin",
@@ -86,7 +97,9 @@ class BookServiceTest {
                 true
         );
 
-        given(kaKaoService.searchBooks(request)).willReturn(kakaoResponse);
+        given(kaKaoService.searchBooks(expandedRequest)).willReturn(kakaoResponse);
+        given(bookSearchRankingService.rankByPopularity(anyList(), eq("clean code")))
+            .willAnswer(invocation -> BookSearchRankingResult.kakao(invocation.getArgument(0)));
         given(bookLikeRepository.findInterestedIsbns(
                 userPK,
                 List.of("9780132350884", "9780134757599")
@@ -99,6 +112,217 @@ class BookServiceTest {
         assertThat(response.books().get(0).isInterested()).isTrue();
         assertThat(response.books().get(1).isbn()).isEqualTo("9780134757599");
         assertThat(response.books().get(1).isInterested()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
+    }
+
+    @Test
+    @DisplayName("Search expands Kakao candidates before ranking and returns only requested size")
+    void searchBooks_ExpandsKakaoCandidatesBeforeRanking() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", null, null, null);
+        BookSearchRequest expandedRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        List<BookSearchResponse> kakaoCandidates = IntStream.rangeClosed(1, 50)
+            .mapToObj(index -> searchBook("Kakao book " + index, "9780000000" + String.format("%03d", index)))
+            .toList();
+        BookSearchResponse popularBook = kakaoCandidates.get(24);
+        List<BookSearchResponse> rankedBooks = Stream.concat(
+                Stream.of(popularBook),
+                kakaoCandidates.stream().filter(book -> !book.equals(popularBook))
+            )
+            .toList();
+
+        given(kaKaoService.searchBooks(expandedRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 305, false));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates, "vegetarian"))
+            .willReturn(BookSearchRankingResult.data4Library(
+                rankedBooks,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(rankedBooks.subList(0, 10));
+        assertThat(response.books().get(0)).isEqualTo(popularBook);
+        assertThat(response.totalCount()).isEqualTo(305);
+        assertThat(response.isEnd()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("DATA4LIBRARY");
+    }
+
+    @Test
+    @DisplayName("2페이지도 1페이지와 동일한 재정렬 구간을 이어서 잘라 요청한 크기만큼만 반환한다.")
+    void searchBooks_SlicesSameRankedWindowOnLaterPages() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", null, 2, 10);
+        BookSearchRequest windowRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        List<BookSearchResponse> kakaoCandidates = kakaoBooks(50);
+        // 제목 일치 도서 10건이 병합돼 후보가 60건이 된 상황
+        List<BookSearchResponse> rankedBooks = Stream.concat(
+                naruBooks(10).stream(),
+                kakaoCandidates.stream()
+            )
+            .toList();
+
+        given(kaKaoService.searchBooks(windowRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 305, false));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates, "vegetarian"))
+            .willReturn(BookSearchRankingResult.data4Library(
+                rankedBooks,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).hasSize(10);
+        assertThat(response.books()).containsExactlyElementsOf(rankedBooks.subList(10, 20));
+        assertThat(response.totalCount()).isEqualTo(305);
+        assertThat(response.isEnd()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("DATA4LIBRARY");
+    }
+
+    @Test
+    @DisplayName("제목 일치 도서가 병합돼도 재정렬 구간 크기를 넘겨 반환하지 않는다.")
+    void searchBooks_KeepsRequestedSizeWhenTitleMatchedBooksAreMerged() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", null, 1, 50);
+        BookSearchRequest windowRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        List<BookSearchResponse> kakaoCandidates = kakaoBooks(50);
+        List<BookSearchResponse> rankedBooks = Stream.concat(
+                naruBooks(10).stream(),
+                kakaoCandidates.stream()
+            )
+            .toList();
+
+        given(kaKaoService.searchBooks(windowRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 305, false));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates, "vegetarian"))
+            .willReturn(BookSearchRankingResult.data4Library(
+                rankedBooks,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).hasSize(50);
+        assertThat(response.books()).containsExactlyElementsOf(rankedBooks.subList(0, 50));
+    }
+
+    @Test
+    @DisplayName("카카오 결과가 적고 제목 일치 도서가 병합된 경우에도 isEnd를 병합 결과 기준으로 계산한다.")
+    void searchBooks_CalculatesIsEndFromMergedResults() {
+        BookSearchRequest windowRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        List<BookSearchResponse> kakaoCandidates = kakaoBooks(2);
+        // 카카오는 2건에서 끝났지만 제목 일치 도서 50건이 병합된 상황
+        List<BookSearchResponse> rankedBooks = Stream.concat(
+                naruBooks(50).stream(),
+                kakaoCandidates.stream()
+            )
+            .toList();
+
+        given(kaKaoService.searchBooks(windowRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 2, true));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates, "vegetarian"))
+            .willReturn(BookSearchRankingResult.data4Library(
+                rankedBooks,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse firstPage = bookService.searchBooks(
+            new BookSearchRequest("vegetarian", null, 1, 10), null);
+
+        // 카카오 totalCount(2)가 아니라 병합된 전체 결과를 기준으로 남은 페이지가 있음을 알린다.
+        assertThat(firstPage.books()).hasSize(10);
+        assertThat(firstPage.totalCount()).isEqualTo(50);
+        assertThat(firstPage.isEnd()).isFalse();
+
+        BookSearchListResponse lastPage = bookService.searchBooks(
+            new BookSearchRequest("vegetarian", null, 5, 10), null);
+
+        assertThat(lastPage.books()).containsExactlyElementsOf(rankedBooks.subList(40, 50));
+        assertThat(lastPage.isEnd()).isTrue();
+    }
+
+    @Test
+    @DisplayName("재정렬 구간을 벗어난 페이지는 카카오 검색 순서를 그대로 반환한다.")
+    void searchBooks_UsesKakaoOrderBeyondRankedWindow() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", null, 6, 10);
+        BookSearchRequest kakaoRequest = new BookSearchRequest("vegetarian", "accuracy", 6, 10);
+        List<BookSearchResponse> kakaoPage = kakaoBooks(10);
+
+        given(kaKaoService.searchBooks(kakaoRequest))
+            .willReturn(new BookSearchListResponse(kakaoPage, 305, false));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(kakaoPage);
+        assertThat(response.totalCount()).isEqualTo(305);
+        assertThat(response.isEnd()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
+        verify(bookSearchRankingService, never()).rankByPopularity(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("최신순 요청은 인기순 재정렬 없이 카카오 검색 순서를 그대로 반환한다.")
+    void searchBooks_KeepsKakaoOrderWhenSortIsLatest() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", "latest", 1, 10);
+        List<BookSearchResponse> kakaoPage = kakaoBooks(10);
+
+        // 후보를 확장하지 않고 요청한 페이지/크기를 그대로 카카오에 전달한다.
+        given(kaKaoService.searchBooks(request))
+            .willReturn(new BookSearchListResponse(kakaoPage, 305, false));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(kakaoPage);
+        assertThat(response.totalCount()).isEqualTo(305);
+        assertThat(response.isEnd()).isFalse();
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
+        verify(bookSearchRankingService, never()).rankByPopularity(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("최신순 요청은 페이지가 바뀌어도 정렬 기준이 유지된다.")
+    void searchBooks_KeepsKakaoOrderOnLaterPagesWhenSortIsLatest() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", "latest", 2, 10);
+        List<BookSearchResponse> kakaoPage = kakaoBooks(10);
+
+        given(kaKaoService.searchBooks(request))
+            .willReturn(new BookSearchListResponse(kakaoPage, 305, false));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).containsExactlyElementsOf(kakaoPage);
+        assertThat(response.ranking().source()).isEqualTo("KAKAO");
+        verify(bookSearchRankingService, never()).rankByPopularity(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("재정렬 구간에 걸친 페이지는 남는 건수를 카카오 다음 구간에서 이어 붙인다.")
+    void searchBooks_AppendsKakaoResultsWhenPageStraddlesRankedWindow() {
+        BookSearchRequest request = new BookSearchRequest("vegetarian", null, 2, 30);
+        BookSearchRequest windowRequest = new BookSearchRequest("vegetarian", "accuracy", 1, 50);
+        BookSearchRequest nextWindowRequest = new BookSearchRequest("vegetarian", "accuracy", 2, 50);
+        List<BookSearchResponse> kakaoCandidates = kakaoBooks(50);
+        List<BookSearchResponse> nextKakaoWindow = naruBooks(50);
+
+        given(kaKaoService.searchBooks(windowRequest))
+            .willReturn(new BookSearchListResponse(kakaoCandidates, 305, false));
+        given(kaKaoService.searchBooks(nextWindowRequest))
+            .willReturn(new BookSearchListResponse(nextKakaoWindow, 305, false));
+        given(bookSearchRankingService.rankByPopularity(kakaoCandidates, "vegetarian"))
+            .willReturn(BookSearchRankingResult.data4Library(
+                kakaoCandidates,
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31)
+            ));
+
+        BookSearchListResponse response = bookService.searchBooks(request, null);
+
+        assertThat(response.books()).hasSize(30);
+        assertThat(response.books().subList(0, 20))
+            .containsExactlyElementsOf(kakaoCandidates.subList(30, 50));
+        assertThat(response.books().subList(20, 30))
+            .containsExactlyElementsOf(nextKakaoWindow.subList(0, 10));
     }
 
     @Test
@@ -182,6 +406,30 @@ class BookServiceTest {
                 isbn,
                 true,
                 null
+        );
+    }
+
+    private List<BookSearchResponse> kakaoBooks(int count) {
+        return IntStream.rangeClosed(1, count)
+            .mapToObj(index -> searchBook("Kakao book " + index, "9780000000" + String.format("%03d", index)))
+            .toList();
+    }
+
+    private List<BookSearchResponse> naruBooks(int count) {
+        return IntStream.rangeClosed(1, count)
+            .mapToObj(index -> searchBook("Naru book " + index, "9791111111" + String.format("%03d", index)))
+            .toList();
+    }
+
+    private BookSearchResponse searchBook(String title, String isbn) {
+        return new BookSearchResponse(
+            title,
+            "author",
+            "publisher",
+            "2026-01-01",
+            "https://example.com/book.jpg",
+            isbn,
+            false
         );
     }
 
