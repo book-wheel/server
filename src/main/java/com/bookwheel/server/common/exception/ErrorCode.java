@@ -105,6 +105,7 @@ public enum ErrorCode {
     ALADIN_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "BOOK_005", "외부 도서 정보 연동 중 오류가 발생했습니다."),
     ALREADY_LIKED(HttpStatus.BAD_REQUEST, "BOOK_006", "이미 관심 도서로 찜한 상태입니다."),
     NOT_LIKED(HttpStatus.BAD_REQUEST, "BOOK_007", "관심 도서로 찜하지 않은 상태입니다."),
+    DATA4LIBRARY_API_ERROR(HttpStatus.BAD_GATEWAY, "BOOK_008", "도서관정보나루 API 연동 중 오류가 발생했습니다."),
 
     // 관리자 관련 에러
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_001", "해당 신고 내역을 찾을 수 없습니다."),
