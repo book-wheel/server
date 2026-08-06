@@ -29,6 +29,10 @@ public class PostDeletionService {
     @Transactional
     public void delete(Post post) {
         Long postId = post.getPostId();
+        // 비동기 알림 저장과 같은 게시물 행을 잠가 직렬화한다. 알림 정리보다 먼저 잠가야
+        // 정리 이후에 저장이 끼어들지 못하고, 삭제 후 저장은 게시물이 없어 건너뛰게 된다.
+        postRepository.findByPostIdForUpdate(postId);
+
         // 게시물이 사라진 뒤에는 이미지 키를 다시 읽을 수 없으므로 삭제 전에 수집한다.
         List<String> imageObjectKeys = post.getImages().stream()
             .map(PostImage::getObjectKey)

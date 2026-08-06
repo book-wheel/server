@@ -51,6 +51,8 @@ class PostDeletionServiceTest {
             postDeletionService.delete(post);
 
             InOrder inOrder = inOrder(notificationService, postCommentRepository, postLikeRepository, postRepository);
+            // 알림을 정리하기 전에 게시물 행을 잠가야, 정리 이후에 비동기 알림 저장이 끼어들지 못한다.
+            inOrder.verify(postRepository).findByPostIdForUpdate(10L);
             inOrder.verify(notificationService).deleteByPostId(10L);
             inOrder.verify(postCommentRepository).deleteAllByPost(post);
             inOrder.verify(postLikeRepository).deleteAllByPost(post);

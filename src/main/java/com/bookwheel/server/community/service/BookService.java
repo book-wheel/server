@@ -136,7 +136,9 @@ public class BookService {
     // 리뷰(코멘트) 삭제. 작성자 본인만 삭제할 수 있으며, 연결된 공감(하트)을 먼저 제거한 뒤 리뷰를 삭제한다.
     @Transactional
     public void deleteReview(Long reviewId, String userPK) {
-        BookReview review = bookReviewRepository.findById(reviewId)
+        // 비동기 알림 저장과 같은 리뷰 행을 잠가 직렬화한다. 아래 알림 정리보다 먼저 잠가야
+        // 정리 이후에 저장이 끼어들지 못하고, 삭제 후 저장은 리뷰가 없어 건너뛰게 된다.
+        BookReview review = bookReviewRepository.findByReviewIdForUpdate(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         if (!review.getReviewer().getId().equals(userPK)) {

@@ -248,7 +248,7 @@ class BookServiceTest {
         BookReview review = mock(BookReview.class);
         User reviewer = mock(User.class);
 
-        given(bookReviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+        given(bookReviewRepository.findByReviewIdForUpdate(reviewId)).willReturn(Optional.of(review));
         given(review.getReviewer()).willReturn(reviewer);
         given(reviewer.getId()).willReturn(userPK);
 
@@ -268,7 +268,7 @@ class BookServiceTest {
         BookReview review = mock(BookReview.class);
         User reviewer = mock(User.class);
 
-        given(bookReviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+        given(bookReviewRepository.findByReviewIdForUpdate(reviewId)).willReturn(Optional.of(review));
         given(review.getReviewer()).willReturn(reviewer);
         given(reviewer.getId()).willReturn(UUID.randomUUID().toString());
 
