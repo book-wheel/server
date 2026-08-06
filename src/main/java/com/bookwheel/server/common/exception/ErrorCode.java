@@ -105,6 +105,7 @@ public enum ErrorCode {
     ALADIN_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "BOOK_005", "외부 도서 정보 연동 중 오류가 발생했습니다."),
     ALREADY_LIKED(HttpStatus.BAD_REQUEST, "BOOK_006", "이미 관심 도서로 찜한 상태입니다."),
     NOT_LIKED(HttpStatus.BAD_REQUEST, "BOOK_007", "관심 도서로 찜하지 않은 상태입니다."),
+    DATA4LIBRARY_API_ERROR(HttpStatus.BAD_GATEWAY, "BOOK_008", "도서관정보나루 API 연동 중 오류가 발생했습니다."),
 
     // 관리자 관련 에러
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_001", "해당 신고 내역을 찾을 수 없습니다."),
@@ -127,6 +128,9 @@ public enum ErrorCode {
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_001", "해당 게시물을 찾을 수 없습니다."),
     ALREADY_REPORTED(HttpStatus.BAD_REQUEST, "POST_002", "이미 신고한 게시물입니다."),
     CANNOT_REPORT_OWN_POST(HttpStatus.BAD_REQUEST, "POST_003", "자신의 게시물은 신고할 수 없습니다."),
+    POST_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_004", "해당 댓글을 찾을 수 없습니다."),
+    POST_COMMENT_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "POST_005", "본인이 작성한 댓글만 삭제할 수 있습니다."),
+    POST_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "POST_006", "본인이 작성한 게시물만 삭제할 수 있습니다."),
 
     //리뷰 관련 에러
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "해당 리뷰를 찾을 수 없습니다."),

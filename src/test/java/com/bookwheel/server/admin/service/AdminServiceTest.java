@@ -2,12 +2,17 @@ package com.bookwheel.server.admin.service;
 
 import com.bookwheel.server.admin.dto.AdminBanRequest;
 import com.bookwheel.server.admin.dto.AdminBanResponse;
+import com.bookwheel.server.admin.dto.AdminPostDeleteRequest;
 import com.bookwheel.server.admin.dto.BanReason;
 import com.bookwheel.server.admin.dto.PenaltyResponse;
+import com.bookwheel.server.admin.dto.PostDeletionReason;
 import com.bookwheel.server.admin.entity.Penalty;
 import com.bookwheel.server.admin.repository.PenaltyRepository;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.entity.Post;
+import com.bookwheel.server.community.repository.PostRepository;
+import com.bookwheel.server.community.service.PostDeletionService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +44,12 @@ class AdminServiceTest {
 
     @Mock
     private PenaltyRepository penaltyRepository;
+
+    @Mock
+    private PostRepository postRepository;
+
+    @Mock
+    private PostDeletionService postDeletionService;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -130,5 +141,20 @@ class AdminServiceTest {
         // then
         assertEquals(2, responses.size());
         verify(penaltyRepository, times(1)).findByUserOrderByBannedAtDesc(mockUser);
+    }
+
+    @Test
+    @DisplayName("게시물 강제 삭제는 공통 게시물 삭제 서비스를 사용한다")
+    void deletePost_UsesPostDeletionService() {
+        Long postId = 1L;
+        Post post = mock(Post.class);
+        AdminPostDeleteRequest request = new AdminPostDeleteRequest(PostDeletionReason.OTHER);
+
+        when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+        when(post.getPostId()).thenReturn(postId);
+
+        adminService.deletePost(postId, request);
+
+        verify(postDeletionService, times(1)).delete(post);
     }
 }

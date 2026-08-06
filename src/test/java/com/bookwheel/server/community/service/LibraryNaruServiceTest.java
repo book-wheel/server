@@ -1,14 +1,20 @@
 package com.bookwheel.server.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
+import com.bookwheel.server.community.dto.LibraryNaruPopularLoanResponse;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +30,7 @@ import org.springframework.web.client.RestClient;
 class LibraryNaruServiceTest {
 
     private static final String API_URL = "https://data4library.kr/api/usageAnalysisList";
+    private static final String POPULAR_LOAN_API_URL = "https://data4library.kr/api/loanItemSrch";
     private static final String ISBN = "9788954681179";
 
     // 실제 응답과 동일한 구조. 매핑하지 않는 항목(request, loanHistory, gender, ranking 등)도 함께 담아
@@ -54,10 +61,12 @@ class LibraryNaruServiceTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
+        RestClient restClient = builder.build();
 
-        libraryNaruService = new LibraryNaruService(builder.build());
+        libraryNaruService = new LibraryNaruService(restClient, restClient);
         ReflectionTestUtils.setField(libraryNaruService, "naruApiKey", "test-key");
         ReflectionTestUtils.setField(libraryNaruService, "naruApiUrl", API_URL);
+        ReflectionTestUtils.setField(libraryNaruService, "naruPopularLoanApiUrl", POPULAR_LOAN_API_URL);
     }
 
     @Test
@@ -142,5 +151,211 @@ class LibraryNaruServiceTest {
 
         assertThat(libraryNaruService.getUsageAnalysis(ISBN)).isNull();
         server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 응답을 파싱한다")
+    void getPopularLoanBooks_ParsesSuccessResponse() {
+        String body = """
+            {
+              "response": {
+                "resultNum": 2,
+                "numFound": 5000,
+                "docs": [
+                  {
+                    "doc": {
+                      "ranking": 1,
+                      "bookname": "Bright Night",
+                      "authors": "Author A",
+                      "publisher": "Publisher A",
+                      "publication_year": "2021",
+                      "isbn13": "9788954681179",
+                      "bookImageURL": "https://example.com/bright-night.jpg",
+                      "loan_count": "104490"
+                    }
+                  },
+                  {
+                    "doc": {
+                      "ranking": 2,
+                      "bookname": "Clean Code",
+                      "authors": "Robert C. Martin",
+                      "publisher": "Prentice Hall",
+                      "publication_year": "2008",
+                      "isbn13": "9780132350884",
+                      "loan_count": 90000
+                    }
+                  }
+                ]
+              }
+            }
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).ranking()).isEqualTo(1);
+        assertThat(result.get(0).isbn()).isEqualTo("9788954681179");
+        assertThat(result.get(0).loanCount()).isEqualTo(104490);
+        assertThat(result.get(0).bookname()).isEqualTo("Bright Night");
+        assertThat(result.get(0).authors()).isEqualTo("Author A");
+        assertThat(result.get(0).publisher()).isEqualTo("Publisher A");
+        assertThat(result.get(0).publicationYear()).isEqualTo("2021");
+        assertThat(result.get(0).bookImageUrl()).isEqualTo("https://example.com/bright-night.jpg");
+        assertThat(result.get(1).ranking()).isEqualTo(2);
+        assertThat(result.get(1).loanCount()).isEqualTo(90000);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 조회에 기간과 JSON 응답 형식을 전달한다")
+    void getPopularLoanBooks_SendsRequiredQueryParams() {
+        String body = """
+            {"response": {"docs": []}}
+            """;
+        server.expect(requestTo(containsString("startDt=2026-07-01")))
+            .andExpect(requestTo(containsString("endDt=2026-07-31")))
+            .andExpect(requestTo(containsString("pageNo=1")))
+            .andExpect(requestTo(containsString("pageSize=1000")))
+            .andExpect(requestTo(containsString("format=json")))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("응답에 레코드가 있는데 전부 해석하지 못하면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsWhenEveryDocIsUnparsable() {
+        // 응답 스키마가 바뀌어 필수 필드가 매핑되지 않는 상황.
+        // 빈 결과로 돌려주면 적재 건수 0으로 성공 처리돼 장애가 드러나지 않는다.
+        String body = """
+            {
+              "response": {
+                "docs": [
+                  {"doc": {"no": 1, "book_isbn": "9788954681179", "loanCount": 104490}},
+                  {"doc": {"no": 2, "book_isbn": "9780132350884", "loanCount": 90000}}
+                ]
+              }
+            }
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
+        );
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("일부 레코드만 해석하지 못하면 유효한 레코드만 반환한다")
+    void getPopularLoanBooks_ReturnsValidDocsWhenSomeAreUnparsable() {
+        String body = """
+            {
+              "response": {
+                "docs": [
+                  {"doc": {"no": 1, "book_isbn": "9788954681179", "loanCount": 104490}},
+                  {
+                    "doc": {
+                      "ranking": 2,
+                      "bookname": "Clean Code",
+                      "isbn13": "9780132350884",
+                      "loan_count": 90000
+                    }
+                  }
+                ]
+              }
+            }
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        List<LibraryNaruPopularLoanResponse.Doc> result = libraryNaruService.getPopularLoanBooks(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31),
+            1,
+            1000
+        );
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isbn()).isEqualTo("9780132350884");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서가 errCode를 내려주면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsOnErrorCode() {
+        String body = """
+            {"response": {"errCode": "authErr", "error": "invalid auth key"}}
+            """;
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
+        );
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 호출이 실패하면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsOnServerError() {
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL))).andRespond(withServerError());
+
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
+        );
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("정보나루 인기대출도서 연결이 실패하면 DATA4LIBRARY_API_ERROR를 던진다")
+    void getPopularLoanBooks_ThrowsOnConnectionFailure() {
+        server.expect(requestTo(startsWith(POPULAR_LOAN_API_URL)))
+            .andRespond(request -> {
+                throw new IOException("connect timed out");
+            });
+
+        assertData4LibraryApiError(() -> libraryNaruService.getPopularLoanBooks(
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                1,
+                1000
+            )
+        );
+        server.verify();
+    }
+
+    private void assertData4LibraryApiError(Runnable action) {
+        assertThatThrownBy(action::run)
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(ErrorCode.DATA4LIBRARY_API_ERROR);
     }
 }
