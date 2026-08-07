@@ -94,8 +94,9 @@ public class BookController {
         description = "마이페이지에서 현재 로그인한 사용자가 관심 등록한 도서를 조회합니다. "
             + "관심 등록이 최근인 순서로 정렬하며, 등록 시각이 같으면 도서 정보 ID 내림차순으로 정렬합니다. "
             + "각 항목의 isbn은 도서 상세 조회(GET /api/v1/books/{isbn}) 요청에 그대로 사용할 수 있습니다. "
-            + "title은 도서 데이터가 적재되지 않은 경우 게시글 작성 시점에 저장된 제목으로 대체되며, "
-            + "coverImageUrl과 author는 도서 데이터가 없으면 null로 내려갑니다. "
+            + "제목·저자·표지는 관심 도서 등록 시점에 저장해 둔 값을 사용하므로 목록 조회 시 외부 API를 호출하지 않습니다. "
+            + "등록 시점에 외부 API 조회가 실패했거나 이 기능 이전에 등록된 도서는 모임 도서로 등록된 도서 정보로 대체되며, "
+            + "그마저 없으면 title·author·coverImageUrl이 null로 내려갈 수 있습니다. "
             + "관심 도서가 없으면 content는 빈 배열, hasNext는 false, nextCursor는 null로 응답합니다. "
             + "totalElements는 첫 페이지 조회(cursor 미전달) 시에만 내려가고 다음 페이지부터는 null입니다.")
     @ApiResponses({

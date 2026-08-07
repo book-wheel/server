@@ -3,6 +3,7 @@ package com.bookwheel.server.community.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -28,6 +29,7 @@ import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.entity.BookInfo;
+import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.repository.BookInfoRepository;
@@ -412,7 +414,7 @@ class BookServiceTest {
         String userPK = UUID.randomUUID().toString();
         given(userRepository.existsById(userPK)).willReturn(true);
         given(cursorUtils.decode(null, InterestCursor.class)).willReturn(null);
-        given(bookLikeRepository.findInterestBooksFirstPage(eq(userPK), any())).willReturn(List.of());
+        given(bookLikeRepository.findInterestBooks(eq(userPK), eq(null), eq(null), any())).willReturn(List.of());
         given(bookLikeRepository.countByUserPK(userPK)).willReturn(0L);
 
         CursorPageResponse<InterestBookResponseDto> response = bookService.getInterestBooks(null, null, userPK);
@@ -433,7 +435,7 @@ class BookServiceTest {
         given(userRepository.existsById(userPK)).willReturn(true);
         given(cursorUtils.decode(null, InterestCursor.class)).willReturn(null);
         // size + 1 건을 조회해 다음 페이지 존재 여부를 판단한다.
-        given(bookLikeRepository.findInterestBooksFirstPage(eq(userPK), eq(PageRequest.of(0, 2))))
+        given(bookLikeRepository.findInterestBooks(eq(userPK), eq(null), eq(null), eq(PageRequest.of(0, 2))))
             .willReturn(List.of(recent, older));
         given(cursorUtils.encode(any(InterestCursor.class))).willReturn("next-cursor");
 
@@ -453,7 +455,7 @@ class BookServiceTest {
 
         given(userRepository.existsById(userPK)).willReturn(true);
         given(cursorUtils.decode("encoded-cursor", InterestCursor.class)).willReturn(cursor);
-        given(bookLikeRepository.findInterestBooksAfterCursor(
+        given(bookLikeRepository.findInterestBooks(
             eq(userPK), eq(cursor.interestedAt()), eq(cursor.bookId()), any()
         )).willReturn(List.of());
 
@@ -464,7 +466,81 @@ class BookServiceTest {
         assertThat(response.hasNext()).isFalse();
         // 다음 페이지 조회에서는 전체 개수를 다시 세지 않는다.
         assertThat(response.totalElements()).isNull();
-        verify(bookLikeRepository, never()).findInterestBooksFirstPage(any(), any());
+        verify(bookLikeRepository, never()).countByUserPK(any());
+    }
+
+    @Test
+    @DisplayName("관심 도서로 등록하면 목록 조회에 필요한 도서 정보를 함께 저장한다.")
+    void toggleBookLike_StoresBookDetailsOnInterest() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
+
+        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
+        given(aladinService.getBookDetailByIsbn(eq(isbn), anyBoolean())).willReturn(sampleBookDetail(isbn));
+
+        bookService.toggleBookLike(isbn, userPK);
+
+        assertThat(bookInfo.getTitle()).isEqualTo("밝은 밤");
+        assertThat(bookInfo.getAuthor()).isEqualTo("최은영");
+        assertThat(bookInfo.getCoverImage()).isEqualTo("https://image.aladin.co.kr/cover.jpg");
+    }
+
+    @Test
+    @DisplayName("도서 정보를 이미 저장한 도서는 찜할 때 외부 API를 다시 호출하지 않는다.")
+    void toggleBookLike_SkipsLookupWhenBookDetailsAlreadyStored() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder()
+            .isbn(isbn)
+            .title("밝은 밤")
+            .author("최은영")
+            .coverImage("https://image.aladin.co.kr/cover.jpg")
+            .build();
+
+        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
+
+        bookService.toggleBookLike(isbn, userPK);
+
+        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("도서 정보 조회에 실패해도 관심 도서 등록은 성공한다.")
+    void toggleBookLike_SucceedsWhenBookDetailLookupFails() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
+
+        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
+        given(aladinService.getBookDetailByIsbn(eq(isbn), anyBoolean()))
+            .willThrow(new BusinessException(ErrorCode.ALADIN_API_ERROR));
+
+        assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isTrue();
+        assertThat(bookInfo.getCoverImage()).isNull();
+        then(bookLikeRepository).should().save(any());
+    }
+
+    @Test
+    @DisplayName("관심 도서를 취소할 때는 도서 정보를 조회하지 않는다.")
+    void toggleBookLike_SkipsLookupWhenCancelingInterest() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
+
+        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK))
+            .willReturn(Optional.of(BookLike.create(bookInfo, userPK)));
+
+        assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isFalse();
+        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
     }
 
     private InterestBookResponseDto interestBook(Long bookInfoId, String isbn, LocalDateTime interestedAt) {

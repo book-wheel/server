@@ -34,8 +34,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -178,7 +180,10 @@ class BookControllerTest {
         given(bookService.getInterestBooks(any(), any(), any()))
                 .willReturn(CursorPageResponse.of(List.of(interestBook), 30, 1L, false, null));
 
-        mockMvc.perform(get("/api/v1/books/likes"))
+        mockMvc.perform(get("/api/v1/books/likes")
+                        .param("cursor", "encoded-cursor")
+                        .param("size", "10")
+                        .with(user("user-pk")))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -187,6 +192,9 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.content[0].coverImageUrl").value("https://image.aladin.co.kr/cover.jpg"))
                 .andExpect(jsonPath("$.data.hasNext").value(false))
                 .andExpect(jsonPath("$.data.nextCursor").doesNotExist());
+
+        // 커서/size/로그인 사용자가 서비스로 그대로 전달되는지 확인한다.
+        verify(bookService).getInterestBooks("encoded-cursor", 10, "user-pk");
     }
 
     @Test

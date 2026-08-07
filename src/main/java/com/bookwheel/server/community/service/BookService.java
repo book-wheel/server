@@ -25,6 +25,7 @@ import com.bookwheel.server.notification.service.NotificationService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 
@@ -448,8 +450,24 @@ public class BookService {
             })
             .orElseGet(() -> {
                 bookLikeRepository.save(BookLike.create(bookInfo, userPK));
+                // 관심 도서 목록에서 외부 API 호출 없이 제목과 표지를 내려주기 위해 찜 시점에 저장해 둔다.
+                applyBookDetailsIfAbsent(bookInfo);
                 return BookLikeResponse.of(isbn, true);
             });
+    }
+
+    private void applyBookDetailsIfAbsent(BookInfo bookInfo) {
+        if (bookInfo.hasCoverImage()) {
+            return;
+        }
+
+        try {
+            BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(bookInfo.getIsbn(), true);
+            bookInfo.applyBookDetailsIfAbsent(bookDetail.title(), bookDetail.author(), bookDetail.cover());
+        } catch (Exception e) {
+            // 도서 정보 조회 실패가 찜 자체를 막지 않도록 한다. 목록에서는 book 테이블 값으로 대체된다.
+            log.warn("관심 도서 정보 저장 실패 - ISBN: {}, 원인: {}", bookInfo.getIsbn(), e.getMessage());
+        }
     }
 
     public CursorPageResponse<InterestBookResponseDto> getInterestBooks(String cursor, Integer size, String userPK) {
@@ -559,17 +577,11 @@ public class BookService {
     }
 
     private List<InterestBookResponseDto> findInterestBooks(String userPK, InterestCursor cursor, int limit) {
-        PageRequest pageRequest = PageRequest.of(0, limit);
-
-        if (cursor == null) {
-            return bookLikeRepository.findInterestBooksFirstPage(userPK, pageRequest);
-        }
-
-        return bookLikeRepository.findInterestBooksAfterCursor(
+        return bookLikeRepository.findInterestBooks(
             userPK,
-            cursor.interestedAt(),
-            cursor.bookId(),
-            pageRequest
+            cursor == null ? null : cursor.interestedAt(),
+            cursor == null ? null : cursor.bookId(),
+            PageRequest.of(0, limit)
         );
     }
 
