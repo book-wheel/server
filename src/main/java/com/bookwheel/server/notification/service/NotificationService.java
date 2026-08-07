@@ -2,6 +2,8 @@ package com.bookwheel.server.notification.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.community.repository.BookReviewRepository;
+import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.notification.dto.NotificationResponse;
@@ -13,6 +15,7 @@ import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
 import com.bookwheel.server.notification.push.FcmSender;
 import com.bookwheel.server.notification.repository.NotificationRepository;
+import com.bookwheel.server.notification.support.NotificationDeepLink;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +39,8 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final GroupRepository groupRepository;
+    private final PostRepository postRepository;
+    private final BookReviewRepository bookReviewRepository;
     private final NotificationPreferenceService preferenceService;
     private final FcmSender fcmSender;
     private final ObjectMapper objectMapper;
@@ -51,6 +56,10 @@ public class NotificationService {
         }
 
         if (!lockGroupIfPresent(event.groupId())) {
+            return null;
+        }
+
+        if (!lockDeepLinkTargetIfPresent(event.deepLink())) {
             return null;
         }
 
@@ -101,6 +110,10 @@ public class NotificationService {
         }
 
         if (!lockGroupIfPresent(event.groupId())) {
+            return List.of();
+        }
+
+        if (!lockDeepLinkTargetIfPresent(event.deepLink())) {
             return List.of();
         }
 
@@ -201,6 +214,18 @@ public class NotificationService {
     }
 
     @Transactional
+    public void deleteByPostId(Long postId) {
+        // 게시물이 삭제되면 해당 게시물로 이동하는 알림은 열 수 없는 링크가 되므로 함께 정리한다.
+        notificationRepository.deleteAllByDeepLink(NotificationDeepLink.post(postId));
+    }
+
+    @Transactional
+    public void deleteByReviewId(Long reviewId) {
+        // 리뷰가 삭제되면 해당 리뷰로 이동하는 알림은 열 수 없는 링크가 되므로 함께 정리한다.
+        notificationRepository.deleteAllByDeepLink(NotificationDeepLink.review(reviewId));
+    }
+
+    @Transactional
     public int backfillGroupIds() {
         // 기존 알림 중 실제로 존재하는 모임을 가리키는 행만 안전하게 새 컬럼에 채운다.
         int updated = 0;
@@ -226,6 +251,31 @@ public class NotificationService {
         return groupRepository.findByGroupIdForUpdate(groupId)
                 .filter(group -> group.getGroupState() != State.DELETED)
                 .isPresent();
+    }
+
+    /**
+     * 딥링크가 게시물·리뷰를 가리키면 대상 행을 삭제와 같은 기준으로 잠그고 아직 살아 있는지 확인한다.
+     *
+     * 알림 저장은 좋아요·댓글 트랜잭션이 커밋된 뒤 비동기로 실행되므로, 그 사이에 대상이 삭제되면
+     * 삭제 트랜잭션의 알림 정리는 이미 끝난 뒤라 열 수 없는 링크가 그대로 남는다.
+     * 삭제 쪽이 대상 행을 먼저 잠그기 때문에 여기서 같은 행을 잠그면
+     * 삭제 전 저장은 삭제 트랜잭션이 정리하고, 삭제 후 저장은 대상이 없어 건너뛰게 된다.
+     *
+     * @return 저장을 계속해도 되면 true, 대상이 이미 삭제됐으면 false
+     */
+    private boolean lockDeepLinkTargetIfPresent(String deepLink) {
+        Long postId = NotificationDeepLink.extractPostId(deepLink);
+        if (postId != null) {
+            return postRepository.findByPostIdForUpdate(postId).isPresent();
+        }
+
+        Long reviewId = NotificationDeepLink.extractReviewId(deepLink);
+        if (reviewId != null) {
+            return bookReviewRepository.findByReviewIdForUpdate(reviewId).isPresent();
+        }
+
+        // 게시물·리뷰가 아닌 딥링크는 정리 대상이 아니므로 잠그지 않는다.
+        return true;
     }
 
     private String extractGroupId(String payload) {
