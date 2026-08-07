@@ -6,6 +6,7 @@ import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
+import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewLikeResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
@@ -160,6 +161,48 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.books[0].isInterested").value(true))
                 .andExpect(jsonPath("$.data.ranking.source").value("KAKAO"))
                 .andExpect(jsonPath("$.data.ranking.sourceName").value("카카오 도서 검색 API"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("관심 도서 목록 조회 응답에 상세 페이지 이동용 ISBN과 표지 이미지가 포함된다.")
+    void getInterestBooks_ContainsIsbnAndCoverImage() throws Exception {
+        InterestBookResponseDto interestBook = new InterestBookResponseDto(
+                1L,
+                "9788954681179",
+                "밝은 밤",
+                "최은영",
+                "https://image.aladin.co.kr/cover.jpg",
+                LocalDateTime.of(2026, 7, 14, 12, 0)
+        );
+        given(bookService.getInterestBooks(any(), any(), any()))
+                .willReturn(CursorPageResponse.of(List.of(interestBook), 30, 1L, false, null));
+
+        mockMvc.perform(get("/api/v1/books/likes"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].isbn").value("9788954681179"))
+                .andExpect(jsonPath("$.data.content[0].title").value("밝은 밤"))
+                .andExpect(jsonPath("$.data.content[0].coverImageUrl").value("https://image.aladin.co.kr/cover.jpg"))
+                .andExpect(jsonPath("$.data.hasNext").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("관심 도서가 없으면 빈 목록을 반환한다.")
+    void getInterestBooks_ReturnsEmptyList() throws Exception {
+        given(bookService.getInterestBooks(any(), any(), any()))
+                .willReturn(CursorPageResponse.of(List.of(), 30, 0L, false, null));
+
+        mockMvc.perform(get("/api/v1/books/likes"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isEmpty())
+                .andExpect(jsonPath("$.data.totalElements").value(0))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
     }
 
     @Test

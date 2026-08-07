@@ -14,6 +14,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.bookwheel.server.common.cursor.GalleryCursor;
+import com.bookwheel.server.common.cursor.InterestCursor;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
@@ -25,6 +26,7 @@ import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
+import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
@@ -53,6 +55,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class BookServiceTest {
@@ -401,6 +404,78 @@ class BookServiceTest {
 
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).thumbnailUrl()).isEqualTo(presignedUrl);
+    }
+
+    @Test
+    @DisplayName("관심 도서가 없으면 빈 목록과 다음 페이지 없음을 반환한다.")
+    void getInterestBooks_ReturnsEmptyPageWhenNoInterestBooks() {
+        String userPK = UUID.randomUUID().toString();
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(cursorUtils.decode(null, InterestCursor.class)).willReturn(null);
+        given(bookLikeRepository.findInterestBooksFirstPage(eq(userPK), any())).willReturn(List.of());
+        given(bookLikeRepository.countByUserPK(userPK)).willReturn(0L);
+
+        CursorPageResponse<InterestBookResponseDto> response = bookService.getInterestBooks(null, null, userPK);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.hasNext()).isFalse();
+        assertThat(response.nextCursor()).isNull();
+        assertThat(response.totalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("관심 도서 목록은 등록 최신순으로 반환되며 요청한 size 만큼만 내려간다.")
+    void getInterestBooks_ReturnsRecentlyInterestedFirstWithinRequestedSize() {
+        String userPK = UUID.randomUUID().toString();
+        InterestBookResponseDto recent = interestBook(2L, "9788934972464", LocalDateTime.of(2026, 7, 14, 12, 0));
+        InterestBookResponseDto older = interestBook(1L, "9791165341909", LocalDateTime.of(2026, 7, 13, 12, 0));
+
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(cursorUtils.decode(null, InterestCursor.class)).willReturn(null);
+        // size + 1 건을 조회해 다음 페이지 존재 여부를 판단한다.
+        given(bookLikeRepository.findInterestBooksFirstPage(eq(userPK), eq(PageRequest.of(0, 2))))
+            .willReturn(List.of(recent, older));
+        given(cursorUtils.encode(any(InterestCursor.class))).willReturn("next-cursor");
+
+        CursorPageResponse<InterestBookResponseDto> response = bookService.getInterestBooks(null, 1, userPK);
+
+        assertThat(response.content()).containsExactly(recent);
+        assertThat(response.hasNext()).isTrue();
+        assertThat(response.nextCursor()).isEqualTo("next-cursor");
+        verify(cursorUtils).encode(new InterestCursor(recent.interestedAt(), recent.bookInfoId()));
+    }
+
+    @Test
+    @DisplayName("커서가 있으면 커서 이후의 관심 도서를 조회한다.")
+    void getInterestBooks_UsesCursorQueryWhenCursorGiven() {
+        String userPK = UUID.randomUUID().toString();
+        InterestCursor cursor = new InterestCursor(LocalDateTime.of(2026, 7, 14, 12, 0), 5L);
+
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(cursorUtils.decode("encoded-cursor", InterestCursor.class)).willReturn(cursor);
+        given(bookLikeRepository.findInterestBooksAfterCursor(
+            eq(userPK), eq(cursor.interestedAt()), eq(cursor.bookId()), any()
+        )).willReturn(List.of());
+
+        CursorPageResponse<InterestBookResponseDto> response =
+            bookService.getInterestBooks("encoded-cursor", null, userPK);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.hasNext()).isFalse();
+        // 다음 페이지 조회에서는 전체 개수를 다시 세지 않는다.
+        assertThat(response.totalElements()).isNull();
+        verify(bookLikeRepository, never()).findInterestBooksFirstPage(any(), any());
+    }
+
+    private InterestBookResponseDto interestBook(Long bookInfoId, String isbn, LocalDateTime interestedAt) {
+        return new InterestBookResponseDto(
+                bookInfoId,
+                isbn,
+                "밝은 밤",
+                "최은영",
+                "https://image.aladin.co.kr/cover.jpg",
+                interestedAt
+        );
     }
 
     private BookDetailResponse sampleBookDetail(String isbn) {

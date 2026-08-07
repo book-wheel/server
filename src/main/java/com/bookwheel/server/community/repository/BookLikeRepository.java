@@ -35,7 +35,8 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
     @Query("""
             select new com.bookwheel.server.community.dto.InterestBookResponseDto(
                 bi.bookInfoId,
-                b.title,
+                bi.isbn,
+                coalesce(b.title, bi.title),
                 b.author,
                 b.coverImage,
                 bl.createdAt
@@ -54,7 +55,8 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
     @Query("""
             select new com.bookwheel.server.community.dto.InterestBookResponseDto(
                 bi.bookInfoId,
-                b.title,
+                bi.isbn,
+                coalesce(b.title, bi.title),
                 b.author,
                 b.coverImage,
                 bl.createdAt
