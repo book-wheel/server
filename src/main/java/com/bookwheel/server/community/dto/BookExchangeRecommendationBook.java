@@ -2,33 +2,33 @@ package com.bookwheel.server.community.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Book exchange recommendation item")
+@Schema(description = "교환독서 추천도서 정보")
 public record BookExchangeRecommendationBook(
-    @Schema(description = "ISBN", example = "9788954681179")
+    @Schema(description = "13자리 ISBN", example = "9788954681179")
     String isbn,
 
-    @Schema(description = "Book title", example = "밝은 밤")
+    @Schema(description = "도서 제목", example = "밝은 밤")
     String title,
 
-    @Schema(description = "Book author", example = "최은영")
+    @Schema(description = "저자명", example = "최은영")
     String author,
 
-    @Schema(description = "Book cover image URL", nullable = true)
+    @Schema(description = "표지 이미지 URL. 정보나루가 표지를 제공하지 않으면 null입니다.", nullable = true)
     String coverImageUrl,
 
-    @Schema(description = "Data4Library popularity rank", example = "1")
+    @Schema(description = "정보나루 인기대출 순위", example = "1")
     int data4LibraryRank,
 
-    @Schema(description = "Data4Library loan count for the source period", example = "104490")
+    @Schema(description = "집계 기간 동안의 정보나루 대출 건수", example = "104490")
     int data4LibraryLoanCount,
 
-    @Schema(description = "BookWheel interest count", example = "12")
+    @Schema(description = "BookWheel 내부 관심 도서(찜) 수", example = "12")
     long likeCount,
 
-    @Schema(description = "Whether the current user is interested in this book", example = "true")
+    @Schema(description = "현재 로그인한 사용자의 관심 도서(찜) 여부", example = "true")
     boolean isInterested,
 
-    @Schema(description = "Representative public review. Null when no public review exists.", nullable = true)
+    @Schema(description = "대표 공개 후기. 공개 후기가 없으면 null입니다.", nullable = true)
     BookExchangeRecommendationReview review
 ) {
 }

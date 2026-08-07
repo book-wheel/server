@@ -31,6 +31,16 @@ public class PopularLoanBookSyncService {
     private final PopularLoanBookRepository popularLoanBookRepository;
     private final Clock clock;
 
+    /**
+     * 해당 기간 스냅샷이 이미 적재되어 있는지 확인한다.
+     * 정보나루가 전월 집계를 며칠 늦게 공개하는 경우가 있어 스케줄러가 여러 날 재시도하는데,
+     * 이미 적재를 마친 날에는 외부 API를 다시 호출하지 않기 위해 사용한다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isAlreadySynced(LocalDate startDate, LocalDate endDate) {
+        return popularLoanBookRepository.existsBySourceAndStartDateAndEndDate(SOURCE, startDate, endDate);
+    }
+
     @Transactional
     public PopularLoanBookSyncResult syncPopularLoanBooks(LocalDate startDate, LocalDate endDate, int pageSize) {
         validateSyncRequest(startDate, endDate, pageSize);

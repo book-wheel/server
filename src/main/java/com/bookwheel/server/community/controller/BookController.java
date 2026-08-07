@@ -111,9 +111,12 @@ public class BookController {
 
     @Operation(
         summary = "교환독서 추천도서 조회",
-        description = "정보나루 전월 인기대출도서 최신 스냅샷의 상위 30권을 일자별로 순환해 오늘의 교환독서 추천도서를 조회합니다. "
+        description = "정보나루 전월 인기대출도서 최신 스냅샷의 상위 31권을 날짜별로 순환해 오늘의 교환독서 추천도서를 조회합니다. "
             + "책 선정 기준과 서지 정보의 출처는 도서관 정보나루(국립중앙도서관)이며, 좋아요 수와 찜 여부, 대표 후기는 BookWheel 내부 데이터입니다. "
-            + "대표 후기는 스포일러 방지를 위해 공개 후기(isHidden=false) 중 공감 수가 가장 많고 최신인 후기 1건만 제공합니다.")
+            + "대표 후기는 스포일러 방지를 위해 공개 후기(isHidden=false) 중 공감 수가 가장 많고 최신인 후기 1건만 제공합니다.\n\n"
+            + "추천 후보 목록은 매월 1일 새벽 4시(KST)에 전월 인기대출도서를 적재한 뒤 교체됩니다. "
+            + "따라서 매월 1일 0시~4시 사이에는 아직 직전 스냅샷 기준으로 추천이 내려가며, 같은 날이라도 4시를 기점으로 추천 도서가 바뀔 수 있습니다. "
+            + "갱신 시점 안내 문구는 basis.description으로 함께 내려가니 클라이언트에서 그대로 노출하면 됩니다.")
     @GetMapping("/exchange-recommendation")
     public ApiResponse<BookExchangeRecommendationResponse> getExchangeRecommendation(
         @AuthenticationPrincipal Object principal

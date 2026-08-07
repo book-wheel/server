@@ -34,7 +34,7 @@ public class PopularLoanBookAdminController {
         @Value("${naru.popular-loan.sync.page-size:1000}") int defaultPageSize
     ) {
         if (defaultPageSize <= 0) {
-            throw new IllegalArgumentException("Popular loan sync page size must be greater than 0");
+            throw new IllegalArgumentException("인기대출도서 적재 조회 건수는 1 이상이어야 합니다. - pageSize: " + defaultPageSize);
         }
         this.popularLoanBookSyncService = popularLoanBookSyncService;
         this.clock = clock;

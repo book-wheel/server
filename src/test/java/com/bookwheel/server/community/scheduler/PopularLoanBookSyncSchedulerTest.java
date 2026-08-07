@@ -2,8 +2,11 @@ package com.bookwheel.server.community.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -98,6 +101,29 @@ class PopularLoanBookSyncSchedulerTest {
             LocalDate.of(2026, 7, 1),
             LocalDate.of(2026, 7, 31),
             PAGE_SIZE
+        );
+    }
+
+    @Test
+    @DisplayName("Scheduler skips the external call when the period is already synced")
+    void syncPreviousMonthPopularLoanBooks_SkipsWhenAlreadySynced() {
+        Clock clock = Clock.fixed(Instant.parse("2026-08-03T00:00:00Z"), SEOUL_ZONE);
+        PopularLoanBookSyncScheduler scheduler = new PopularLoanBookSyncScheduler(
+            popularLoanBookSyncService,
+            clock,
+            PAGE_SIZE
+        );
+        given(popularLoanBookSyncService.isAlreadySynced(
+            LocalDate.of(2026, 7, 1),
+            LocalDate.of(2026, 7, 31)
+        )).willReturn(true);
+
+        scheduler.syncPreviousMonthPopularLoanBooks();
+
+        then(popularLoanBookSyncService).should(never()).syncPopularLoanBooks(
+            any(LocalDate.class),
+            any(LocalDate.class),
+            anyInt()
         );
     }
 

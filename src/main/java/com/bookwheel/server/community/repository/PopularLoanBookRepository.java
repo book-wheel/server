@@ -14,6 +14,12 @@ public interface PopularLoanBookRepository extends JpaRepository<PopularLoanBook
         PopularLoanBookSource source
     );
 
+    boolean existsBySourceAndStartDateAndEndDate(
+        PopularLoanBookSource source,
+        LocalDate startDate,
+        LocalDate endDate
+    );
+
     List<PopularLoanBook> findBySourceAndStartDateAndEndDateAndIsbnIn(
         PopularLoanBookSource source,
         LocalDate startDate,
@@ -21,7 +27,7 @@ public interface PopularLoanBookRepository extends JpaRepository<PopularLoanBook
         List<String> isbns
     );
 
-    List<PopularLoanBook> findTop30BySourceAndStartDateAndEndDateOrderByRankAscLoanCountDesc(
+    List<PopularLoanBook> findTop31BySourceAndStartDateAndEndDateOrderByRankAscLoanCountDesc(
         PopularLoanBookSource source,
         LocalDate startDate,
         LocalDate endDate
