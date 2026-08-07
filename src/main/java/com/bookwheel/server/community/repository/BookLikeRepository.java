@@ -18,6 +18,8 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
 
     boolean existsByBookInfo_IsbnAndUserPK(String isbn, String userPK);
 
+    long countByBookInfo_Isbn(String isbn);
+
     long countByUserPK(String userPK);
 
     @Query("""

@@ -1,6 +1,5 @@
 package com.bookwheel.server.community.repository;
 
-import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookReview;
 import org.springframework.data.domain.Page;
@@ -9,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface BookReviewRepository extends JpaRepository<BookReview, Long> {
     boolean existsByBookInfoAndReviewer_Id(BookInfo bookInfo, String userPK);
 
@@ -16,4 +17,17 @@ public interface BookReviewRepository extends JpaRepository<BookReview, Long> {
     @Query(value = "select r from BookReview r join fetch r.reviewer where r.bookInfo = :bookInfo",
         countQuery = "select count(r) from BookReview r where r.bookInfo = :bookInfo")
     Page<BookReview> findAllByBookInfo(@Param("bookInfo") BookInfo bookInfo, Pageable pageable);
+
+    @Query("""
+            select r
+            from BookReview r
+            join fetch r.reviewer
+            where r.bookInfo.isbn = :isbn
+            and r.isHidden = false
+            order by r.likeCount desc, r.createdAt desc
+            """)
+    List<BookReview> findRepresentativePublicReviewByIsbn(
+        @Param("isbn") String isbn,
+        Pageable pageable
+    );
 }

@@ -2,6 +2,10 @@ package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.community.dto.BookDetailResponse;
+import com.bookwheel.server.community.dto.BookExchangeRecommendationBasis;
+import com.bookwheel.server.community.dto.BookExchangeRecommendationBook;
+import com.bookwheel.server.community.dto.BookExchangeRecommendationResponse;
+import com.bookwheel.server.community.dto.BookExchangeRecommendationReview;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
@@ -10,6 +14,7 @@ import com.bookwheel.server.community.dto.ReviewDetailResponse;
 import com.bookwheel.server.community.dto.ReviewLikeResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
 import com.bookwheel.server.community.dto.VoteType;
+import com.bookwheel.server.community.service.BookExchangeRecommendationService;
 import com.bookwheel.server.community.service.BookService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +31,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
@@ -49,6 +55,9 @@ class BookControllerTest {
 
     @MockitoBean
     private BookService bookService;
+
+    @MockitoBean
+    private BookExchangeRecommendationService bookExchangeRecommendationService;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -131,6 +140,59 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.isbn").value(isbn))
                 // 필드가 생략되지 않고 null로 내려가야 프론트에서 데이터 없음을 구분할 수 있다.
                 .andExpect(content().string(containsString("\"usageAnalysis\":null")));
+    }
+
+    @Test
+    @WithMockUser(username = "user-pk")
+    @DisplayName("Book Exchange Recommendation: returns daily recommendation with source metadata")
+    void getExchangeRecommendation_Success() throws Exception {
+        BookExchangeRecommendationResponse response = new BookExchangeRecommendationResponse(
+            LocalDate.of(2026, 8, 8),
+            new BookExchangeRecommendationBasis(
+                "DAILY_ROTATION",
+                "DATA4LIBRARY",
+                "도서관 정보나루",
+                "국립중앙도서관",
+                "https://www.data4library.kr/apiUtilization",
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 31),
+                "전월 인기대출도서 순위 기반 일별 추천"
+            ),
+            new BookExchangeRecommendationBook(
+                "9788954681179",
+                "밝은 밤",
+                "최은영",
+                "https://example.com/cover.jpg",
+                8,
+                104490,
+                12,
+                true,
+                new BookExchangeRecommendationReview(
+                    1L,
+                    "문희연",
+                    "좋은 후기",
+                    7,
+                    LocalDateTime.of(2026, 8, 1, 10, 0)
+                )
+            )
+        );
+        given(bookExchangeRecommendationService.getDailyRecommendation("user-pk")).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/books/exchange-recommendation"))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.recommendationDate").value("2026-08-08"))
+            .andExpect(jsonPath("$.data.basis.source").value("DATA4LIBRARY"))
+            .andExpect(jsonPath("$.data.basis.sourceName").value("도서관 정보나루"))
+            .andExpect(jsonPath("$.data.basis.provider").value("국립중앙도서관"))
+            .andExpect(jsonPath("$.data.basis.startDate").value("2026-07-01"))
+            .andExpect(jsonPath("$.data.basis.endDate").value("2026-07-31"))
+            .andExpect(jsonPath("$.data.book.isbn").value("9788954681179"))
+            .andExpect(jsonPath("$.data.book.likeCount").value(12))
+            .andExpect(jsonPath("$.data.book.isInterested").value(true))
+            .andExpect(jsonPath("$.data.book.review.reviewerName").value("문희연"))
+            .andExpect(jsonPath("$.data.book.review.comment").value("좋은 후기"));
     }
 
     @Test

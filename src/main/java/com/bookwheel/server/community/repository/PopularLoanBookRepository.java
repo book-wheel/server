@@ -21,6 +21,12 @@ public interface PopularLoanBookRepository extends JpaRepository<PopularLoanBook
         List<String> isbns
     );
 
+    List<PopularLoanBook> findTop30BySourceAndStartDateAndEndDateOrderByRankAscLoanCountDesc(
+        PopularLoanBookSource source,
+        LocalDate startDate,
+        LocalDate endDate
+    );
+
     List<PopularLoanBook> findTop50BySourceAndStartDateAndEndDateAndTitleContainingIgnoreCaseOrderByRankAscLoanCountDesc(
         PopularLoanBookSource source,
         LocalDate startDate,
