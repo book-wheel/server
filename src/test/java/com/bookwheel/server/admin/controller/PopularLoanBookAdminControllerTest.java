@@ -1,7 +1,10 @@
 package com.bookwheel.server.admin.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -110,6 +113,26 @@ class PopularLoanBookAdminControllerTest {
             LocalDate.of(2026, 6, 1),
             LocalDate.of(2026, 6, 30),
             500
+        );
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("추천 후보 수보다 작은 조회 건수는 400을 반환하고 적재하지 않는다")
+    void syncPopularLoanBooks_ReturnsBadRequestWhenPageSizeIsBelowCandidateCount() throws Exception {
+        // 적재는 기존 스냅샷을 교체하므로, 소량 요청을 허용하면 확보된 추천 후보가 덮여쓰인다.
+        mockMvc.perform(post("/api/v1/admin/books/popular-loans/sync")
+                .param("startDate", "2026-06-01")
+                .param("endDate", "2026-06-30")
+                .param("pageSize", "1")
+                .with(csrf()))
+            .andDo(print())
+            .andExpect(status().isBadRequest());
+
+        then(popularLoanBookSyncService).should(never()).syncPopularLoanBooks(
+            any(LocalDate.class),
+            any(LocalDate.class),
+            anyInt()
         );
     }
 
