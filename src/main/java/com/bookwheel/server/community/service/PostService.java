@@ -181,8 +181,7 @@ public class PostService {
     public PostCreateResponse create(String isbn, PostCreateRequest request, String userPK) {
         String normalizedIsbn = requireIsbn(isbn);
         String bookTitle = requireBookTitle(request.title());
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(normalizedIsbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(normalizedIsbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(normalizedIsbn);
 
         // 상세 조회에서 외부 API 없이 제목을 내려줄 수 있도록 작성 시점에 저장해 둔다.
         bookInfo.applyTitleIfAbsent(bookTitle);

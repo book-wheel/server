@@ -14,6 +14,7 @@ import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.BookVote;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.ReviewLike;
+import com.bookwheel.server.community.event.BookLikedEvent;
 import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
@@ -25,6 +26,7 @@ import com.bookwheel.server.notification.service.NotificationService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 
@@ -76,8 +79,7 @@ public class BookService {
 
     @Transactional
     public ReviewDetailResponse createReview(String isbn, ReviewCreateRequest request, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(isbn);
 
         if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userPK)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
@@ -161,8 +163,7 @@ public class BookService {
     // 추천/비추천 등록·변경. 기존 투표가 없으면 등록, 있으면 값 변경(같은 값이면 그대로 유지)한다.
     @Transactional
     public ReviewVoteResponse upsertVote(String isbn, boolean isRecommended, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(isbn);
 
         if (!userRepository.existsById(userPK)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -434,8 +435,7 @@ public class BookService {
 
     @Transactional
     public BookLikeResponse toggleBookLike(String isbn, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(isbn);
 
         if (!userRepository.existsById(userPK)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -448,6 +448,11 @@ public class BookService {
             })
             .orElseGet(() -> {
                 bookLikeRepository.save(BookLike.create(bookInfo, userPK));
+                // 목록에 필요한 제목·표지는 커밋 이후 BookInfoDetailsListener 가 채운다.
+                // 알라딘 호출을 이 트랜잭션에 두면 외부 API 지연만큼 DB 커넥션을 붙잡게 된다.
+                if (!bookInfo.hasCoverImage()) {
+                    eventPublisher.publishEvent(new BookLikedEvent(isbn));
+                }
                 return BookLikeResponse.of(isbn, true);
             });
     }
@@ -559,17 +564,11 @@ public class BookService {
     }
 
     private List<InterestBookResponseDto> findInterestBooks(String userPK, InterestCursor cursor, int limit) {
-        PageRequest pageRequest = PageRequest.of(0, limit);
-
-        if (cursor == null) {
-            return bookLikeRepository.findInterestBooksFirstPage(userPK, pageRequest);
-        }
-
-        return bookLikeRepository.findInterestBooksAfterCursor(
+        return bookLikeRepository.findInterestBooks(
             userPK,
-            cursor.interestedAt(),
-            cursor.bookId(),
-            pageRequest
+            cursor == null ? null : cursor.interestedAt(),
+            cursor == null ? null : cursor.bookId(),
+            PageRequest.of(0, limit)
         );
     }
 

@@ -3,6 +3,7 @@ package com.bookwheel.server.community.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.bookwheel.server.common.cursor.GalleryCursor;
+import com.bookwheel.server.common.cursor.InterestCursor;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.response.CursorPageResponse;
@@ -25,9 +27,12 @@ import com.bookwheel.server.community.dto.BookSearchRequest;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
+import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.entity.BookInfo;
+import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.event.BookLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
@@ -53,6 +58,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class BookServiceTest {
@@ -401,6 +407,132 @@ class BookServiceTest {
 
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).thumbnailUrl()).isEqualTo(presignedUrl);
+    }
+
+    @Test
+    @DisplayName("관심 도서가 없으면 빈 목록과 다음 페이지 없음을 반환한다.")
+    void getInterestBooks_ReturnsEmptyPageWhenNoInterestBooks() {
+        String userPK = UUID.randomUUID().toString();
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(cursorUtils.decode(null, InterestCursor.class)).willReturn(null);
+        given(bookLikeRepository.findInterestBooks(eq(userPK), eq(null), eq(null), any())).willReturn(List.of());
+        given(bookLikeRepository.countByUserPK(userPK)).willReturn(0L);
+
+        CursorPageResponse<InterestBookResponseDto> response = bookService.getInterestBooks(null, null, userPK);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.hasNext()).isFalse();
+        assertThat(response.nextCursor()).isNull();
+        assertThat(response.totalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("관심 도서 목록은 등록 최신순으로 반환되며 요청한 size 만큼만 내려간다.")
+    void getInterestBooks_ReturnsRecentlyInterestedFirstWithinRequestedSize() {
+        String userPK = UUID.randomUUID().toString();
+        InterestBookResponseDto recent = interestBook(2L, "9788934972464", LocalDateTime.of(2026, 7, 14, 12, 0));
+        InterestBookResponseDto older = interestBook(1L, "9791165341909", LocalDateTime.of(2026, 7, 13, 12, 0));
+
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(cursorUtils.decode(null, InterestCursor.class)).willReturn(null);
+        // size + 1 건을 조회해 다음 페이지 존재 여부를 판단한다.
+        given(bookLikeRepository.findInterestBooks(eq(userPK), eq(null), eq(null), eq(PageRequest.of(0, 2))))
+            .willReturn(List.of(recent, older));
+        given(cursorUtils.encode(any(InterestCursor.class))).willReturn("next-cursor");
+
+        CursorPageResponse<InterestBookResponseDto> response = bookService.getInterestBooks(null, 1, userPK);
+
+        assertThat(response.content()).containsExactly(recent);
+        assertThat(response.hasNext()).isTrue();
+        assertThat(response.nextCursor()).isEqualTo("next-cursor");
+        verify(cursorUtils).encode(new InterestCursor(recent.interestedAt(), recent.bookInfoId()));
+    }
+
+    @Test
+    @DisplayName("커서가 있으면 커서 이후의 관심 도서를 조회한다.")
+    void getInterestBooks_UsesCursorQueryWhenCursorGiven() {
+        String userPK = UUID.randomUUID().toString();
+        InterestCursor cursor = new InterestCursor(LocalDateTime.of(2026, 7, 14, 12, 0), 5L);
+
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(cursorUtils.decode("encoded-cursor", InterestCursor.class)).willReturn(cursor);
+        given(bookLikeRepository.findInterestBooks(
+            eq(userPK), eq(cursor.interestedAt()), eq(cursor.bookId()), any()
+        )).willReturn(List.of());
+
+        CursorPageResponse<InterestBookResponseDto> response =
+            bookService.getInterestBooks("encoded-cursor", null, userPK);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.hasNext()).isFalse();
+        // 다음 페이지 조회에서는 전체 개수를 다시 세지 않는다.
+        assertThat(response.totalElements()).isNull();
+        verify(bookLikeRepository, never()).countByUserPK(any());
+    }
+
+    @Test
+    @DisplayName("관심 도서로 등록하면 도서 정보를 채우는 이벤트를 발행하고, 트랜잭션 안에서는 외부 API를 호출하지 않는다.")
+    void toggleBookLike_PublishesBookLikedEventOnInterest() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
+
+        given(bookInfoRepository.findOrCreateByIsbn(isbn)).willReturn(bookInfo);
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
+
+        assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isTrue();
+
+        then(eventPublisher).should().publishEvent(new BookLikedEvent(isbn));
+        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("도서 정보를 이미 저장한 도서는 찜해도 조회 이벤트를 발행하지 않는다.")
+    void toggleBookLike_SkipsEventWhenBookDetailsAlreadyStored() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder()
+            .isbn(isbn)
+            .title("밝은 밤")
+            .author("최은영")
+            .coverImage("https://image.aladin.co.kr/cover.jpg")
+            .build();
+
+        given(bookInfoRepository.findOrCreateByIsbn(isbn)).willReturn(bookInfo);
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
+
+        bookService.toggleBookLike(isbn, userPK);
+
+        then(eventPublisher).should(never()).publishEvent(any(BookLikedEvent.class));
+    }
+
+    @Test
+    @DisplayName("관심 도서를 취소할 때는 도서 정보 조회 이벤트를 발행하지 않는다.")
+    void toggleBookLike_SkipsEventWhenCancelingInterest() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
+
+        given(bookInfoRepository.findOrCreateByIsbn(isbn)).willReturn(bookInfo);
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK))
+            .willReturn(Optional.of(BookLike.create(bookInfo, userPK)));
+
+        assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isFalse();
+        then(eventPublisher).should(never()).publishEvent(any(BookLikedEvent.class));
+    }
+
+    private InterestBookResponseDto interestBook(Long bookInfoId, String isbn, LocalDateTime interestedAt) {
+        return new InterestBookResponseDto(
+                bookInfoId,
+                isbn,
+                "밝은 밤",
+                "최은영",
+                "https://image.aladin.co.kr/cover.jpg",
+                interestedAt
+        );
     }
 
     private BookDetailResponse sampleBookDetail(String isbn) {
