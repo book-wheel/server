@@ -14,6 +14,7 @@ import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.entity.BookVote;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.ReviewLike;
+import com.bookwheel.server.community.event.BookLikedEvent;
 import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
@@ -78,8 +79,7 @@ public class BookService {
 
     @Transactional
     public ReviewDetailResponse createReview(String isbn, ReviewCreateRequest request, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(isbn);
 
         if (bookReviewRepository.existsByBookInfoAndReviewer_Id(bookInfo, userPK)) {
             throw new BusinessException(ErrorCode.ALREADY_REVIEWED);
@@ -163,8 +163,7 @@ public class BookService {
     // 추천/비추천 등록·변경. 기존 투표가 없으면 등록, 있으면 값 변경(같은 값이면 그대로 유지)한다.
     @Transactional
     public ReviewVoteResponse upsertVote(String isbn, boolean isRecommended, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(isbn);
 
         if (!userRepository.existsById(userPK)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -436,8 +435,7 @@ public class BookService {
 
     @Transactional
     public BookLikeResponse toggleBookLike(String isbn, String userPK) {
-        BookInfo bookInfo = bookInfoRepository.findByIsbn(isbn)
-            .orElseGet(() -> bookInfoRepository.save(BookInfo.builder().isbn(isbn).build()));
+        BookInfo bookInfo = bookInfoRepository.findOrCreateByIsbn(isbn);
 
         if (!userRepository.existsById(userPK)) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -450,24 +448,13 @@ public class BookService {
             })
             .orElseGet(() -> {
                 bookLikeRepository.save(BookLike.create(bookInfo, userPK));
-                // 관심 도서 목록에서 외부 API 호출 없이 제목과 표지를 내려주기 위해 찜 시점에 저장해 둔다.
-                applyBookDetailsIfAbsent(bookInfo);
+                // 목록에 필요한 제목·표지는 커밋 이후 BookInfoDetailsListener 가 채운다.
+                // 알라딘 호출을 이 트랜잭션에 두면 외부 API 지연만큼 DB 커넥션을 붙잡게 된다.
+                if (!bookInfo.hasCoverImage()) {
+                    eventPublisher.publishEvent(new BookLikedEvent(isbn));
+                }
                 return BookLikeResponse.of(isbn, true);
             });
-    }
-
-    private void applyBookDetailsIfAbsent(BookInfo bookInfo) {
-        if (bookInfo.hasCoverImage()) {
-            return;
-        }
-
-        try {
-            BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(bookInfo.getIsbn(), true);
-            bookInfo.applyBookDetailsIfAbsent(bookDetail.title(), bookDetail.author(), bookDetail.cover());
-        } catch (Exception e) {
-            // 도서 정보 조회 실패가 찜 자체를 막지 않도록 한다. 목록에서는 book 테이블 값으로 대체된다.
-            log.warn("관심 도서 정보 저장 실패 - ISBN: {}, 원인: {}", bookInfo.getIsbn(), e.getMessage());
-        }
     }
 
     public CursorPageResponse<InterestBookResponseDto> getInterestBooks(String cursor, Integer size, String userPK) {

@@ -37,6 +37,23 @@ public class RestClientConfig {
             .build();
     }
 
+    // 알라딘 호출은 도서 상세 조회의 응답 시간에 그대로 더해지고, 관심 등록 후처리에서도 쓰인다.
+    // 기본 클라이언트(5초/5초)는 연결과 응답이 각각 따로 소모되어 최악의 경우 10초를 대기하므로,
+    // 알라딘 전용 클라이언트로 최악의 대기 시간을 6초로 제한한다.
+    //
+    // 실측값이 아니라 상한을 좁히기 위한 보수적인 값이다.
+    // 타임아웃 발생률이 눈에 띄면 응답 시간을 측정해 정보나루처럼 근거를 남기고 조정한다.
+    @Bean
+    public RestClient aladinRestClient(RestClient.Builder builder) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(2000);
+        factory.setReadTimeout(4000);
+
+        return builder
+            .requestFactory(factory)
+            .build();
+    }
+
     @Bean
     public RestClient naruPopularLoanRestClient(RestClient.Builder builder) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

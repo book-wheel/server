@@ -32,6 +32,7 @@ import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.event.BookLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
@@ -470,27 +471,25 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("관심 도서로 등록하면 목록 조회에 필요한 도서 정보를 함께 저장한다.")
-    void toggleBookLike_StoresBookDetailsOnInterest() {
+    @DisplayName("관심 도서로 등록하면 도서 정보를 채우는 이벤트를 발행하고, 트랜잭션 안에서는 외부 API를 호출하지 않는다.")
+    void toggleBookLike_PublishesBookLikedEventOnInterest() {
         String isbn = "9788954681179";
         String userPK = UUID.randomUUID().toString();
         BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
 
-        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(bookInfoRepository.findOrCreateByIsbn(isbn)).willReturn(bookInfo);
         given(userRepository.existsById(userPK)).willReturn(true);
         given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
-        given(aladinService.getBookDetailByIsbn(eq(isbn), anyBoolean())).willReturn(sampleBookDetail(isbn));
 
-        bookService.toggleBookLike(isbn, userPK);
+        assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isTrue();
 
-        assertThat(bookInfo.getTitle()).isEqualTo("밝은 밤");
-        assertThat(bookInfo.getAuthor()).isEqualTo("최은영");
-        assertThat(bookInfo.getCoverImage()).isEqualTo("https://image.aladin.co.kr/cover.jpg");
+        then(eventPublisher).should().publishEvent(new BookLikedEvent(isbn));
+        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
     }
 
     @Test
-    @DisplayName("도서 정보를 이미 저장한 도서는 찜할 때 외부 API를 다시 호출하지 않는다.")
-    void toggleBookLike_SkipsLookupWhenBookDetailsAlreadyStored() {
+    @DisplayName("도서 정보를 이미 저장한 도서는 찜해도 조회 이벤트를 발행하지 않는다.")
+    void toggleBookLike_SkipsEventWhenBookDetailsAlreadyStored() {
         String isbn = "9788954681179";
         String userPK = UUID.randomUUID().toString();
         BookInfo bookInfo = BookInfo.builder()
@@ -500,47 +499,29 @@ class BookServiceTest {
             .coverImage("https://image.aladin.co.kr/cover.jpg")
             .build();
 
-        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(bookInfoRepository.findOrCreateByIsbn(isbn)).willReturn(bookInfo);
         given(userRepository.existsById(userPK)).willReturn(true);
         given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
 
         bookService.toggleBookLike(isbn, userPK);
 
-        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+        then(eventPublisher).should(never()).publishEvent(any(BookLikedEvent.class));
     }
 
     @Test
-    @DisplayName("도서 정보 조회에 실패해도 관심 도서 등록은 성공한다.")
-    void toggleBookLike_SucceedsWhenBookDetailLookupFails() {
+    @DisplayName("관심 도서를 취소할 때는 도서 정보 조회 이벤트를 발행하지 않는다.")
+    void toggleBookLike_SkipsEventWhenCancelingInterest() {
         String isbn = "9788954681179";
         String userPK = UUID.randomUUID().toString();
         BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
 
-        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
-        given(userRepository.existsById(userPK)).willReturn(true);
-        given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK)).willReturn(Optional.empty());
-        given(aladinService.getBookDetailByIsbn(eq(isbn), anyBoolean()))
-            .willThrow(new BusinessException(ErrorCode.ALADIN_API_ERROR));
-
-        assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isTrue();
-        assertThat(bookInfo.getCoverImage()).isNull();
-        then(bookLikeRepository).should().save(any());
-    }
-
-    @Test
-    @DisplayName("관심 도서를 취소할 때는 도서 정보를 조회하지 않는다.")
-    void toggleBookLike_SkipsLookupWhenCancelingInterest() {
-        String isbn = "9788954681179";
-        String userPK = UUID.randomUUID().toString();
-        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
-
-        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(bookInfoRepository.findOrCreateByIsbn(isbn)).willReturn(bookInfo);
         given(userRepository.existsById(userPK)).willReturn(true);
         given(bookLikeRepository.findByBookInfoAndUserPK(bookInfo, userPK))
             .willReturn(Optional.of(BookLike.create(bookInfo, userPK)));
 
         assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isFalse();
-        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+        then(eventPublisher).should(never()).publishEvent(any(BookLikedEvent.class));
     }
 
     private InterestBookResponseDto interestBook(Long bookInfoId, String isbn, LocalDateTime interestedAt) {
