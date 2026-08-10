@@ -69,6 +69,7 @@ class PostServiceTest {
         given(bookInfo.getIsbn()).willReturn(ISBN);
 
         User uploader = mock(User.class);
+        given(uploader.getId()).willReturn(userPK);
         given(uploader.getNickname()).willReturn("writer");
         given(uploader.getProfileImageKey()).willReturn(null);
 
@@ -101,6 +102,7 @@ class PostServiceTest {
 
         assertThat(response.title()).isEqualTo("Clean Code");
         assertThat(response.isbn()).isEqualTo(ISBN);
+        assertThat(response.isMine()).isTrue();
     }
 
     // 게시글 작성 요청을 stubbing하고, 작성에 사용된 BookInfo를 돌려준다.

@@ -128,7 +128,7 @@ public class PostService {
 
         long commentCount = postCommentRepository.countByPost(post);
         boolean isLikedByMe = postLikeRepository.existsByPostAndUser(post, user);
-
+        boolean isMine = userPK.equals(post.getUploader().getId());
         // 모임에서 작성한 게시물이면 모임 이름, 개인 작성이면 null
         String groupName = post.getGroup() != null ? post.getGroup().getGroupName() : null;
 
@@ -144,6 +144,7 @@ public class PostService {
             post.getLikeCount(),
             commentCount,
             isLikedByMe,
+            isMine,
             post.getCreatedAt()
         );
     }
