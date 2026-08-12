@@ -34,7 +34,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -69,6 +68,7 @@ class PostServiceTest {
         given(bookInfo.getIsbn()).willReturn(ISBN);
 
         User uploader = mock(User.class);
+        given(uploader.getId()).willReturn(userPK);
         given(uploader.getNickname()).willReturn("writer");
         given(uploader.getProfileImageKey()).willReturn(null);
 
@@ -101,11 +101,12 @@ class PostServiceTest {
 
         assertThat(response.title()).isEqualTo("Clean Code");
         assertThat(response.isbn()).isEqualTo(ISBN);
+        assertThat(response.isMine()).isTrue();
     }
 
     // 게시글 작성 요청을 stubbing하고, 작성에 사용된 BookInfo를 돌려준다.
     private BookInfo stubCreate(BookInfo bookInfo) {
-        given(bookInfoRepository.findByIsbn(ISBN)).willReturn(Optional.of(bookInfo));
+        given(bookInfoRepository.findOrCreateByIsbn(ISBN)).willReturn(bookInfo);
         given(userRepository.findById(anyString())).willReturn(Optional.of(mock(User.class)));
         given(postRepository.save(any(Post.class))).willAnswer(invocation -> invocation.getArgument(0));
         return bookInfo;
@@ -155,17 +156,15 @@ class PostServiceTest {
         String pathIsbn = "9791161571188";
         PostCreateRequest request =
             new PostCreateRequest("Clean Code", "post content", List.of(), null);
-        given(bookInfoRepository.findByIsbn(pathIsbn)).willReturn(Optional.empty());
-        given(bookInfoRepository.save(any(BookInfo.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(bookInfoRepository.findOrCreateByIsbn(pathIsbn))
+            .willReturn(BookInfo.builder().isbn(pathIsbn).build());
         given(userRepository.findById(anyString())).willReturn(Optional.of(mock(User.class)));
         given(postRepository.save(any(Post.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         var response = postService.create(pathIsbn, request, UUID.randomUUID().toString());
 
         assertThat(response.isbn()).isEqualTo(pathIsbn);
-        ArgumentCaptor<BookInfo> bookInfoCaptor = ArgumentCaptor.forClass(BookInfo.class);
-        then(bookInfoRepository).should().save(bookInfoCaptor.capture());
-        assertThat(bookInfoCaptor.getValue().getIsbn()).isEqualTo(pathIsbn);
+        then(bookInfoRepository).should().findOrCreateByIsbn(pathIsbn);
     }
 
     @Test

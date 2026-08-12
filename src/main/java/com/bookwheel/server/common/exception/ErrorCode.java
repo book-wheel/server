@@ -31,6 +31,8 @@ public enum ErrorCode {
     SOCIAL_ACCOUNT_CANNOT_USE_RECOVERY(HttpStatus.BAD_REQUEST, "AUTH_020", "소셜 로그인 계정은 계정 찾기 기능을 이용할 수 없습니다."),
     PASSWORD_SAME_AS_OLD(HttpStatus.BAD_REQUEST, "AUTH_021", "현재 비밀번호와 동일한 비밀번호로 변경할 수 없습니다."),
     INVALID_PASSWORD_FORMAT(HttpStatus.BAD_REQUEST, "AUTH_022", "비밀번호는 8~20자이며, 영문, 숫자, 특수문자를 포함해야 합니다."),
+    INVALID_OAUTH2_LOGIN_CODE(HttpStatus.UNAUTHORIZED, "AUTH_023", "유효하지 않거나 만료된 소셜 로그인 코드입니다."),
+    INVALID_PKCE_VALUE(HttpStatus.BAD_REQUEST, "AUTH_024", "유효하지 않은 PKCE 값입니다."),
 
     // JWT 토큰 관련 에러
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_011", "유효하지 않은 토큰입니다."),

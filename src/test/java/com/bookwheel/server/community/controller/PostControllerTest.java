@@ -156,6 +156,7 @@ class PostControllerTest {
                 26,
                 3L,
                 true,
+                true,
                 LocalDateTime.of(2026, 6, 23, 12, 0)
         );
         given(postService.getPostDetail(eq(postId), any())).willReturn(response);
@@ -169,7 +170,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.title").value("내 남편을 팝니다"))
                 .andExpect(jsonPath("$.data.imageUrls.length()").value(2))
                 .andExpect(jsonPath("$.data.commentCount").value(3))
-                .andExpect(jsonPath("$.data.isLikedByMe").value(true));
+                .andExpect(jsonPath("$.data.isLikedByMe").value(true))
+                .andExpect(jsonPath("$.data.isMine").value(true));
     }
 
     @Test

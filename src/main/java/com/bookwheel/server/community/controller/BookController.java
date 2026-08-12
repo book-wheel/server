@@ -3,6 +3,7 @@ package com.bookwheel.server.community.controller;
 import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.community.dto.BookDetailResponse;
+import com.bookwheel.server.community.dto.BookExchangeRecommendationResponse;
 import com.bookwheel.server.community.dto.BookLikeResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchRequest;
@@ -14,9 +15,11 @@ import com.bookwheel.server.community.dto.ReviewLikeResponse;
 import com.bookwheel.server.community.dto.ReviewStatsResponse;
 import com.bookwheel.server.community.dto.ReviewVoteRequest;
 import com.bookwheel.server.community.dto.ReviewVoteResponse;
+import com.bookwheel.server.community.service.BookExchangeRecommendationService;
 import com.bookwheel.server.community.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -44,6 +47,7 @@ import static com.bookwheel.server.common.util.SecurityUtil.getUserPKOrNull;
 public class BookController {
 
     private final BookService bookService;
+    private final BookExchangeRecommendationService bookExchangeRecommendationService;
 
     @Operation(summary = "도서 검색(목록 조회)",
         description = "카카오 API를 사용해 후보 도서 목록을 검색한 뒤, "
@@ -89,7 +93,23 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "관심 도서 목록 조회", description = "현재 로그인한 사용자가 관심 등록한 도서를 최근 등록순 커서 페이징으로 조회합니다.")
+    @Operation(summary = "관심 도서 목록 조회",
+        description = "마이페이지에서 현재 로그인한 사용자가 관심 등록한 도서를 조회합니다. "
+            + "관심 등록이 최근인 순서로 정렬하며, 등록 시각이 같으면 도서 정보 ID 내림차순으로 정렬합니다. "
+            + "각 항목의 isbn은 도서 상세 조회(GET /api/v1/books/{isbn}) 요청에 그대로 사용할 수 있습니다. "
+            + "제목·저자·표지는 관심 도서 등록 시점에 저장해 둔 값을 사용하므로 목록 조회 시 외부 API를 호출하지 않습니다. "
+            + "등록 시점에 외부 API 조회가 실패했거나 이 기능 이전에 등록된 도서는 모임 도서로 등록된 도서 정보로 대체되며, "
+            + "그마저 없으면 title·author·coverImageUrl이 null로 내려갈 수 있습니다. "
+            + "관심 도서가 없으면 content는 빈 배열, hasNext는 false, nextCursor는 null로 응답합니다. "
+            + "totalElements는 첫 페이지 조회(cursor 미전달) 시에만 내려가고 다음 페이지부터는 null입니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "관심 도서 목록 조회 성공 (관심 도서가 없으면 빈 목록)"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "size가 1~50 범위를 벗어남 (COMMON_001) 또는 커서 값이 유효하지 않음 (CURSOR_001)"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+            description = "사용자를 찾을 수 없음 (AUTH_001)")
+    })
     @GetMapping("/likes")
     public ApiResponse<CursorPageResponse<InterestBookResponseDto>> getInterestBooks(
         @Parameter(description = "다음 페이지 조회용 커서")
@@ -106,9 +126,26 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "도서 상세 조회",
-        description = "ISBN을 통해 도서 상세 정보를 조회합니다. "
-            + "도서관정보나루 기반 이용 분석 정보(usageAnalysis)를 함께 제공하며, "
+    @Operation(
+        summary = "교환독서 추천도서 조회",
+        description = "정보나루 전월 인기대출도서 최신 스냅샷의 상위 31권을 날짜별로 순환해 오늘의 교환독서 추천도서를 조회합니다. "
+            + "책 선정 기준과 서지 정보의 출처는 도서관 정보나루(국립중앙도서관)이며, 좋아요 수와 찜 여부, 대표 후기는 BookWheel 내부 데이터입니다. "
+            + "대표 후기는 스포일러 방지를 위해 공개 후기(isHidden=false) 중 공감 수가 가장 많고 최신인 후기 1건만 제공합니다.\n\n"
+            + "추천 후보 목록은 매월 1일 새벽 4시(KST)에 전월 인기대출도서를 적재한 뒤 교체됩니다. "
+            + "따라서 매월 1일 0시~4시 사이에는 아직 직전 스냅샷 기준으로 추천이 내려가며, 같은 날이라도 4시를 기점으로 추천 도서가 바뀔 수 있습니다. "
+            + "갱신 시점 안내 문구는 basis.description으로 함께 내려가니 클라이언트에서 그대로 노출하면 됩니다.")
+    @GetMapping("/exchange-recommendation")
+    public ApiResponse<BookExchangeRecommendationResponse> getExchangeRecommendation(
+        @AuthenticationPrincipal Object principal
+    ) {
+        BookExchangeRecommendationResponse response =
+            bookExchangeRecommendationService.getDailyRecommendation(getUserPK(principal));
+        return ApiResponse.success(response);
+    }
+
+    @Operation(
+        summary = "도서 상세 조회",
+        description = "ISBN으로 도서 상세 정보를 조회합니다. 도서관정보나루 기반 이용 분석 정보(usageAnalysis)를 함께 제공하며, "
             + "해당 데이터가 없거나 외부 API 조회에 실패한 경우 usageAnalysis는 null로 내려가고 도서 상세 조회는 정상 응답합니다.")
     @GetMapping("/{isbn}")
     public ApiResponse<BookDetailResponse> getBookDetail(

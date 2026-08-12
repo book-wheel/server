@@ -31,6 +31,28 @@ public class PopularLoanBookSyncService {
     private final PopularLoanBookRepository popularLoanBookRepository;
     private final Clock clock;
 
+    /**
+     * 해당 기간 스냅샷에 추천 순환에 필요한 후보가 모두 확보됐는지 확인한다.
+     * 정보나루가 전월 집계를 며칠 늦게 공개하는 경우가 있어 스케줄러가 여러 날 재시도하는데,
+     * 적재를 마친 날에는 외부 API를 다시 호출하지 않기 위해 사용한다.
+     *
+     * 존재 여부(exists)가 아니라 개수로 판단하는 이유는, 소량만 적재된 기간도 "적재됨"으로 보면
+     * 이후 재시도가 모두 건너뛰어져 추천 후보가 한두 권으로 고정되기 때문이다.
+     * 정보나루가 집계를 부분 공개했거나 수동 적재를 작은 pageSize 로 실행한 경우가 여기에 해당한다.
+     *
+     * 정보나루에 실제로 후보 수보다 적은 데이터밖에 없는 기간이면 남은 날에도 재시도하게 되지만,
+     * 같은 데이터로 다시 적재할 뿐이고 더 공개되면 받아올 수 있으므로 이쪽이 의도에 맞다.
+     */
+    @Transactional(readOnly = true)
+    public boolean hasEnoughCandidates(LocalDate startDate, LocalDate endDate) {
+        long syncedCount = popularLoanBookRepository.countBySourceAndStartDateAndEndDate(
+            SOURCE,
+            startDate,
+            endDate
+        );
+        return syncedCount >= PopularLoanBookRepository.RECOMMENDATION_CANDIDATE_COUNT;
+    }
+
     @Transactional
     public PopularLoanBookSyncResult syncPopularLoanBooks(LocalDate startDate, LocalDate endDate, int pageSize) {
         validateSyncRequest(startDate, endDate, pageSize);

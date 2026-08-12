@@ -5,8 +5,8 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.AladinBookSearchResponse;
 import com.bookwheel.server.community.dto.BookDetailResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,6 @@ import java.net.URI;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AladinService {
     @Value("${aladin.api.key}")
     private String aladinApiKey;
@@ -28,6 +27,9 @@ public class AladinService {
 
     private final RestClient restClient;
 
+    public AladinService(@Qualifier("aladinRestClient") RestClient restClient) {
+        this.restClient = restClient;
+    }
 
     public BookDetailResponse getBookDetailByIsbn(String isbn, boolean isInterested) {
 

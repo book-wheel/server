@@ -175,6 +175,28 @@ class PopularLoanBookSyncServiceTest {
         verifyNoInteractions(libraryNaruService, popularLoanBookRepository);
     }
 
+    @Test
+    @DisplayName("A period holding all recommendation candidates is treated as synced")
+    void hasEnoughCandidates_ReturnsTrueWhenCandidateCountIsSecured() {
+        given(popularLoanBookRepository.countBySourceAndStartDateAndEndDate(
+            PopularLoanBookSource.DATA4LIBRARY, START_DATE, END_DATE
+        )).willReturn((long) PopularLoanBookRepository.RECOMMENDATION_CANDIDATE_COUNT);
+
+        assertThat(syncService.hasEnoughCandidates(START_DATE, END_DATE)).isTrue();
+    }
+
+    @Test
+    @DisplayName("A period holding only a few books is not treated as synced")
+    void hasEnoughCandidates_ReturnsFalseWhenOnlyAFewBooksAreStored() {
+        // 수동 적재를 작은 pageSize 로 실행했거나 정보나루가 집계를 부분 공개한 경우,
+        // 행이 있다는 이유로 건너뛰면 추천 후보가 소수로 고정된다.
+        given(popularLoanBookRepository.countBySourceAndStartDateAndEndDate(
+            PopularLoanBookSource.DATA4LIBRARY, START_DATE, END_DATE
+        )).willReturn(1L);
+
+        assertThat(syncService.hasEnoughCandidates(START_DATE, END_DATE)).isFalse();
+    }
+
     private LibraryNaruPopularLoanResponse.Doc doc(Integer ranking, String isbn, Integer loanCount) {
         return new LibraryNaruPopularLoanResponse.Doc(
             ranking,

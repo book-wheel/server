@@ -18,6 +18,8 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
 
     boolean existsByBookInfo_IsbnAndUserPK(String isbn, String userPK);
 
+    long countByBookInfo_Isbn(String isbn);
+
     long countByUserPK(String userPK);
 
     @Query("""
@@ -32,31 +34,15 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
         @Param("isbns") List<String> isbns
     );
 
+    // 찜 시점에 저장해 둔 BookInfo 값을 우선 사용하고, 없으면 모임 도서로 등록된 book 행으로 대체한다.
+    // 커서가 null 이면 첫 페이지, 있으면 커서 이후 페이지를 조회한다.
     @Query("""
             select new com.bookwheel.server.community.dto.InterestBookResponseDto(
                 bi.bookInfoId,
-                b.title,
-                b.author,
-                b.coverImage,
-                bl.createdAt
-            )
-            from BookLike bl
-            join bl.bookInfo bi
-            left join Book b on b.isbn = bi.isbn
-            where bl.userPK = :userPK
-            order by bl.createdAt desc, bi.bookInfoId desc
-            """)
-    List<InterestBookResponseDto> findInterestBooksFirstPage(
-        @Param("userPK") String userPK,
-        Pageable pageable
-    );
-
-    @Query("""
-            select new com.bookwheel.server.community.dto.InterestBookResponseDto(
-                bi.bookInfoId,
-                b.title,
-                b.author,
-                b.coverImage,
+                bi.isbn,
+                coalesce(bi.title, b.title),
+                coalesce(bi.author, b.author),
+                coalesce(bi.coverImage, b.coverImage),
                 bl.createdAt
             )
             from BookLike bl
@@ -64,12 +50,13 @@ public interface BookLikeRepository extends JpaRepository<BookLike, Long> {
             left join Book b on b.isbn = bi.isbn
             where bl.userPK = :userPK
             and (
-                bl.createdAt < :cursorInterestedAt
+                :cursorInterestedAt is null
+                or bl.createdAt < :cursorInterestedAt
                 or (bl.createdAt = :cursorInterestedAt and bi.bookInfoId < :cursorBookId)
             )
             order by bl.createdAt desc, bi.bookInfoId desc
             """)
-    List<InterestBookResponseDto> findInterestBooksAfterCursor(
+    List<InterestBookResponseDto> findInterestBooks(
         @Param("userPK") String userPK,
         @Param("cursorInterestedAt") LocalDateTime cursorInterestedAt,
         @Param("cursorBookId") Long cursorBookId,

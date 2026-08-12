@@ -40,6 +40,9 @@ public record PostDetailResponse(
     @Schema(description = "로그인 사용자의 좋아요 여부", example = "true")
     boolean isLikedByMe,
 
+    @Schema(description = "로그인 사용자의 게시글 작성자 여부", example = "true")
+    boolean isMine,
+
     @Schema(description = "작성 일시")
     LocalDateTime createdAt
 ) {
