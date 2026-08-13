@@ -1,9 +1,13 @@
 package com.bookwheel.server.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Configuration
@@ -63,5 +67,27 @@ public class RestClientConfig {
         return builder
             .requestFactory(factory)
             .build();
+    }
+
+    @Bean
+    public RestClient expoPushRestClient(
+            RestClient.Builder builder,
+            @Value("${expo.push.url:https://exp.host/--/api/v2/push/send}") String pushUrl,
+            @Value("${expo.push.access-token:}") String accessToken
+    ) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(5000);
+
+        RestClient.Builder expoBuilder = builder
+                .requestFactory(factory)
+                .baseUrl(pushUrl)
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+        if (StringUtils.hasText(accessToken)) {
+            expoBuilder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken.trim());
+        }
+        return expoBuilder.build();
     }
 }

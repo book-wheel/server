@@ -12,7 +12,8 @@ import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.enums.NotificationType;
 import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
-import com.bookwheel.server.notification.push.FcmSender;
+import com.bookwheel.server.notification.push.PushSender;
+import com.bookwheel.server.notification.push.PushTarget;
 import com.bookwheel.server.notification.repository.NotificationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -21,13 +22,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -51,7 +58,7 @@ class NotificationServiceTest {
     private NotificationPreferenceService preferenceService;
 
     @Mock
-    private FcmSender fcmSender;
+    private PushSender pushSender;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -152,7 +159,7 @@ class NotificationServiceTest {
         then(preferenceService).shouldHaveNoInteractions();
         then(notificationRepository).should(never()).save(any(Notification.class));
         // 열 수 없는 링크를 푸시로 먼저 보내는 일도 없어야 한다.
-        then(fcmSender).shouldHaveNoInteractions();
+        then(pushSender).shouldHaveNoInteractions();
     }
 
     @Test
@@ -172,7 +179,7 @@ class NotificationServiceTest {
         assertThat(notification).isNull();
         then(preferenceService).shouldHaveNoInteractions();
         then(notificationRepository).should(never()).save(any(Notification.class));
-        then(fcmSender).shouldHaveNoInteractions();
+        then(pushSender).shouldHaveNoInteractions();
     }
 
     @Test
@@ -213,7 +220,102 @@ class NotificationServiceTest {
         assertThat(saved).isEmpty();
         then(preferenceService).shouldHaveNoInteractions();
         then(notificationRepository).should(never()).saveAll(org.mockito.ArgumentMatchers.anyList());
-        then(fcmSender).shouldHaveNoInteractions();
+        then(pushSender).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("Expo Push Token이 있으면 저장된 알림으로 실제 푸시 발송을 요청한다")
+    void createSendsPushWithSavedNotification() {
+        String token = "ExponentPushToken[valid_token]";
+        NotificationPreference preference = NotificationPreference.builder()
+                .userPK("userPK")
+                .expoPushToken(token)
+                .build();
+        given(preferenceService.getOrInit("userPK")).willReturn(preference);
+        given(notificationRepository.save(any(Notification.class))).willAnswer(invocation -> {
+            Notification notification = invocation.getArgument(0);
+            ReflectionTestUtils.setField(notification, "id", 41L);
+            return notification;
+        });
+
+        Notification saved = notificationService.create(NotificationEvent.builder()
+                .recipientUserPK("userPK")
+                .type(NotificationType.ACCOUNT_DEACTIVATED)
+                .title("계정 알림")
+                .body("계정 상태가 변경됐어요.")
+                .deepLink("/account")
+                .build());
+
+        assertThat(saved.getId()).isEqualTo(41L);
+        then(pushSender).should().send(token, saved);
+    }
+
+    @Test
+    @DisplayName("벌크 푸시는 토큰마다 해당 사용자의 저장된 알림을 함께 전달한다")
+    @SuppressWarnings("unchecked")
+    void createBulkSendsRecipientSpecificNotifications() {
+        NotificationPreference firstPreference = NotificationPreference.builder()
+                .userPK("firstUserPK")
+                .expoPushToken("ExponentPushToken[first_token]")
+                .build();
+        NotificationPreference secondPreference = NotificationPreference.builder()
+                .userPK("secondUserPK")
+                .expoPushToken("ExpoPushToken[second_token]")
+                .build();
+        given(preferenceService.getOrInitAll(List.of("firstUserPK", "secondUserPK")))
+                .willReturn(Map.of(
+                        "firstUserPK", firstPreference,
+                        "secondUserPK", secondPreference
+                ));
+        given(notificationRepository.saveAll(any())).willAnswer(invocation -> {
+            List<Notification> notifications = invocation.getArgument(0);
+            ReflectionTestUtils.setField(notifications.get(0), "id", 51L);
+            ReflectionTestUtils.setField(notifications.get(1), "id", 52L);
+            return notifications;
+        });
+
+        notificationService.createBulk(BulkNotificationEvent.builder()
+                .recipientUserPKs(List.of("firstUserPK", "secondUserPK"))
+                .type(NotificationType.GROUP_JOIN_APPROVED)
+                .title("가입 승인")
+                .body("모임 가입이 승인됐어요.")
+                .deepLink("/groups/group-1")
+                .build());
+
+        ArgumentCaptor<List<PushTarget>> captor = ArgumentCaptor.forClass(List.class);
+        then(pushSender).should().sendBatch(captor.capture());
+        assertThat(captor.getValue())
+                .extracting(PushTarget::expoPushToken)
+                .containsExactly("ExponentPushToken[first_token]", "ExpoPushToken[second_token]");
+        assertThat(captor.getValue())
+                .extracting(target -> target.notification().getId())
+                .containsExactly(51L, 52L);
+    }
+
+    @Test
+    @DisplayName("인앱 알림 목록은 프론트 이동에 필요한 payload를 data로 반환한다")
+    void listExposesNotificationData() {
+        Notification notification = Notification.builder()
+                .id(63L)
+                .recipientUserPK("userPK")
+                .type(NotificationType.REVIEW_LIKED)
+                .category(NotificationType.REVIEW_LIKED.getCategory())
+                .title("리뷰 공감")
+                .body("리뷰에 공감했어요.")
+                .deepLink("/reviews/3")
+                .payload("{\"reviewId\":3,\"isbn\":\"9788954681179\"}")
+                .build();
+        PageRequest pageable = PageRequest.of(0, 20);
+        given(notificationRepository.findByRecipientUserPKOrderByCreatedAtDesc("userPK", pageable))
+                .willReturn(new PageImpl<>(List.of(notification), pageable, 1));
+
+        var response = notificationService.list("userPK", pageable).getContent().get(0);
+
+        assertThat(response.data().notificationId()).isEqualTo(63L);
+        assertThat(response.data().type()).isEqualTo(NotificationType.REVIEW_LIKED);
+        assertThat(response.data().deepLink()).isEqualTo("/reviews/3");
+        assertThat(response.data().reviewId()).isEqualTo(3L);
+        assertThat(response.data().isbn()).isEqualTo("9788954681179");
     }
 
     private NotificationEvent postLikedEvent() {

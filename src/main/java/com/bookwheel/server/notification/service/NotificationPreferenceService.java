@@ -88,8 +88,9 @@ public class NotificationPreferenceService {
                 request.communityEnabled(),
                 request.pushEnabled()
         );
-        if (request.fcmToken() != null) {
-            preference.updateFcmToken(request.fcmToken());
+        if (request.expoPushToken() != null) {
+            // 빈 문자열은 프론트가 명시적으로 전달하는 토큰 해제 요청이다.
+            preference.updateExpoPushToken(request.expoPushToken().isEmpty() ? null : request.expoPushToken());
         }
         return NotificationPreferenceResponse.from(preference);
     }

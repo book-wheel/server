@@ -39,8 +39,9 @@ public class NotificationPreference {
     @Column(name = "push_enabled", nullable = false)
     private Boolean pushEnabled = true;
 
+    // Keep the deployed column name for a zero-downtime rollout; the domain and API now treat the value as an Expo token.
     @Column(name = "fcm_token", length = 255)
-    private String fcmToken;
+    private String expoPushToken;
 
     public static NotificationPreference defaultsFor(String userPK) {
         return NotificationPreference.builder()
@@ -81,7 +82,7 @@ public class NotificationPreference {
         if (pushEnabled != null) this.pushEnabled = pushEnabled;
     }
 
-    public void updateFcmToken(String fcmToken) {
-        this.fcmToken = fcmToken;
+    public void updateExpoPushToken(String expoPushToken) {
+        this.expoPushToken = expoPushToken;
     }
 }

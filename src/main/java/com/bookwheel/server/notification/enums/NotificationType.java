@@ -1,10 +1,12 @@
 package com.bookwheel.server.notification.enums;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
+@Schema(description = "알림 종류")
 public enum NotificationType {
     // 그룹 가입/멤버십
     GROUP_JOIN_REQUESTED(NotificationCategory.GROUP),
