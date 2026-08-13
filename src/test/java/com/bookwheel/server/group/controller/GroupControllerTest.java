@@ -1,6 +1,8 @@
 package com.bookwheel.server.group.controller;
 
 import java.time.LocalDate;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
 import com.bookwheel.server.group.dto.member.*;
 import com.bookwheel.server.group.dto.search.*;
@@ -229,6 +231,22 @@ class GroupControllerTest {
                         .value("https://example.com/cover.jpg"))
                 .andExpect(jsonPath("$.data.members[0].currentRoundAssignment.readingStatus")
                         .value("READING"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("존재하지 않는 그룹의 멤버 목록 조회는 GROUP_NOT_FOUND를 반환한다")
+    void getGroupMembers_ReturnsGroupNotFound_WhenGroupDoesNotExist() throws Exception {
+        String groupId = "not-existing-group";
+        given(memberService.getGroupMembers(groupId))
+                .willThrow(new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("GROUP_004"))
+                .andExpect(jsonPath("$.error.message").value("존재하지 않는 그룹입니다."));
     }
 
     @Test

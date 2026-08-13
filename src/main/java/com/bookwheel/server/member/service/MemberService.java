@@ -1,11 +1,14 @@
 package com.bookwheel.server.member.service;
 
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.group.dto.member.GroupCurrentRoundResponse;
 import com.bookwheel.server.group.dto.member.GroupMemberListResponse;
 import com.bookwheel.server.group.dto.member.GroupMemberCurrentRoundAssignmentResponse;
 import com.bookwheel.server.group.dto.member.GroupMemberResponse;
 import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MemberService {
+    private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
     private final S3Service s3Service;
     private final RoundRepository roundRepository;
@@ -41,6 +45,8 @@ public class MemberService {
     }
 
     public GroupMemberListResponse getGroupMembers(String groupId) {
+        validateGroupExists(groupId);
+
         Optional<Round> currentRound = roundRepository.findCurrentRound(
                 groupId,
                 LocalDate.now(clock),
@@ -65,6 +71,12 @@ public class MemberService {
                 currentRound.map(GroupCurrentRoundResponse::from).orElse(null),
                 members
         );
+    }
+
+    private void validateGroupExists(String groupId) {
+        groupRepository.findById(groupId)
+                .filter(group -> group.getGroupState() != State.DELETED)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
     }
 
     // 조회된 멤버를 DTO로 변환

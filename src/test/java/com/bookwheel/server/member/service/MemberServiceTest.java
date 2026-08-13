@@ -1,15 +1,19 @@
 package com.bookwheel.server.member.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
 import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.entity.OwnBook;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.group.dto.member.GroupMemberListResponse;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -46,6 +50,9 @@ class MemberServiceTest {
     );
 
     @Mock
+    private GroupRepository groupRepository;
+
+    @Mock
     private MemberRepository memberRepository;
 
     @Mock
@@ -62,6 +69,7 @@ class MemberServiceTest {
     @BeforeEach
     void setUp() {
         memberService = new MemberService(
+                groupRepository,
                 memberRepository,
                 s3Service,
                 roundRepository,
@@ -137,6 +145,7 @@ class MemberServiceTest {
                 .build();
         given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
                 .willReturn(List.of(member));
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(roundRepository.findCurrentRound(groupId, LocalDate.of(2026, 8, 14), State.IN_PROGRESS))
                 .willReturn(Optional.empty());
 
@@ -198,6 +207,7 @@ class MemberServiceTest {
                 LocalDate.of(2026, 8, 14),
                 State.IN_PROGRESS
         )).willReturn(Optional.of(currentRound));
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(wheelStateRepository.findAllByRoundIdWithMemberAndBook(currentRound.getRoundId()))
                 .willReturn(List.of(assignment));
         given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
@@ -248,6 +258,7 @@ class MemberServiceTest {
                 LocalDate.of(2026, 8, 14),
                 State.IN_PROGRESS
         )).willReturn(Optional.of(currentRound));
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(wheelStateRepository.findAllByRoundIdWithMemberAndBook(currentRound.getRoundId()))
                 .willReturn(List.of());
         given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
@@ -259,6 +270,43 @@ class MemberServiceTest {
         assertThat(response.members()).singleElement().satisfies(item ->
                 assertThat(item.currentRoundAssignment()).isNull()
         );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 그룹의 멤버 목록은 조회할 수 없다")
+    void getGroupMembers_ThrowsGroupNotFound_WhenGroupDoesNotExist() {
+        String groupId = "not-existing-group";
+        given(groupRepository.findById(groupId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberService.getGroupMembers(groupId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_NOT_FOUND);
+
+        then(roundRepository).shouldHaveNoInteractions();
+        then(wheelStateRepository).shouldHaveNoInteractions();
+        then(memberRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("삭제된 그룹의 멤버 목록은 조회할 수 없다")
+    void getGroupMembers_ThrowsGroupNotFound_WhenGroupIsDeleted() {
+        String groupId = "deleted-group";
+        Group deletedGroup = Group.builder()
+                .groupId(groupId)
+                .groupName("삭제된 모임")
+                .groupState(State.DELETED)
+                .build();
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(deletedGroup));
+
+        assertThatThrownBy(() -> memberService.getGroupMembers(groupId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_NOT_FOUND);
+
+        then(roundRepository).shouldHaveNoInteractions();
+        then(wheelStateRepository).shouldHaveNoInteractions();
+        then(memberRepository).shouldHaveNoInteractions();
     }
 
     private User createUser(String loginId, String nickname) {
