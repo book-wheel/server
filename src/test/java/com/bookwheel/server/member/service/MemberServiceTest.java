@@ -2,29 +2,48 @@ package com.bookwheel.server.member.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
+import com.bookwheel.server.book.entity.Book;
+import com.bookwheel.server.book.entity.OwnBook;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.group.dto.member.GroupMemberListResponse;
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
+import com.bookwheel.server.schedule.entity.Round;
+import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
+import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.enums.WheelStatus;
+import com.bookwheel.server.wheel.repository.WheelStateRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestWatcher;
 import org.mockito.junit.jupiter.MockitoExtension;
-import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
+
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-08-14T00:00:00Z"),
+            ZoneId.of("Asia/Seoul")
+    );
 
     @Mock
     private MemberRepository memberRepository;
@@ -32,8 +51,24 @@ class MemberServiceTest {
     @Mock
     private S3Service s3Service;
 
-    @InjectMocks
+    @Mock
+    private RoundRepository roundRepository;
+
+    @Mock
+    private WheelStateRepository wheelStateRepository;
+
     private MemberService memberService;
+
+    @BeforeEach
+    void setUp() {
+        memberService = new MemberService(
+                memberRepository,
+                s3Service,
+                roundRepository,
+                wheelStateRepository,
+                FIXED_CLOCK
+        );
+    }
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -102,13 +137,136 @@ class MemberServiceTest {
                 .build();
         given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
                 .willReturn(List.of(member));
+        given(roundRepository.findCurrentRound(groupId, LocalDate.of(2026, 8, 14), State.IN_PROGRESS))
+                .willReturn(Optional.empty());
 
         GroupMemberListResponse response = memberService.getGroupMembers(groupId);
 
+        assertThat(response.currentRound()).isNull();
         assertThat(response.members()).singleElement().satisfies(item -> {
             assertThat(item.memberId()).isEqualTo("member-1");
             assertThat(item.userPK()).isEqualTo(user.getId());
             assertThat(item.readOrder()).isEqualTo(2);
+            assertThat(item.currentRoundAssignment()).isNull();
         });
+        then(wheelStateRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("멤버 목록은 현재 라운드와 멤버별 배정 도서 및 독서 상태를 반환한다")
+    void getGroupMembers_ReturnsCurrentRoundAssignment() {
+        String groupId = "group-1";
+        Group group = Group.builder().groupId(groupId).groupName("모임").build();
+        User reader = createUser("reader", "독자");
+        User owner = createUser("owner", "책 주인");
+        Member member = Member.builder()
+                .memberId("member-1")
+                .group(group)
+                .user(reader)
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.ACTIVE)
+                .readOrder(1)
+                .build();
+        Round currentRound = Round.builder()
+                .roundId("round-2")
+                .group(group)
+                .roundNumber(2)
+                .startDate(LocalDate.of(2026, 8, 10))
+                .endDate(LocalDate.of(2026, 8, 16))
+                .build();
+        Book book = Book.builder()
+                .bookId("book-1")
+                .title("소년이 온다")
+                .coverImage("https://example.com/cover.jpg")
+                .build();
+        OwnBook ownBook = OwnBook.builder()
+                .ownBookId("own-book-1")
+                .group(group)
+                .owner(owner)
+                .book(book)
+                .build();
+        WheelState assignment = WheelState.builder()
+                .wheelStateId("wheel-1")
+                .roundId(currentRound.getRoundId())
+                .member(member)
+                .ownBook(ownBook)
+                .wheelState(WheelStatus.READING)
+                .build();
+
+        given(roundRepository.findCurrentRound(
+                groupId,
+                LocalDate.of(2026, 8, 14),
+                State.IN_PROGRESS
+        )).willReturn(Optional.of(currentRound));
+        given(wheelStateRepository.findAllByRoundIdWithMemberAndBook(currentRound.getRoundId()))
+                .willReturn(List.of(assignment));
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
+                .willReturn(List.of(member));
+
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+
+        assertThat(response.totalCount()).isEqualTo(1);
+        assertThat(response.currentRound()).satisfies(round -> {
+            assertThat(round.roundId()).isEqualTo("round-2");
+            assertThat(round.roundNumber()).isEqualTo(2);
+        });
+        assertThat(response.members()).singleElement().satisfies(item -> {
+            assertThat(item.readOrder()).isEqualTo(1);
+            assertThat(item.currentRoundAssignment()).satisfies(currentAssignment -> {
+                assertThat(currentAssignment.wheelStateId()).isEqualTo("wheel-1");
+                assertThat(currentAssignment.bookId()).isEqualTo("book-1");
+                assertThat(currentAssignment.bookTitle()).isEqualTo("소년이 온다");
+                assertThat(currentAssignment.coverImage()).isEqualTo("https://example.com/cover.jpg");
+                assertThat(currentAssignment.readingStatus()).isEqualTo(WheelStatus.READING);
+            });
+        });
+    }
+
+    @Test
+    @DisplayName("현재 라운드에 배정되지 않은 멤버의 배정 정보는 null이다")
+    void getGroupMembers_ReturnsNullAssignment_WhenMemberIsNotAssigned() {
+        String groupId = "group-1";
+        Group group = Group.builder().groupId(groupId).groupName("모임").build();
+        Member member = Member.builder()
+                .memberId("member-1")
+                .group(group)
+                .user(createUser("reader", "독자"))
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.ACTIVE)
+                .readOrder(1)
+                .build();
+        Round currentRound = Round.builder()
+                .roundId("round-1")
+                .group(group)
+                .roundNumber(1)
+                .startDate(LocalDate.of(2026, 8, 10))
+                .endDate(LocalDate.of(2026, 8, 16))
+                .build();
+
+        given(roundRepository.findCurrentRound(
+                groupId,
+                LocalDate.of(2026, 8, 14),
+                State.IN_PROGRESS
+        )).willReturn(Optional.of(currentRound));
+        given(wheelStateRepository.findAllByRoundIdWithMemberAndBook(currentRound.getRoundId()))
+                .willReturn(List.of());
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
+                .willReturn(List.of(member));
+
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+
+        assertThat(response.currentRound()).isNotNull();
+        assertThat(response.members()).singleElement().satisfies(item ->
+                assertThat(item.currentRoundAssignment()).isNull()
+        );
+    }
+
+    private User createUser(String loginId, String nickname) {
+        return User.builder()
+                .loginId(loginId)
+                .password("password")
+                .nickname(nickname)
+                .mail(loginId + "@example.com")
+                .build();
     }
 }

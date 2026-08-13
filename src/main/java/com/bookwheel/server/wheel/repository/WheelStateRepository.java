@@ -33,6 +33,17 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
 
     List<WheelState> findByRoundId(String roundId);
 
+    // 멤버 목록에서 현재 라운드의 멤버별 배정과 책 정보를 한 번에 조회한다.
+    @Query("""
+            select ws
+            from WheelState ws
+            join fetch ws.member
+            join fetch ws.ownBook ownBook
+            join fetch ownBook.book
+            where ws.roundId = :roundId
+            """)
+    List<WheelState> findAllByRoundIdWithMemberAndBook(@Param("roundId") String roundId);
+
     // 인증 시작부터 완료 저장까지 같은 WheelState를 단독으로 다룬다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from WheelState w where w.wheelStateId = :wheelStateId")
