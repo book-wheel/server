@@ -1,5 +1,6 @@
 package com.bookwheel.server.wheel.repository;
 
+import com.bookwheel.server.community.dto.CurrentReadingBookResponse;
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import jakarta.persistence.LockModeType;
@@ -9,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +34,31 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
     List<WheelState> findByRoundIdInForUpdate(@Param("roundIds") Collection<String> roundIds);
 
     List<WheelState> findByRoundId(String roundId);
+
+    @Query("""
+            select new com.bookwheel.server.community.dto.CurrentReadingBookResponse(
+                g.groupId,
+                b.title,
+                b.coverImage
+            )
+            from WheelState ws
+            join ws.member m
+            join m.group g
+            join ws.ownBook ownBook
+            join ownBook.book b
+            join Round r on r.roundId = ws.roundId
+            where m.user.id = :userPK
+              and m.memberStatus = com.bookwheel.server.member.enums.MemberStatus.ACTIVE
+              and g.groupState = com.bookwheel.server.group.enums.State.IN_PROGRESS
+              and r.startDate <= :today
+              and r.endDate >= :today
+              and r.roundNumber <= g.groupRoundCount
+            order by r.endDate asc, g.groupId asc
+            """)
+    List<CurrentReadingBookResponse> findCurrentReadingBooks(
+            @Param("userPK") String userPK,
+            @Param("today") LocalDate today
+    );
 
     // 인증 시작부터 완료 저장까지 같은 WheelState를 단독으로 다룬다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
