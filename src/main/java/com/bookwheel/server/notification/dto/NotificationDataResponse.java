@@ -10,17 +10,19 @@ import java.util.Map;
 
 @Schema(
         name = "NotificationDataResponse",
-        description = "푸시 및 인앱 알림 화면 이동에 사용하는 데이터입니다. 알림 종류에 해당하는 선택 필드만 포함됩니다."
+        description = "GET /api/v1/notifications의 인앱 알림 data입니다. 알림 종류에 해당하는 선택 필드만 포함됩니다. "
+                + "실제 Expo Push data는 개인정보 최소화를 위해 notificationId, type, deepLink만 기본 제공하고 "
+                + "REVIEW_LIKED에만 isbn을 추가로 제공합니다."
 )
 public record NotificationDataResponse(
-        @Schema(description = "저장된 알림 ID", example = "42", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "저장된 알림 ID. 인앱·Expo Push data 공통 필드", example = "42", requiredMode = Schema.RequiredMode.REQUIRED)
         Long notificationId,
 
-        @Schema(description = "알림 종류", example = "REVIEW_LIKED", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "알림 종류. 인앱·Expo Push data 공통 필드", example = "REVIEW_LIKED", requiredMode = Schema.RequiredMode.REQUIRED)
         NotificationType type,
 
         @Schema(
-                description = "프론트엔드 이동 경로. 이동 대상이 없는 알림은 null일 수 있습니다.",
+                description = "프론트엔드 이동 경로. 인앱·Expo Push data 공통 필드며 이동 대상이 없으면 null일 수 있습니다.",
                 example = "/reviews/9",
                 nullable = true,
                 requiredMode = Schema.RequiredMode.REQUIRED
@@ -60,7 +62,7 @@ public record NotificationDataResponse(
         Long reviewId,
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        @Schema(description = "리뷰가 작성된 도서 ISBN", example = "9788954681179", nullable = true)
+        @Schema(description = "리뷰가 작성된 도서 ISBN. REVIEW_LIKED에서 인앱과 Expo Push data에 모두 포함", example = "9788954681179", nullable = true)
         String isbn,
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -84,7 +86,7 @@ public record NotificationDataResponse(
         String banType,
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        @Schema(description = "계정 제재 사유", example = "운영 정책 위반", nullable = true)
+        @Schema(description = "계정 제재 사유. 인앱 알림 전용이며 Expo Push data에는 포함하지 않음", example = "운영 정책 위반", nullable = true)
         String reasonMessage,
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -96,7 +98,7 @@ public record NotificationDataResponse(
         String releaseDate,
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        @Schema(description = "계정 알림 관련 이메일", example = "reader@example.com", nullable = true)
+        @Schema(description = "계정 알림 관련 이메일. 인앱 알림 전용이며 Expo Push data에는 포함하지 않음", example = "reader@example.com", nullable = true)
         String mail
 ) {
 
@@ -150,6 +152,21 @@ public record NotificationDataResponse(
         putIfNotNull(data, "permanent", permanent);
         putIfNotNull(data, "releaseDate", releaseDate);
         putIfNotNull(data, "mail", mail);
+        return data;
+    }
+
+    /**
+     * 외부 Push 제공자에는 프론트 이동에 필요한 최소 데이터만 전달한다.
+     * 제재 사유나 이메일 같은 인앱 상세 필드는 푸시 payload에 포함하지 않는다.
+     */
+    public Map<String, Object> toPushData() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("notificationId", notificationId);
+        data.put("type", type.name());
+        data.put("deepLink", deepLink);
+        if (type == NotificationType.REVIEW_LIKED) {
+            putIfNotNull(data, "isbn", isbn);
+        }
         return data;
     }
 

@@ -75,13 +75,26 @@ public class RestClientConfig {
             @Value("${expo.push.url:https://exp.host/--/api/v2/push/send}") String pushUrl,
             @Value("${expo.push.access-token:}") String accessToken
     ) {
+        return expoRestClient(builder, pushUrl, accessToken);
+    }
+
+    @Bean
+    public RestClient expoPushReceiptRestClient(
+            RestClient.Builder builder,
+            @Value("${expo.push.receipts-url:https://exp.host/--/api/v2/push/getReceipts}") String receiptsUrl,
+            @Value("${expo.push.access-token:}") String accessToken
+    ) {
+        return expoRestClient(builder, receiptsUrl, accessToken);
+    }
+
+    private RestClient expoRestClient(RestClient.Builder builder, String url, String accessToken) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3000);
         factory.setReadTimeout(5000);
 
         RestClient.Builder expoBuilder = builder
                 .requestFactory(factory)
-                .baseUrl(pushUrl)
+                .baseUrl(url)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
