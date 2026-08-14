@@ -34,8 +34,9 @@ public class NotificationController {
     @Operation(
             summary = "내 알림 목록 조회",
             description = "로그인 사용자의 알림을 최신순으로 조회합니다. "
-                    + "data에는 푸시와 동일한 notificationId, type, deepLink와 알림 종류별 이동 정보가 포함됩니다. "
-                    + "REVIEW_LIKED 알림에는 reviewId와 isbn이 함께 제공됩니다."
+                    + "data에는 notificationId, type, deepLink와 알림 종류별 이동·상세 정보가 포함됩니다. "
+                    + "REVIEW_LIKED 알림에는 reviewId와 isbn이 함께 제공됩니다. "
+                    + "외부 Expo Push data는 notificationId, type, deepLink와 REVIEW_LIKED의 isbn만 전달합니다."
     )
     @GetMapping
     public ApiResponse<Page<NotificationResponse>> list(
@@ -77,7 +78,8 @@ public class NotificationController {
 
     @Operation(
             summary = "내 알림 설정 조회",
-            description = "카테고리별 수신 여부, 푸시 수신 여부와 현재 등록된 Expo Push Token을 조회합니다."
+            description = "카테고리별 수신 여부, 푸시 수신 여부와 현재 계정에 귀속된 Expo Push Token을 조회합니다. "
+                    + "로그아웃·명시적 해제·만료 토큰 처리 후에는 expoPushToken이 null입니다."
     )
     @GetMapping("/preferences")
     public ApiResponse<NotificationPreferenceResponse> getPreferences(@AuthenticationPrincipal Object principal) {
@@ -87,7 +89,9 @@ public class NotificationController {
     @Operation(
             summary = "내 알림 설정 변경",
             description = "카테고리·푸시 on/off와 Expo Push Token 등록·해제를 처리합니다. "
-                    + "expoPushToken에 유효한 토큰을 전달하면 등록·갱신하고, 빈 문자열이면 해제하며, "
+                    + "expoPushToken은 ExpoPushToken[...] / ExponentPushToken[...] / UUID 형식을 지원합니다. "
+                    + "유효한 토큰을 전달하면 등록·갱신하고, 같은 토큰의 이전 사용자 귀속은 자동 해제합니다. "
+                    + "빈 문자열이면 해제하며, "
                     + "null 또는 생략하면 기존 값을 유지합니다. 다른 설정 필드도 null 또는 생략 시 기존 값을 유지합니다."
     )
     @PutMapping("/preferences")

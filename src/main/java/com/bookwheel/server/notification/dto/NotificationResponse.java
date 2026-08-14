@@ -28,7 +28,11 @@ public record NotificationResponse(
         @Schema(description = "프론트엔드 이동 경로", example = "/reviews/9", nullable = true)
         String deepLink,
 
-        @Schema(description = "푸시와 동일한 화면 이동 데이터", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                description = "인앱 화면 이동과 알림 종류별 상세 데이터. "
+                        + "Expo Push는 여기서 notificationId, type, deepLink와 REVIEW_LIKED의 isbn만 전달",
+                requiredMode = Schema.RequiredMode.REQUIRED
+        )
         NotificationDataResponse data,
 
         @Schema(description = "읽음 여부", example = "false", requiredMode = Schema.RequiredMode.REQUIRED)
