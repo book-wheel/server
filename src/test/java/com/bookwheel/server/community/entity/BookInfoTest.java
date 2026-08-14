@@ -17,7 +17,7 @@ class BookInfoTest {
     }
 
     @Test
-    @DisplayName("제목이 비어 있으면 전달받은 제목으로 채운다.")
+    @DisplayName("Missing title is filled")
     void applyTitleIfAbsent_FillsWhenEmpty() {
         BookInfo bookInfo = bookInfo(null);
 
@@ -27,11 +27,22 @@ class BookInfoTest {
     }
 
     @Test
-    @DisplayName("이미 저장된 제목이 있으면 덮어쓰지 않는다.")
+    @DisplayName("Existing title is kept")
     void applyTitleIfAbsent_KeepsExistingTitle() {
         BookInfo bookInfo = bookInfo("Clean Code");
 
-        bookInfo.applyTitleIfAbsent("다른 제목");
+        bookInfo.applyTitleIfAbsent("Other Title");
+
+        assertThat(bookInfo.getTitle()).isEqualTo("Clean Code");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "\t"})
+    @DisplayName("Blank stored title is filled")
+    void applyTitleIfAbsent_FillsWhenStoredTitleIsBlank(String storedTitle) {
+        BookInfo bookInfo = bookInfo(storedTitle);
+
+        bookInfo.applyTitleIfAbsent("Clean Code");
 
         assertThat(bookInfo.getTitle()).isEqualTo("Clean Code");
     }
@@ -39,12 +50,40 @@ class BookInfoTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " ", "\t"})
-    @DisplayName("전달받은 제목이 null이거나 공백이면 저장하지 않는다.")
+    @DisplayName("Blank incoming title is ignored")
     void applyTitleIfAbsent_IgnoresBlankTitle(String title) {
         BookInfo bookInfo = bookInfo(null);
 
         bookInfo.applyTitleIfAbsent(title);
 
         assertThat(bookInfo.getTitle()).isNull();
+    }
+
+    @Test
+    @DisplayName("Book metadata is complete only when title, author, and cover are all present")
+    void hasBookDetails_ReturnsTrueWhenAllMetadataExists() {
+        BookInfo bookInfo = BookInfo.builder()
+            .isbn(ISBN)
+            .title("Clean Code")
+            .author("Robert C. Martin")
+            .coverImage("https://example.com/cover.jpg")
+            .build();
+
+        assertThat(bookInfo.hasBookDetails()).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " ", "\t"})
+    @DisplayName("Blank title keeps book metadata incomplete")
+    void hasBookDetails_ReturnsFalseWhenRequiredMetadataIsBlank(String title) {
+        BookInfo bookInfo = BookInfo.builder()
+            .isbn(ISBN)
+            .title(title)
+            .author("Robert C. Martin")
+            .coverImage("https://example.com/cover.jpg")
+            .build();
+
+        assertThat(bookInfo.hasBookDetails()).isFalse();
     }
 }

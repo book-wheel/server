@@ -7,8 +7,6 @@ import com.bookwheel.server.community.dto.AladinBookSearchResponse;
 import com.bookwheel.server.community.dto.BookDetailResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -35,7 +33,7 @@ public class AladinService {
 
         URI uri = UriComponentsBuilder.fromHttpUrl(aladinApiUrl)
             .queryParam("ttbkey", aladinApiKey)
-            .queryParam("itemIdType", "ISBN13")
+            .queryParam("itemIdType", resolveItemIdType(isbn))
             .queryParam("ItemId", isbn)
             .queryParam("output", "js")
             .queryParam("Version", "20131101")
@@ -62,6 +60,10 @@ public class AladinService {
         }
 
         return BookDetailResponse.from(response.item().get(0), isInterested);
+    }
+
+    private String resolveItemIdType(String isbn) {
+        return isbn != null && isbn.trim().length() == 10 ? "ISBN" : "ISBN13";
     }
 }
 

@@ -3,8 +3,14 @@ package com.bookwheel.server.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 public class RestClientConfig {
@@ -18,6 +24,7 @@ public class RestClientConfig {
 
         return builder
             .requestFactory(factory)
+            .messageConverters(this::supportAladinJsonMediaTypes)
             .build();
     }
 
@@ -63,5 +70,24 @@ public class RestClientConfig {
         return builder
             .requestFactory(factory)
             .build();
+    }
+
+    private void supportAladinJsonMediaTypes(List<HttpMessageConverter<?>> converters) {
+        converters.stream()
+            .filter(MappingJackson2HttpMessageConverter.class::isInstance)
+            .map(MappingJackson2HttpMessageConverter.class::cast)
+            .findFirst()
+            .ifPresent(converter -> {
+                List<MediaType> mediaTypes = new ArrayList<>(converter.getSupportedMediaTypes());
+                addIfAbsent(mediaTypes, MediaType.valueOf("text/javascript"));
+                addIfAbsent(mediaTypes, MediaType.valueOf("application/javascript"));
+                converter.setSupportedMediaTypes(mediaTypes);
+            });
+    }
+
+    private void addIfAbsent(List<MediaType> mediaTypes, MediaType mediaType) {
+        if (!mediaTypes.contains(mediaType)) {
+            mediaTypes.add(mediaType);
+        }
     }
 }

@@ -32,7 +32,7 @@ public class BookInfo {
 
     // 같은 ISBN의 BookInfo는 게시글 간에 재사용되므로, 제목이 비어 있을 때만 채운다.
     public void applyTitleIfAbsent(String title) {
-        if (this.title == null && title != null && !title.isBlank()) {
+        if (!hasText(this.title) && hasText(title)) {
             this.title = title;
         }
     }
@@ -41,17 +41,21 @@ public class BookInfo {
     public void applyBookDetailsIfAbsent(String title, String author, String coverImage) {
         applyTitleIfAbsent(title);
 
-        if (this.author == null && author != null && !author.isBlank()) {
+        if (!hasText(this.author) && hasText(author)) {
             this.author = author;
         }
 
-        if (this.coverImage == null && coverImage != null && !coverImage.isBlank()) {
+        if (!hasText(this.coverImage) && hasText(coverImage)) {
             this.coverImage = coverImage;
         }
     }
 
-    // 표지가 있으면 관심 도서 목록을 그리는 데 필요한 정보가 갖춰진 것으로 본다.
-    public boolean hasCoverImage() {
-        return coverImage != null;
+    // 관심 도서 목록에 필요한 기본 메타데이터가 모두 있어야 외부 조회를 다시 시도하지 않는다.
+    public boolean hasBookDetails() {
+        return hasText(title) && hasText(author) && hasText(coverImage);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

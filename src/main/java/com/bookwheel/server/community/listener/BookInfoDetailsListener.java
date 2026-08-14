@@ -4,7 +4,7 @@ import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.event.BookLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
-import com.bookwheel.server.community.service.AladinService;
+import com.bookwheel.server.community.service.BookDetailLookupService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,7 +26,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class BookInfoDetailsListener {
 
     private final BookInfoRepository bookInfoRepository;
-    private final AladinService aladinService;
+    private final BookDetailLookupService bookDetailLookupService;
 
     /**
      * 커밋 이후에 실행되므로 찜 트랜잭션의 영속성 컨텍스트는 이미 닫혀 있다.
@@ -40,7 +40,7 @@ public class BookInfoDetailsListener {
     public void onBookLiked(BookLikedEvent event) {
         try {
             bookInfoRepository.findByIsbn(event.isbn())
-                .filter(bookInfo -> !bookInfo.hasCoverImage())
+                .filter(bookInfo -> !bookInfo.hasBookDetails())
                 .ifPresent(this::applyBookDetails);
         } catch (Exception e) {
             log.warn("관심 도서 정보 저장 실패 - ISBN: {}, 원인: {}", event.isbn(), e.getMessage());
@@ -48,7 +48,7 @@ public class BookInfoDetailsListener {
     }
 
     private void applyBookDetails(BookInfo bookInfo) {
-        BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(bookInfo.getIsbn(), true);
+        BookDetailResponse bookDetail = bookDetailLookupService.getBookDetailByIsbn(bookInfo.getIsbn(), true);
         bookInfo.applyBookDetailsIfAbsent(bookDetail.title(), bookDetail.author(), bookDetail.cover());
     }
 }

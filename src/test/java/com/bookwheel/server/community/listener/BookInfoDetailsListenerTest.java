@@ -15,7 +15,7 @@ import com.bookwheel.server.community.dto.BookDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.event.BookLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
-import com.bookwheel.server.community.service.AladinService;
+import com.bookwheel.server.community.service.BookDetailLookupService;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,48 +28,68 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class BookInfoDetailsListenerTest {
 
     private static final String ISBN = "9788954681179";
+    private static final String TITLE = "Bright Night";
+    private static final String AUTHOR = "Choi Eun-young";
+    private static final String COVER_IMAGE = "https://image.aladin.co.kr/cover.jpg";
 
     @Mock private BookInfoRepository bookInfoRepository;
-    @Mock private AladinService aladinService;
+    @Mock private BookDetailLookupService bookDetailLookupService;
 
     @InjectMocks private BookInfoDetailsListener listener;
 
     @Test
-    @DisplayName("관심 등록 이벤트를 받으면 알라딘에서 조회한 도서 정보를 저장한다.")
+    @DisplayName("Book like event stores looked-up book metadata")
     void onBookLiked_StoresBookDetails() {
         BookInfo bookInfo = BookInfo.builder().isbn(ISBN).build();
         given(bookInfoRepository.findByIsbn(ISBN)).willReturn(Optional.of(bookInfo));
-        given(aladinService.getBookDetailByIsbn(eq(ISBN), anyBoolean())).willReturn(sampleBookDetail());
+        given(bookDetailLookupService.getBookDetailByIsbn(eq(ISBN), anyBoolean())).willReturn(sampleBookDetail());
 
         listener.onBookLiked(new BookLikedEvent(ISBN));
 
-        assertThat(bookInfo.getTitle()).isEqualTo("밝은 밤");
-        assertThat(bookInfo.getAuthor()).isEqualTo("최은영");
-        assertThat(bookInfo.getCoverImage()).isEqualTo("https://image.aladin.co.kr/cover.jpg");
+        assertThat(bookInfo.getTitle()).isEqualTo(TITLE);
+        assertThat(bookInfo.getAuthor()).isEqualTo(AUTHOR);
+        assertThat(bookInfo.getCoverImage()).isEqualTo(COVER_IMAGE);
     }
 
     @Test
-    @DisplayName("이벤트 처리 시점에 이미 표지가 채워져 있으면 외부 API를 호출하지 않는다.")
-    void onBookLiked_SkipsLookupWhenCoverAlreadyStored() {
+    @DisplayName("Complete stored book metadata skips lookup")
+    void onBookLiked_SkipsLookupWhenBookDetailsAlreadyStored() {
         BookInfo bookInfo = BookInfo.builder()
             .isbn(ISBN)
-            .title("밝은 밤")
-            .author("최은영")
-            .coverImage("https://image.aladin.co.kr/cover.jpg")
+            .title(TITLE)
+            .author(AUTHOR)
+            .coverImage(COVER_IMAGE)
             .build();
         given(bookInfoRepository.findByIsbn(ISBN)).willReturn(Optional.of(bookInfo));
 
         listener.onBookLiked(new BookLikedEvent(ISBN));
 
-        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+        then(bookDetailLookupService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
     }
 
     @Test
-    @DisplayName("도서 정보 조회에 실패해도 예외를 밖으로 전파하지 않는다.")
+    @DisplayName("Stored cover alone is not complete book metadata")
+    void onBookLiked_FillsMissingTitleAndAuthorWhenCoverAlreadyStored() {
+        BookInfo bookInfo = BookInfo.builder()
+            .isbn(ISBN)
+            .coverImage(COVER_IMAGE)
+            .build();
+        given(bookInfoRepository.findByIsbn(ISBN)).willReturn(Optional.of(bookInfo));
+        given(bookDetailLookupService.getBookDetailByIsbn(eq(ISBN), anyBoolean())).willReturn(sampleBookDetail());
+
+        listener.onBookLiked(new BookLikedEvent(ISBN));
+
+        assertThat(bookInfo.getTitle()).isEqualTo(TITLE);
+        assertThat(bookInfo.getAuthor()).isEqualTo(AUTHOR);
+        assertThat(bookInfo.getCoverImage()).isEqualTo(COVER_IMAGE);
+    }
+
+    @Test
+    @DisplayName("Lookup failures do not escape the after-commit listener")
     void onBookLiked_SwallowsLookupFailure() {
         BookInfo bookInfo = BookInfo.builder().isbn(ISBN).build();
         given(bookInfoRepository.findByIsbn(ISBN)).willReturn(Optional.of(bookInfo));
-        given(aladinService.getBookDetailByIsbn(eq(ISBN), anyBoolean()))
+        given(bookDetailLookupService.getBookDetailByIsbn(eq(ISBN), anyBoolean()))
             .willThrow(new BusinessException(ErrorCode.ALADIN_API_ERROR));
 
         assertThatCode(() -> listener.onBookLiked(new BookLikedEvent(ISBN))).doesNotThrowAnyException();
@@ -78,11 +98,11 @@ class BookInfoDetailsListenerTest {
 
     private BookDetailResponse sampleBookDetail() {
         return new BookDetailResponse(
-            "밝은 밤",
-            "최은영",
-            "문학동네",
-            "소개",
-            "https://image.aladin.co.kr/cover.jpg",
+            TITLE,
+            AUTHOR,
+            "Munhakdongne",
+            "Book description",
+            COVER_IMAGE,
             340,
             ISBN,
             true,
