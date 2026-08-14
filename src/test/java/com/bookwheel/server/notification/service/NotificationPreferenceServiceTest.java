@@ -17,6 +17,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationPreferenceServiceTest {
@@ -40,6 +41,8 @@ class NotificationPreferenceServiceTest {
 
         assertThat(response.expoPushToken()).isEqualTo("ExponentPushToken[valid_token]");
         assertThat(preference.getExpoPushToken()).isEqualTo("ExponentPushToken[valid_token]");
+        then(preferenceRepository).should()
+                .clearExpoPushTokenFromOtherUsers("ExponentPushToken[valid_token]", "userPK");
     }
 
     @Test
@@ -79,6 +82,7 @@ class NotificationPreferenceServiceTest {
 
             assertThat(validator.validate(request("ExpoPushToken[expo_token]"))).isEmpty();
             assertThat(validator.validate(request("ExponentPushToken[exponent_token]"))).isEmpty();
+            assertThat(validator.validate(request("123e4567-e89b-12d3-a456-426614174000"))).isEmpty();
             assertThat(validator.validate(request(""))).isEmpty();
             assertThat(validator.validate(request(null))).isEmpty();
             assertThat(validator.validate(request("native-fcm-token"))).isNotEmpty();

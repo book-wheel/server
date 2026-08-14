@@ -9,7 +9,10 @@ import lombok.*;
 @Builder
 @Table(
         name = "notification_preference",
-        uniqueConstraints = @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_pk")
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_pk"),
+                @UniqueConstraint(name = "uk_notification_pref_expo_token", columnNames = "fcm_token")
+        }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
