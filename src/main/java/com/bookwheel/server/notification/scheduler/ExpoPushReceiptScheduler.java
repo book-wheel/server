@@ -45,7 +45,7 @@ public class ExpoPushReceiptScheduler {
         Instant now = clock.instant();
         long expiredCount = receiptService.discardExpired(now.minus(RECEIPT_RETENTION));
         if (expiredCount > 0) {
-            log.warn("Discarded expired Expo Push receipts without a result: count={}", expiredCount);
+            log.warn("결과 없이 만료된 Expo Push Receipt 삭제: count={}", expiredCount);
         }
 
         List<ExpoPushReceipt> pending = receiptService.findReady(now.minus(RECEIPT_READY_DELAY));
@@ -60,12 +60,12 @@ public class ExpoPushReceiptScheduler {
                     .body(ExpoReceiptResponse.class);
 
             if (response == null) {
-                log.warn("Expo Push receipt response body is empty: requested={}", pending.size());
+                log.warn("Expo Push Receipt 응답 본문이 비어 있음: requested={}", pending.size());
                 return;
             }
             if (response.errors() != null) {
                 for (ExpoReceiptRequestError error : response.errors()) {
-                    log.warn("Expo Push receipt request error: code={}, message={}", error.code(), error.message());
+                    log.warn("Expo Push Receipt 요청 오류: code={}, message={}", error.code(), error.message());
                 }
             }
             if (response.data() == null || response.data().isEmpty()) {
@@ -80,7 +80,7 @@ public class ExpoPushReceiptScheduler {
             receiptService.complete(results);
         } catch (Exception exception) {
             // Receipt는 24시간 보관되므로 일시 오류는 다음 스케줄에서 다시 시도한다.
-            log.warn("Expo Push receipt check failed: requested={}, reason={}",
+            log.warn("Expo Push Receipt 확인 실패: requested={}, reason={}",
                     pending.size(), exception.getMessage());
         }
     }

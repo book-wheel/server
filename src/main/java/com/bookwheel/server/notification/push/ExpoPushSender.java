@@ -1,7 +1,6 @@
 package com.bookwheel.server.notification.push;
 
 import com.bookwheel.server.notification.entity.Notification;
-import com.bookwheel.server.notification.dto.NotificationDataResponse;
 import com.bookwheel.server.notification.service.ExpoPushReceiptService;
 import com.bookwheel.server.notification.service.NotificationPreferenceService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Sends persisted notifications through the Expo Push Service HTTP API.
+ * 저장된 알림을 Expo Push Service HTTP API로 전송한다.
  */
 @Slf4j
 @Component
@@ -71,7 +70,7 @@ public class ExpoPushSender implements PushSender {
                 .toList();
 
         if (validTargets.size() != targets.size()) {
-            log.warn("Skipped invalid Expo Push targets: requested={}, valid={}",
+            log.warn("유효하지 않은 Expo Push 대상 제외: requested={}, valid={}",
                     targets.size(), validTargets.size());
         }
 
@@ -81,7 +80,7 @@ public class ExpoPushSender implements PushSender {
             try {
                 sendChunkWithRetry(chunk);
             } catch (RuntimeException exception) {
-                log.warn("Expo Push chunk failed after retries: start={}, count={}, reason={}",
+                log.warn("Expo Push 묶음 재시도 후 최종 실패: start={}, count={}, reason={}",
                         start, chunk.size(), exception.getMessage());
             }
         }
@@ -97,7 +96,7 @@ public class ExpoPushSender implements PushSender {
                     throw exception;
                 }
                 long delayMillis = retryInitialDelayMillis * (1L << (attempt - 1));
-                log.warn("Retrying Expo Push chunk: attempt={}, count={}, delayMs={}, reason={}",
+                log.warn("Expo Push 묶음 재시도: attempt={}, count={}, delayMs={}, reason={}",
                         attempt + 1, targets.size(), delayMillis, exception.getMessage());
                 sleep(delayMillis);
             }
@@ -117,17 +116,17 @@ public class ExpoPushSender implements PushSender {
                 .body(ExpoPushResponse.class);
 
         if (response == null) {
-            throw new IllegalStateException("Expo Push response body is empty.");
+            throw new IllegalStateException("Expo Push 응답 본문이 비어 있습니다.");
         }
 
         if (response.errors() != null) {
             for (ExpoRequestError error : response.errors()) {
-                log.warn("Expo Push request error: code={}, message={}", error.code(), error.message());
+                log.warn("Expo Push 요청 오류: code={}, message={}", error.code(), error.message());
             }
             boolean rateLimited = response.errors().stream()
                     .anyMatch(error -> "TOO_MANY_REQUESTS".equals(error.code()));
             if (rateLimited && (response.data() == null || response.data().isEmpty())) {
-                throw new RetryableExpoPushException("Expo Push request was rate limited.");
+                throw new RetryableExpoPushException("Expo Push 요청이 사용량 제한에 걸렸습니다.");
             }
         }
 
@@ -136,7 +135,7 @@ public class ExpoPushSender implements PushSender {
         }
 
         if (response.data().size() != targets.size()) {
-            log.warn("Expo Push ticket count mismatch: requested={}, received={}",
+            log.warn("Expo Push Ticket 개수 불일치: requested={}, received={}",
                     targets.size(), response.data().size());
         }
 
@@ -146,7 +145,7 @@ public class ExpoPushSender implements PushSender {
             PushTarget target = index < targets.size() ? targets.get(index) : null;
             Long notificationId = target == null ? null : target.notification().getId();
             if ("error".equals(ticket.status())) {
-                log.warn("Expo Push ticket error: notificationId={}, error={}, message={}",
+                log.warn("Expo Push Ticket 오류: notificationId={}, error={}, message={}",
                         notificationId, ticket.errorCode(), ticket.message());
                 if (target != null && DEVICE_NOT_REGISTERED.equals(ticket.errorCode())) {
                     preferenceService.clearInvalidExpoPushToken(target.expoPushToken());
@@ -157,9 +156,9 @@ public class ExpoPushSender implements PushSender {
                         target.expoPushToken(),
                         notificationId
                 ));
-                log.debug("Expo Push ticket created: notificationId={}, receiptId={}", notificationId, ticket.id());
+                log.debug("Expo Push Ticket 생성: notificationId={}, receiptId={}", notificationId, ticket.id());
             } else {
-                log.warn("Unexpected Expo Push ticket: notificationId={}, status={}",
+                log.warn("예상하지 못한 Expo Push Ticket: notificationId={}, status={}",
                         notificationId, ticket.status());
             }
         }
@@ -167,7 +166,7 @@ public class ExpoPushSender implements PushSender {
             receiptService.trackAll(registrations);
         } catch (RuntimeException exception) {
             // Push는 이미 Expo에 접수됐으므로 Receipt 저장 실패로 재발송하지 않는다.
-            log.warn("Failed to track Expo Push receipts: count={}, reason={}",
+            log.warn("Expo Push Receipt 저장 실패: count={}, reason={}",
                     registrations.size(), exception.getMessage());
         }
     }
@@ -184,8 +183,8 @@ public class ExpoPushSender implements PushSender {
         );
     }
 
-    private Map<String, Object> buildData(Notification notification) {
-        return NotificationDataResponse.from(notification, readPayload(notification.getPayload())).toPushData();
+    private ExpoPushData buildData(Notification notification) {
+        return ExpoPushData.from(notification, readPayload(notification.getPayload()));
     }
 
     private boolean isRetryable(RuntimeException exception) {
@@ -208,7 +207,7 @@ public class ExpoPushSender implements PushSender {
             Thread.sleep(delayMillis);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Expo Push retry was interrupted.", exception);
+            throw new IllegalStateException("Expo Push 재시도 대기가 중단되었습니다.", exception);
         }
     }
 
@@ -220,7 +219,7 @@ public class ExpoPushSender implements PushSender {
             Map<String, Object> data = objectMapper.readValue(payload, PAYLOAD_TYPE);
             return data == null ? Map.of() : data;
         } catch (JsonProcessingException exception) {
-            log.warn("Failed to parse Expo Push payload: reason={}", exception.getMessage());
+            log.warn("Expo Push payload 해석 실패: reason={}", exception.getMessage());
             return Map.of();
         }
     }
@@ -231,7 +230,7 @@ public class ExpoPushSender implements PushSender {
             String body,
             String sound,
             String priority,
-            Map<String, Object> data
+            ExpoPushData data
     ) {
     }
 

@@ -4,8 +4,8 @@ import com.bookwheel.server.notification.entity.Notification;
 import com.bookwheel.server.notification.enums.NotificationType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Schema(
@@ -14,6 +14,7 @@ import java.util.Map;
                 + "실제 Expo Push data는 개인정보 최소화를 위해 notificationId, type, deepLink만 기본 제공하고 "
                 + "REVIEW_LIKED에만 isbn을 추가로 제공합니다."
 )
+@Builder
 public record NotificationDataResponse(
         @Schema(description = "저장된 알림 ID. 인앱·Expo Push data 공통 필드", example = "42", requiredMode = Schema.RequiredMode.REQUIRED)
         Long notificationId,
@@ -104,70 +105,29 @@ public record NotificationDataResponse(
 
     public static NotificationDataResponse from(Notification notification, Map<String, Object> payload) {
         Map<String, Object> safePayload = payload == null ? Map.of() : payload;
-        return new NotificationDataResponse(
-                notification.getId(),
-                notification.getType(),
-                notification.getDeepLink(),
-                stringValue(safePayload, "groupId"),
-                stringValue(safePayload, "applicantUserPK"),
-                stringValue(safePayload, "status"),
-                longValue(safePayload, "postId"),
-                stringValue(safePayload, "likerUserPK"),
-                stringValue(safePayload, "commenterUserPK"),
-                stringValue(safePayload, "commentPreview"),
-                longValue(safePayload, "reviewId"),
-                stringValue(safePayload, "isbn"),
-                integerValue(safePayload, "roundNumber"),
-                integerValue(safePayload, "daysLeft"),
-                stringValue(safePayload, "wheelStateId"),
-                stringValue(safePayload, "completedUserPK"),
-                stringValue(safePayload, "banType"),
-                stringValue(safePayload, "reasonMessage"),
-                booleanValue(safePayload, "permanent"),
-                stringValue(safePayload, "releaseDate"),
-                stringValue(safePayload, "mail")
-        );
-    }
-
-    public Map<String, Object> toMap() {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("notificationId", notificationId);
-        data.put("type", type.name());
-        data.put("deepLink", deepLink);
-        putIfNotNull(data, "groupId", groupId);
-        putIfNotNull(data, "applicantUserPK", applicantUserPK);
-        putIfNotNull(data, "status", status);
-        putIfNotNull(data, "postId", postId);
-        putIfNotNull(data, "likerUserPK", likerUserPK);
-        putIfNotNull(data, "commenterUserPK", commenterUserPK);
-        putIfNotNull(data, "commentPreview", commentPreview);
-        putIfNotNull(data, "reviewId", reviewId);
-        putIfNotNull(data, "isbn", isbn);
-        putIfNotNull(data, "roundNumber", roundNumber);
-        putIfNotNull(data, "daysLeft", daysLeft);
-        putIfNotNull(data, "wheelStateId", wheelStateId);
-        putIfNotNull(data, "completedUserPK", completedUserPK);
-        putIfNotNull(data, "banType", banType);
-        putIfNotNull(data, "reasonMessage", reasonMessage);
-        putIfNotNull(data, "permanent", permanent);
-        putIfNotNull(data, "releaseDate", releaseDate);
-        putIfNotNull(data, "mail", mail);
-        return data;
-    }
-
-    /**
-     * 외부 Push 제공자에는 프론트 이동에 필요한 최소 데이터만 전달한다.
-     * 제재 사유나 이메일 같은 인앱 상세 필드는 푸시 payload에 포함하지 않는다.
-     */
-    public Map<String, Object> toPushData() {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("notificationId", notificationId);
-        data.put("type", type.name());
-        data.put("deepLink", deepLink);
-        if (type == NotificationType.REVIEW_LIKED) {
-            putIfNotNull(data, "isbn", isbn);
-        }
-        return data;
+        return NotificationDataResponse.builder()
+                .notificationId(notification.getId())
+                .type(notification.getType())
+                .deepLink(notification.getDeepLink())
+                .groupId(stringValue(safePayload, "groupId"))
+                .applicantUserPK(stringValue(safePayload, "applicantUserPK"))
+                .status(stringValue(safePayload, "status"))
+                .postId(longValue(safePayload, "postId"))
+                .likerUserPK(stringValue(safePayload, "likerUserPK"))
+                .commenterUserPK(stringValue(safePayload, "commenterUserPK"))
+                .commentPreview(stringValue(safePayload, "commentPreview"))
+                .reviewId(longValue(safePayload, "reviewId"))
+                .isbn(stringValue(safePayload, "isbn"))
+                .roundNumber(integerValue(safePayload, "roundNumber"))
+                .daysLeft(integerValue(safePayload, "daysLeft"))
+                .wheelStateId(stringValue(safePayload, "wheelStateId"))
+                .completedUserPK(stringValue(safePayload, "completedUserPK"))
+                .banType(stringValue(safePayload, "banType"))
+                .reasonMessage(stringValue(safePayload, "reasonMessage"))
+                .permanent(booleanValue(safePayload, "permanent"))
+                .releaseDate(stringValue(safePayload, "releaseDate"))
+                .mail(stringValue(safePayload, "mail"))
+                .build();
     }
 
     private static String stringValue(Map<String, Object> payload, String key) {
@@ -188,11 +148,5 @@ public record NotificationDataResponse(
     private static Boolean booleanValue(Map<String, Object> payload, String key) {
         Object value = payload.get(key);
         return value instanceof Boolean booleanValue ? booleanValue : null;
-    }
-
-    private static void putIfNotNull(Map<String, Object> data, String key, Object value) {
-        if (value != null) {
-            data.put(key, value);
-        }
     }
 }
