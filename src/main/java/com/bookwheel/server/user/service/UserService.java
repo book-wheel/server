@@ -10,6 +10,7 @@ import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
+import com.bookwheel.server.notification.service.NotificationPreferenceService;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
@@ -41,6 +42,7 @@ public class UserService {
     private final S3Service s3Service;
     private final MemberRepository memberRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationPreferenceService notificationPreferenceService;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -181,6 +183,7 @@ public class UserService {
     @Transactional
     public void logout(String userPK) {
         refreshTokenRepository.deleteById(userPK);
+        notificationPreferenceService.clearExpoPushTokenForUser(userPK);
         log.info("로그아웃 완료: userPK={}", userPK);
     }
 

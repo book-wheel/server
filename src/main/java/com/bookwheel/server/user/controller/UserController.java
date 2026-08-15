@@ -41,7 +41,11 @@ public class UserController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "로그아웃", description = "사용자를 로그아웃 처리하고 Redis의 Refresh Token을 삭제합니다.")
+    @Operation(
+            summary = "로그아웃",
+            description = "사용자를 로그아웃 처리합니다. Redis의 Refresh Token과 현재 계정에 귀속된 "
+                    + "Expo Push Token을 함께 해제하여 로그아웃 후 해당 기기로 알림이 전달되지 않게 합니다."
+    )
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal Object principal) {
         String userPK = getUserPK(principal);

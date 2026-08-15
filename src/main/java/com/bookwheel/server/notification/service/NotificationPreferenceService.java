@@ -6,6 +6,7 @@ import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.repository.NotificationPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -79,6 +80,13 @@ public class NotificationPreferenceService {
 
     @Transactional
     public NotificationPreferenceResponse update(String userPK, NotificationPreferenceUpdateRequest request) {
+        String requestedToken = request.expoPushToken();
+        if (requestedToken != null && !requestedToken.isEmpty()) {
+            // Expo Push Token은 앱 설치 단위이므로 계정 전환 시 이전 사용자에게 남아 있으면
+            // 다른 사용자의 알림이 같은 기기로 전달될 수 있다. 현재 사용자에게 귀속하기 전에 이전 소유자를 해제한다.
+            preferenceRepository.clearExpoPushTokenFromOtherUsers(requestedToken, userPK);
+        }
+
         NotificationPreference preference = preferenceRepository.findByUserPK(userPK)
                 .orElseGet(() -> preferenceRepository.save(NotificationPreference.defaultsFor(userPK)));
 
@@ -88,9 +96,23 @@ public class NotificationPreferenceService {
                 request.communityEnabled(),
                 request.pushEnabled()
         );
-        if (request.fcmToken() != null) {
-            preference.updateFcmToken(request.fcmToken());
+        if (requestedToken != null) {
+            // 빈 문자열은 프론트가 명시적으로 전달하는 토큰 해제 요청이다.
+            preference.updateExpoPushToken(requestedToken.isEmpty() ? null : requestedToken);
         }
         return NotificationPreferenceResponse.from(preference);
+    }
+
+    @Transactional
+    public void clearExpoPushTokenForUser(String userPK) {
+        preferenceRepository.clearExpoPushTokenByUserPK(userPK);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void clearInvalidExpoPushToken(String expoPushToken) {
+        if (expoPushToken == null || expoPushToken.isBlank()) {
+            return;
+        }
+        preferenceRepository.clearExpoPushTokenByValue(expoPushToken);
     }
 }

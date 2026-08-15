@@ -13,10 +13,10 @@ import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.enums.NotificationCategory;
 import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
-import com.bookwheel.server.notification.push.FcmSender;
 import com.bookwheel.server.notification.repository.NotificationRepository;
 import com.bookwheel.server.notification.support.NotificationDeepLink;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +25,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -37,12 +39,15 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class NotificationService {
 
+    private static final TypeReference<Map<String, Object>> PAYLOAD_TYPE = new TypeReference<>() {
+    };
+
     private final NotificationRepository notificationRepository;
     private final GroupRepository groupRepository;
     private final PostRepository postRepository;
     private final BookReviewRepository bookReviewRepository;
     private final NotificationPreferenceService preferenceService;
-    private final FcmSender fcmSender;
+    private final NotificationPushService notificationPushService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -82,15 +87,11 @@ public class NotificationService {
 
         Notification saved = notificationRepository.save(notification);
 
-        // FCM 푸시 - 카테고리별 푸시 허용 여부 + FCM 토큰 보유 시 발송
-        // (REPORT/ACCOUNT 는 pushEnabled 설정 무시하고 강제 발송)
-        if (preference.allowsPush(category) && preference.getFcmToken() != null
-                && !preference.getFcmToken().isBlank()) {
-            try {
-                fcmSender.send(preference.getFcmToken(), saved);
-            } catch (Exception e) {
-                log.warn("FCM 발송 실패: notificationId={}, reason={}", saved.getId(), e.getMessage());
-            }
+        // 저장 트랜잭션에서는 푸시 발송 필요 여부만 판단한다.
+        // 실제 토큰은 커밋 후 별도 경로에서 다시 조회해 계정 전환·로그아웃 경쟁을 방지한다.
+        if (preference.allowsPush(category) && preference.getExpoPushToken() != null
+                && !preference.getExpoPushToken().isBlank()) {
+            runAfterCommit(() -> notificationPushService.send(List.of(saved.getId())));
         }
         return saved;
     }
@@ -99,7 +100,7 @@ public class NotificationService {
      * 동일 title/body 의 알림을 다수 수신자에게 일괄 생성한다.
      * - preference 일괄 조회로 N+1 SELECT 제거
      * - notification saveAll 로 단일 트랜잭션에서 일괄 영속화
-     * - 푸시 토큰을 모아 한 번의 multicast 호출로 전송
+     * - 커밋 후 최신 토큰을 다시 조회하고 Expo 제한(요청당 100건)에 맞춰 일괄 전송
      *
      * @return 실제로 영속화된 알림 (카테고리 off 사용자는 제외)
      */
@@ -153,32 +154,31 @@ public class NotificationService {
 
         List<Notification> saved = notificationRepository.saveAll(toInsert);
 
-        List<String> tokens = new ArrayList<>(saved.size());
+        List<Long> notificationIds = new ArrayList<>(saved.size());
         for (Notification n : saved) {
             NotificationPreference preference = preferences.get(n.getRecipientUserPK());
             if (preference == null || !preference.allowsPush(category)) {
                 continue;
             }
-            String token = preference.getFcmToken();
+            String token = preference.getExpoPushToken();
             if (token == null || token.isBlank()) {
                 continue;
             }
-            tokens.add(token);
+            notificationIds.add(n.getId());
         }
-        if (!tokens.isEmpty()) {
-            try {
-                fcmSender.sendMulticast(tokens, saved.get(0));
-            } catch (Exception e) {
-                log.warn("FCM 멀티캐스트 발송 실패: type={}, count={}, reason={}",
-                        event.type(), tokens.size(), e.getMessage());
-            }
+        if (!notificationIds.isEmpty()) {
+            List<Long> savedNotificationIds = List.copyOf(notificationIds);
+            runAfterCommit(() -> notificationPushService.send(savedNotificationIds));
         }
         return saved;
     }
 
     public Page<NotificationResponse> list(String userPK, Pageable pageable) {
         return notificationRepository.findByRecipientUserPKOrderByCreatedAtDesc(userPK, pageable)
-                .map(NotificationResponse::from);
+                .map(notification -> NotificationResponse.from(
+                        notification,
+                        deserializePayload(notification.getPayload())
+                ));
     }
 
     public UnreadCountResponse unreadCount(String userPK) {
@@ -308,5 +308,34 @@ public class NotificationService {
             log.warn("알림 payload 직렬화 실패: {}", e.getMessage());
             return null;
         }
+    }
+
+    private Map<String, Object> deserializePayload(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> data = objectMapper.readValue(payload, PAYLOAD_TYPE);
+            return data == null ? Map.of() : data;
+        } catch (JsonProcessingException e) {
+            log.warn("알림 payload 역직렬화 실패: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // 단위 테스트처럼 트랜잭션 프록시 밖에서 직접 호출한 경우에도 같은 동작을 검증할 수 있게 한다.
+            action.run();
+            return;
+        }
+
+        // DB 커밋이 실패한 알림이 디바이스에 먼저 도착하지 않도록 영속화가 확정된 뒤 전송한다.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

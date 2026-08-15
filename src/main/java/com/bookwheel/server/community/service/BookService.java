@@ -61,7 +61,7 @@ public class BookService {
     private final CursorUtils cursorUtils;
     private final KaKaoService kaKaoService;
     private final BookSearchRankingService bookSearchRankingService;
-    private final AladinService aladinService;
+    private final BookDetailLookupService bookDetailLookupService;
     private final LibraryNaruService libraryNaruService;
     private final S3Service s3Service;
 
@@ -131,6 +131,7 @@ public class BookService {
                 if (!reviewerUserPK.equals(userPK)) {
                     eventPublisher.publishEvent(new ReviewLikedEvent(
                             review.getReviewId(),
+                            review.getBookInfo().getIsbn(),
                             reviewerUserPK,
                             userPK,
                             user.getNickname()
@@ -427,7 +428,7 @@ public class BookService {
 
     public BookDetailResponse getBookDetail(String isbn, String userPK) {
         boolean isInterested = bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK);
-        BookDetailResponse bookDetail = aladinService.getBookDetailByIsbn(isbn, isInterested);
+        BookDetailResponse bookDetail = bookDetailLookupService.getBookDetailByIsbn(isbn, isInterested);
 
         // 이용 분석은 부가 정보이므로 조회에 실패하면 null이 되고, 도서 상세 조회 자체는 정상 응답한다.
         return bookDetail.withUsageAnalysis(libraryNaruService.getUsageAnalysis(isbn));
@@ -448,9 +449,9 @@ public class BookService {
             })
             .orElseGet(() -> {
                 bookLikeRepository.save(BookLike.create(bookInfo, userPK));
-                // 목록에 필요한 제목·표지는 커밋 이후 BookInfoDetailsListener 가 채운다.
+                // 목록에 필요한 제목·저자·표지는 커밋 이후 BookInfoDetailsListener 가 채운다.
                 // 알라딘 호출을 이 트랜잭션에 두면 외부 API 지연만큼 DB 커넥션을 붙잡게 된다.
-                if (!bookInfo.hasCoverImage()) {
+                if (!bookInfo.hasBookDetails()) {
                     eventPublisher.publishEvent(new BookLikedEvent(isbn));
                 }
                 return BookLikeResponse.of(isbn, true);

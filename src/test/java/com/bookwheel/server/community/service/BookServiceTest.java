@@ -33,6 +33,7 @@ import com.bookwheel.server.community.entity.BookLike;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.event.BookLikedEvent;
+import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
@@ -54,6 +55,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -74,7 +76,7 @@ class BookServiceTest {
     @Mock private CursorUtils cursorUtils;
     @Mock private KaKaoService kaKaoService;
     @Mock private BookSearchRankingService bookSearchRankingService;
-    @Mock private AladinService aladinService;
+    @Mock private BookDetailLookupService bookDetailLookupService;
     @Mock private LibraryNaruService libraryNaruService;
     @Mock private S3Service s3Service;
 
@@ -484,7 +486,7 @@ class BookServiceTest {
         assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isTrue();
 
         then(eventPublisher).should().publishEvent(new BookLikedEvent(isbn));
-        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+        then(bookDetailLookupService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
     }
 
     @Test
@@ -522,6 +524,40 @@ class BookServiceTest {
 
         assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isFalse();
         then(eventPublisher).should(never()).publishEvent(any(BookLikedEvent.class));
+    }
+
+    @Test
+    @DisplayName("리뷰 공감 알림 이벤트에 프론트 이동용 ISBN을 포함한다")
+    void toggleReviewLikePublishesIsbn() {
+        String isbn = "9788954681179";
+        User reviewer = User.builder()
+                .loginId("reviewer-login")
+                .nickname("리뷰어")
+                .mail("reviewer@example.com")
+                .build();
+        User liker = User.builder()
+                .loginId("liker-login")
+                .nickname("공감한 사용자")
+                .mail("liker@example.com")
+                .build();
+        BookReview review = BookReview.builder()
+                .reviewId(9L)
+                .bookInfo(BookInfo.builder().isbn(isbn).build())
+                .reviewer(reviewer)
+                .content("좋은 책이에요.")
+                .isHidden(false)
+                .build();
+        given(bookReviewRepository.findById(9L)).willReturn(Optional.of(review));
+        given(userRepository.findById(liker.getId())).willReturn(Optional.of(liker));
+        given(reviewLikeRepository.findByReviewAndUser(review, liker)).willReturn(Optional.empty());
+
+        bookService.toggleReviewLike(9L, liker.getId());
+
+        ArgumentCaptor<ReviewLikedEvent> captor = ArgumentCaptor.forClass(ReviewLikedEvent.class);
+        then(eventPublisher).should().publishEvent(captor.capture());
+        assertThat(captor.getValue().reviewId()).isEqualTo(9L);
+        assertThat(captor.getValue().isbn()).isEqualTo(isbn);
+        assertThat(captor.getValue().reviewerUserPK()).isEqualTo(reviewer.getId());
     }
 
     private InterestBookResponseDto interestBook(Long bookInfoId, String isbn, LocalDateTime interestedAt) {
@@ -584,7 +620,7 @@ class BookServiceTest {
         String userPK = UUID.randomUUID().toString();
 
         given(bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK)).willReturn(true);
-        given(aladinService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
+        given(bookDetailLookupService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
         given(libraryNaruService.getUsageAnalysis(isbn)).willReturn(sampleUsageAnalysis());
 
         BookDetailResponse response = bookService.getBookDetail(isbn, userPK);
@@ -603,7 +639,7 @@ class BookServiceTest {
         String userPK = UUID.randomUUID().toString();
 
         given(bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK)).willReturn(true);
-        given(aladinService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
+        given(bookDetailLookupService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
         // 외부 API 호출 실패, 타임아웃, 데이터 없음은 모두 null로 넘어온다.
         given(libraryNaruService.getUsageAnalysis(isbn)).willReturn(null);
 
