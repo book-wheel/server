@@ -74,7 +74,7 @@ class BookServiceTest {
     @Mock private CursorUtils cursorUtils;
     @Mock private KaKaoService kaKaoService;
     @Mock private BookSearchRankingService bookSearchRankingService;
-    @Mock private AladinService aladinService;
+    @Mock private BookDetailLookupService bookDetailLookupService;
     @Mock private LibraryNaruService libraryNaruService;
     @Mock private S3Service s3Service;
 
@@ -484,7 +484,7 @@ class BookServiceTest {
         assertThat(bookService.toggleBookLike(isbn, userPK).liked()).isTrue();
 
         then(eventPublisher).should().publishEvent(new BookLikedEvent(isbn));
-        then(aladinService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
+        then(bookDetailLookupService).should(never()).getBookDetailByIsbn(any(), anyBoolean());
     }
 
     @Test
@@ -584,7 +584,7 @@ class BookServiceTest {
         String userPK = UUID.randomUUID().toString();
 
         given(bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK)).willReturn(true);
-        given(aladinService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
+        given(bookDetailLookupService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
         given(libraryNaruService.getUsageAnalysis(isbn)).willReturn(sampleUsageAnalysis());
 
         BookDetailResponse response = bookService.getBookDetail(isbn, userPK);
@@ -603,7 +603,7 @@ class BookServiceTest {
         String userPK = UUID.randomUUID().toString();
 
         given(bookLikeRepository.existsByBookInfo_IsbnAndUserPK(isbn, userPK)).willReturn(true);
-        given(aladinService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
+        given(bookDetailLookupService.getBookDetailByIsbn(isbn, true)).willReturn(sampleBookDetail(isbn));
         // 외부 API 호출 실패, 타임아웃, 데이터 없음은 모두 null로 넘어온다.
         given(libraryNaruService.getUsageAnalysis(isbn)).willReturn(null);
 
