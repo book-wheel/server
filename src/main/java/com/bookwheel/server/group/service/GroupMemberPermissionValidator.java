@@ -14,6 +14,17 @@ import org.springframework.stereotype.Component;
 public class GroupMemberPermissionValidator {
     private final MemberRepository memberRepository;
 
+    public void validateActiveMember(String groupId, String userPK) {
+        boolean isActiveMember = memberRepository.existsByGroup_GroupIdAndUser_IdAndMemberStatus(
+                groupId,
+                userPK,
+                MemberStatus.ACTIVE
+        );
+        if (!isActiveMember) {
+            throw new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+        }
+    }
+
     public void validateLeader(String groupId, String userPK) {
         Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_LEADER_ONLY));
