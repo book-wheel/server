@@ -24,7 +24,6 @@ public class RestClientConfig {
 
         return builder
             .requestFactory(factory)
-            .messageConverters(this::supportAladinJsonMediaTypes)
             .build();
     }
 
@@ -58,6 +57,7 @@ public class RestClientConfig {
 
         return builder
             .requestFactory(factory)
+            .messageConverters(this::supportAladinJsonMediaTypes)
             .build();
     }
 
@@ -72,17 +72,33 @@ public class RestClientConfig {
             .build();
     }
 
+    // 알라딘은 output=js 응답을 JSON이 아닌 미디어 타입으로 내려줄 수 있어, 역직렬화 실패를 막기 위한 방어 설정이다.
+    // (2026-08-14 장애의 원인은 미디어 타입이 아니라 read timeout이었다. 이 설정은 그 장애의 대응책이 아니다.)
+    //
+    // Spring Boot는 모든 RestClient.Builder에 HttpMessageConverters 빈의 컨버터 "인스턴스"를 그대로 넣어준다.
+    // 따라서 기존 컨버터의 지원 미디어 타입을 직접 바꾸면 다른 RestClient와 MVC 응답 컨버터까지 함께 바뀐다.
+    // 알라딘 클라이언트에만 적용되도록 원본을 두고 사본으로 교체한다.
     private void supportAladinJsonMediaTypes(List<HttpMessageConverter<?>> converters) {
-        converters.stream()
-            .filter(MappingJackson2HttpMessageConverter.class::isInstance)
-            .map(MappingJackson2HttpMessageConverter.class::cast)
-            .findFirst()
-            .ifPresent(converter -> {
-                List<MediaType> mediaTypes = new ArrayList<>(converter.getSupportedMediaTypes());
-                addIfAbsent(mediaTypes, MediaType.valueOf("text/javascript"));
-                addIfAbsent(mediaTypes, MediaType.valueOf("application/javascript"));
-                converter.setSupportedMediaTypes(mediaTypes);
-            });
+        converters.replaceAll(converter -> {
+            if (converter instanceof MappingJackson2HttpMessageConverter jsonConverter) {
+                return copyWithAladinJsonMediaTypes(jsonConverter);
+            }
+            return converter;
+        });
+    }
+
+    private MappingJackson2HttpMessageConverter copyWithAladinJsonMediaTypes(
+        MappingJackson2HttpMessageConverter converter
+    ) {
+        MappingJackson2HttpMessageConverter copy =
+            new MappingJackson2HttpMessageConverter(converter.getObjectMapper());
+
+        List<MediaType> mediaTypes = new ArrayList<>(converter.getSupportedMediaTypes());
+        addIfAbsent(mediaTypes, MediaType.valueOf("text/javascript"));
+        addIfAbsent(mediaTypes, MediaType.valueOf("application/javascript"));
+        copy.setSupportedMediaTypes(mediaTypes);
+
+        return copy;
     }
 
     private void addIfAbsent(List<MediaType> mediaTypes, MediaType mediaType) {
