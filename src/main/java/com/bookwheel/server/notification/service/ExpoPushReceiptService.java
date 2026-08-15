@@ -7,6 +7,7 @@ import com.bookwheel.server.notification.repository.ExpoPushReceiptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -24,7 +25,7 @@ public class ExpoPushReceiptService {
     private final ExpoPushReceiptRepository receiptRepository;
     private final NotificationPreferenceService preferenceService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void trackAll(List<ExpoPushReceiptRegistration> registrations) {
         if (registrations == null || registrations.isEmpty()) {
             return;
@@ -55,7 +56,7 @@ public class ExpoPushReceiptService {
                 continue;
             }
             if (!"ok".equals(result.status())) {
-                log.warn("Expo Push receipt error: notificationId={}, error={}, message={}",
+                log.warn("Expo Push Receipt 오류: notificationId={}, error={}, message={}",
                         receipt.getNotificationId(), result.errorCode(), result.message());
             }
             if (DEVICE_NOT_REGISTERED.equals(result.errorCode())) {

@@ -6,6 +6,7 @@ import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.repository.NotificationPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -107,7 +108,7 @@ public class NotificationPreferenceService {
         preferenceRepository.clearExpoPushTokenByUserPK(userPK);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void clearInvalidExpoPushToken(String expoPushToken) {
         if (expoPushToken == null || expoPushToken.isBlank()) {
             return;

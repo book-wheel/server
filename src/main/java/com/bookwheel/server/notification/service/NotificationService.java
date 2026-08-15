@@ -13,8 +13,6 @@ import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.enums.NotificationCategory;
 import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
-import com.bookwheel.server.notification.push.PushSender;
-import com.bookwheel.server.notification.push.PushTarget;
 import com.bookwheel.server.notification.repository.NotificationRepository;
 import com.bookwheel.server.notification.support.NotificationDeepLink;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,7 +47,7 @@ public class NotificationService {
     private final PostRepository postRepository;
     private final BookReviewRepository bookReviewRepository;
     private final NotificationPreferenceService preferenceService;
-    private final PushSender pushSender;
+    private final NotificationPushService notificationPushService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -89,18 +87,11 @@ public class NotificationService {
 
         Notification saved = notificationRepository.save(notification);
 
-        // Expo Push - 카테고리별 푸시 허용 여부 + Expo Push Token 보유 시 발송
-        // (REPORT/ACCOUNT 는 pushEnabled 설정 무시하고 강제 발송)
+        // 저장 트랜잭션에서는 푸시 발송 필요 여부만 판단한다.
+        // 실제 토큰은 커밋 후 별도 경로에서 다시 조회해 계정 전환·로그아웃 경쟁을 방지한다.
         if (preference.allowsPush(category) && preference.getExpoPushToken() != null
                 && !preference.getExpoPushToken().isBlank()) {
-            String token = preference.getExpoPushToken();
-            runAfterCommit(() -> {
-                try {
-                    pushSender.send(token, saved);
-                } catch (Exception e) {
-                    log.warn("Expo Push 발송 실패: notificationId={}, reason={}", saved.getId(), e.getMessage());
-                }
-            });
+            runAfterCommit(() -> notificationPushService.send(List.of(saved.getId())));
         }
         return saved;
     }
@@ -109,7 +100,7 @@ public class NotificationService {
      * 동일 title/body 의 알림을 다수 수신자에게 일괄 생성한다.
      * - preference 일괄 조회로 N+1 SELECT 제거
      * - notification saveAll 로 단일 트랜잭션에서 일괄 영속화
-     * - 푸시 토큰과 저장된 알림을 1:1로 묶어 Expo 제한(요청당 100건)에 맞춰 일괄 전송
+     * - 커밋 후 최신 토큰을 다시 조회하고 Expo 제한(요청당 100건)에 맞춰 일괄 전송
      *
      * @return 실제로 영속화된 알림 (카테고리 off 사용자는 제외)
      */
@@ -163,7 +154,7 @@ public class NotificationService {
 
         List<Notification> saved = notificationRepository.saveAll(toInsert);
 
-        List<PushTarget> targets = new ArrayList<>(saved.size());
+        List<Long> notificationIds = new ArrayList<>(saved.size());
         for (Notification n : saved) {
             NotificationPreference preference = preferences.get(n.getRecipientUserPK());
             if (preference == null || !preference.allowsPush(category)) {
@@ -173,17 +164,11 @@ public class NotificationService {
             if (token == null || token.isBlank()) {
                 continue;
             }
-            targets.add(new PushTarget(token, n));
+            notificationIds.add(n.getId());
         }
-        if (!targets.isEmpty()) {
-            runAfterCommit(() -> {
-                try {
-                    pushSender.sendBatch(targets);
-                } catch (Exception e) {
-                    log.warn("Expo Push 일괄 발송 실패: type={}, count={}, reason={}",
-                            event.type(), targets.size(), e.getMessage());
-                }
-            });
+        if (!notificationIds.isEmpty()) {
+            List<Long> savedNotificationIds = List.copyOf(notificationIds);
+            runAfterCommit(() -> notificationPushService.send(savedNotificationIds));
         }
         return saved;
     }

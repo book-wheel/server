@@ -12,8 +12,6 @@ import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.enums.NotificationType;
 import com.bookwheel.server.notification.event.BulkNotificationEvent;
 import com.bookwheel.server.notification.event.NotificationEvent;
-import com.bookwheel.server.notification.push.PushSender;
-import com.bookwheel.server.notification.push.PushTarget;
 import com.bookwheel.server.notification.repository.NotificationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
-import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -58,7 +55,7 @@ class NotificationServiceTest {
     private NotificationPreferenceService preferenceService;
 
     @Mock
-    private PushSender pushSender;
+    private NotificationPushService notificationPushService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -159,7 +156,7 @@ class NotificationServiceTest {
         then(preferenceService).shouldHaveNoInteractions();
         then(notificationRepository).should(never()).save(any(Notification.class));
         // 열 수 없는 링크를 푸시로 먼저 보내는 일도 없어야 한다.
-        then(pushSender).shouldHaveNoInteractions();
+        then(notificationPushService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -179,7 +176,7 @@ class NotificationServiceTest {
         assertThat(notification).isNull();
         then(preferenceService).shouldHaveNoInteractions();
         then(notificationRepository).should(never()).save(any(Notification.class));
-        then(pushSender).shouldHaveNoInteractions();
+        then(notificationPushService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -220,12 +217,12 @@ class NotificationServiceTest {
         assertThat(saved).isEmpty();
         then(preferenceService).shouldHaveNoInteractions();
         then(notificationRepository).should(never()).saveAll(org.mockito.ArgumentMatchers.anyList());
-        then(pushSender).shouldHaveNoInteractions();
+        then(notificationPushService).shouldHaveNoInteractions();
     }
 
     @Test
-    @DisplayName("Expo Push Token이 있으면 저장된 알림으로 실제 푸시 발송을 요청한다")
-    void createSendsPushWithSavedNotification() {
+    @DisplayName("Expo Push Token이 있으면 커밋 후 최신 대상을 조회하도록 알림 ID만 전달한다")
+    void createRequestsPushWithSavedNotificationId() {
         String token = "ExponentPushToken[valid_token]";
         NotificationPreference preference = NotificationPreference.builder()
                 .userPK("userPK")
@@ -247,13 +244,12 @@ class NotificationServiceTest {
                 .build());
 
         assertThat(saved.getId()).isEqualTo(41L);
-        then(pushSender).should().send(token, saved);
+        then(notificationPushService).should().send(List.of(41L));
     }
 
     @Test
-    @DisplayName("벌크 푸시는 토큰마다 해당 사용자의 저장된 알림을 함께 전달한다")
-    @SuppressWarnings("unchecked")
-    void createBulkSendsRecipientSpecificNotifications() {
+    @DisplayName("벌크 푸시도 커밋 전 토큰 대신 저장된 알림 ID만 전달한다")
+    void createBulkRequestsPushWithNotificationIds() {
         NotificationPreference firstPreference = NotificationPreference.builder()
                 .userPK("firstUserPK")
                 .expoPushToken("ExponentPushToken[first_token]")
@@ -282,14 +278,7 @@ class NotificationServiceTest {
                 .deepLink("/groups/group-1")
                 .build());
 
-        ArgumentCaptor<List<PushTarget>> captor = ArgumentCaptor.forClass(List.class);
-        then(pushSender).should().sendBatch(captor.capture());
-        assertThat(captor.getValue())
-                .extracting(PushTarget::expoPushToken)
-                .containsExactly("ExponentPushToken[first_token]", "ExpoPushToken[second_token]");
-        assertThat(captor.getValue())
-                .extracting(target -> target.notification().getId())
-                .containsExactly(51L, 52L);
+        then(notificationPushService).should().send(List.of(51L, 52L));
     }
 
     @Test
