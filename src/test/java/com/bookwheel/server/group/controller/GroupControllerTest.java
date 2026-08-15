@@ -1,13 +1,17 @@
 package com.bookwheel.server.group.controller;
 
 import java.time.LocalDate;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.*;
 import com.bookwheel.server.group.dto.member.*;
 import com.bookwheel.server.group.dto.search.*;
 import com.bookwheel.server.group.dto.setting.*;
+import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.group.service.GroupService;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.service.MemberService;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -182,6 +186,84 @@ class GroupControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isArray());
+    }
+
+    @Test
+    @WithMockUser(username = "request-user-pk")
+    @DisplayName("그룹 멤버 목록은 현재 라운드의 배정 도서와 독서 상태를 반환한다")
+    void getGroupMembers_Success() throws Exception {
+        String groupId = "group-1";
+        GroupMemberCurrentRoundAssignmentResponse assignment =
+                new GroupMemberCurrentRoundAssignmentResponse(
+                        "wheel-1",
+                        "book-1",
+                        "소년이 온다",
+                        "https://example.com/cover.jpg",
+                        WheelStatus.READING
+                );
+        GroupMemberResponse member = GroupMemberResponse.builder()
+                .memberId("member-1")
+                .userPK("user-1")
+                .nickname("독자")
+                .profileImageUrl("https://example.com/profile.jpg")
+                .role(MemberRole.MEMBER)
+                .readOrder(1)
+                .currentRoundAssignment(assignment)
+                .build();
+        GroupMemberListResponse response = GroupMemberListResponse.from(
+                new GroupCurrentRoundResponse("round-2", 2),
+                java.util.List.of(member)
+        );
+        given(memberService.getGroupMembers(groupId, "request-user-pk")).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalCount").value(1))
+                .andExpect(jsonPath("$.data.currentRound.roundId").value("round-2"))
+                .andExpect(jsonPath("$.data.currentRound.roundNumber").value(2))
+                .andExpect(jsonPath("$.data.members[0].userPK").value("user-1"))
+                .andExpect(jsonPath("$.data.members[0].readOrder").value(1))
+                .andExpect(jsonPath("$.data.members[0].currentRoundAssignment.wheelStateId").value("wheel-1"))
+                .andExpect(jsonPath("$.data.members[0].currentRoundAssignment.bookId").value("book-1"))
+                .andExpect(jsonPath("$.data.members[0].currentRoundAssignment.bookTitle").value("소년이 온다"))
+                .andExpect(jsonPath("$.data.members[0].currentRoundAssignment.coverImage")
+                        .value("https://example.com/cover.jpg"))
+                .andExpect(jsonPath("$.data.members[0].currentRoundAssignment.readingStatus")
+                        .value("READING"));
+    }
+
+    @Test
+    @WithMockUser(username = "request-user-pk")
+    @DisplayName("존재하지 않는 그룹의 멤버 목록 조회는 GROUP_NOT_FOUND를 반환한다")
+    void getGroupMembers_ReturnsGroupNotFound_WhenGroupDoesNotExist() throws Exception {
+        String groupId = "not-existing-group";
+        given(memberService.getGroupMembers(groupId, "request-user-pk"))
+                .willThrow(new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("GROUP_004"))
+                .andExpect(jsonPath("$.error.message").value("존재하지 않는 그룹입니다."));
+    }
+
+    @Test
+    @WithMockUser(username = "request-user-pk")
+    @DisplayName("ACTIVE 멤버가 아닌 사용자의 멤버 목록 조회는 GROUP_ACTIVE_MEMBER_ONLY를 반환한다")
+    void getGroupMembers_ReturnsGroupActiveMemberOnly_WhenRequesterIsNotActiveMember() throws Exception {
+        String groupId = "group-1";
+        given(memberService.getGroupMembers(groupId, "request-user-pk"))
+                .willThrow(new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("GROUP_011"))
+                .andExpect(jsonPath("$.error.message")
+                        .value("ACTIVE 멤버만 그룹 내부 기능을 사용할 수 있습니다."));
     }
 
     @Test

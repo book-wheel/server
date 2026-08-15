@@ -37,6 +37,7 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
 
     List<WheelState> findByRoundId(String roundId);
 
+    // 커뮤니티 홈에서 현재 읽고 있는 책 카드를 그리기 위해 그룹과 책 정보를 함께 조회한다.
     @Query("""
             select new com.bookwheel.server.community.dto.CurrentReadingBookResponse(
                 g.groupId,
@@ -63,6 +64,17 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
             @Param("memberStatus") MemberStatus memberStatus,
             @Param("groupState") State groupState
     );
+
+    // 멤버 목록에서 현재 라운드의 멤버별 배정과 책 정보를 한 번에 조회한다.
+    @Query("""
+            select ws
+            from WheelState ws
+            join fetch ws.member
+            join fetch ws.ownBook ownBook
+            join fetch ownBook.book
+            where ws.roundId = :roundId
+            """)
+    List<WheelState> findAllByRoundIdWithMemberAndBook(@Param("roundId") String roundId);
 
     // 인증 시작부터 완료 저장까지 같은 WheelState를 단독으로 다룬다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
