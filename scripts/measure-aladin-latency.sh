@@ -17,6 +17,18 @@
 # ISBN 목록을 주지 않으면 알라딘 베스트셀러 API로 실제 ISBN을 받아와 사용한다.
 # TTB 키는 ALADIN_API_KEY 환경 변수를 우선 사용하고, 없으면 application-dev.properties 값을 쓴다.
 # 알라딘 TTB 키는 일일 호출 한도(5,000회)가 있으므로 -n 값을 과하게 키우지 말 것.
+#
+# 결과 CSV는 .gitignore 대상이다(aladin-latency-*.csv). 근거로 남길 값은 커밋하지 말고
+# RestClientConfig 주석에 요약해 기록한다.
+#
+# [측정 지표와 Java 타임아웃의 차이]
+# 여기서 재는 값은 설정값과 등가가 아니라 근사다. 조정할 때는 여유를 둬야 한다.
+#   - readTimeout 은 소켓 read 하나의 최대 대기(SO_TIMEOUT)다. 응답 전체 시간이 아니라
+#     바이트가 도착하지 않은 채 흐른 연속 시간을 잰다. 이 스크립트의 ttfb(첫 바이트까지)는
+#     그 대기가 가장 길게 발생하는 구간이라 실용적인 근사일 뿐이다.
+#     본문 수신 도중 공백이 생기면 ttfb 가 짧아도 read timeout 이 날 수 있다.
+#   - connectTimeout 은 TCP 연결 수립까지다. TLS 핸드셰이크는 JDK 구현에 따라 read 대기로
+#     잡힐 수 있어, 함께 재는 connect+tls 는 상한 근사로 본다.
 
 set -euo pipefail
 
@@ -86,7 +98,8 @@ for ((i = 1; i <= COUNT; i++)); do
     isbn="${ISBNS[$(((i - 1) % ${#ISBNS[@]}))]}"
 
     # connect: TCP 연결, tls: TLS 핸드셰이크, ttfb: 요청 전송 후 첫 바이트까지(서버 처리 시간),
-    # total: 전체. Java 의 connectTimeout 은 connect+tls, readTimeout 은 ttfb 구간에 대응한다.
+    # total: 전체. connectTimeout 은 connect(+tls), readTimeout 은 ttfb 에 대략 대응하지만
+    # 등가는 아니다. 상단 [측정 지표와 Java 타임아웃의 차이] 참고.
     read -r connect appconnect pretransfer starttransfer total code <<<"$(
         curl -s -o /dev/null \
             --max-time 30 \
@@ -154,3 +167,4 @@ END {
 
 echo
 echo "타임아웃 조정 시 위 p95/p99/max 와 초과 건수를 RestClientConfig 주석에 근거로 남길 것."
+echo "위 값은 Java 타임아웃과 등가가 아니라 근사이므로(상단 주석 참고) 여유를 두고 정할 것."
