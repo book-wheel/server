@@ -11,7 +11,7 @@ import lombok.*;
         name = "notification_preference",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_pk"),
-                @UniqueConstraint(name = "uk_notification_pref_expo_token", columnNames = "fcm_token")
+                @UniqueConstraint(name = "uk_notification_pref_expo_token", columnNames = "expo_push_token")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -42,8 +42,7 @@ public class NotificationPreference {
     @Column(name = "push_enabled", nullable = false)
     private Boolean pushEnabled = true;
 
-    // Keep the deployed column name for a zero-downtime rollout; the domain and API now treat the value as an Expo token.
-    @Column(name = "fcm_token", length = 255)
+    @Column(name = "expo_push_token", length = 255)
     private String expoPushToken;
 
     public static NotificationPreference defaultsFor(String userPK) {
