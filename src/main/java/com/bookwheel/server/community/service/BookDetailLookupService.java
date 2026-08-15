@@ -40,7 +40,7 @@ public class BookDetailLookupService {
             .orElseThrow(() -> originalException);
 
         log.warn(
-            "Aladin book detail lookup failed. Using popular loan metadata fallback - ISBN: {}, errorCode: {}",
+            "알라딘 도서 상세 조회 실패. 인기 대출 메타데이터로 대체합니다. - ISBN: {}, 오류: {}",
             isbn,
             originalException.getErrorCode().getCode()
         );
