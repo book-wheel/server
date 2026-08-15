@@ -47,8 +47,15 @@ public class RestClientConfig {
     // 기본 클라이언트(5초/5초)는 연결과 응답이 각각 따로 소모되어 최악의 경우 10초를 대기하므로,
     // 알라딘 전용 클라이언트로 최악의 대기 시간을 6초로 제한한다.
     //
-    // 실측값이 아니라 상한을 좁히기 위한 보수적인 값이다.
-    // 타임아웃 발생률이 눈에 띄면 응답 시간을 측정해 정보나루처럼 근거를 남기고 조정한다.
+    // 실측(50건) 기준 연결은 최대 0.10초, 서버 응답은 중앙값 0.09초, p95 0.18초, 최대 0.56초로
+    // 정보나루보다 빠르고 편차도 작다. 현재 값이 정상 응답을 자르고 있지는 않아 그대로 둔다.
+    //
+    // 다만 2026-08-14 read timeout 장애처럼 스파이크는 발생하며, 이 경우 인기대출 메타데이터로
+    // 대체된다(BookDetailLookupService). 실패 시 대체 경로가 있으므로 대기를 늘리기보다 현행 유지가 낫다.
+    //
+    // 위 실측은 배포 서버가 아닌 로컬에서 수행해 연결 구간은 참고값이다.
+    // 타임아웃 발생률이 눈에 띄면 scripts/measure-aladin-latency.sh 를 배포 서버에서 실행해
+    // 정보나루처럼 근거를 남기고 조정한다.
     @Bean
     public RestClient aladinRestClient(RestClient.Builder builder) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
