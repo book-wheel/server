@@ -1,5 +1,7 @@
 package com.bookwheel.server.community.service;
 
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.BookDetailResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -8,10 +10,12 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class AladinServiceTest {
@@ -70,6 +74,40 @@ class AladinServiceTest {
         BookDetailResponse response = aladinService.getBookDetailByIsbn(isbn, true);
 
         assertThat(response.isbn()).isEqualTo("9788937460449");
+        server.verify();
+    }
+
+    @Test
+    void getBookDetailByIsbn_ThrowsAladinApiErrorOnErrorResponse() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AladinService aladinService = aladinService(builder.build());
+
+        String isbn = "9780132350884";
+        server.expect(once(), requestTo(containsString("ItemId=" + isbn)))
+            .andRespond(withServerError());
+
+        assertThatThrownBy(() -> aladinService.getBookDetailByIsbn(isbn, true))
+            .isInstanceOf(BusinessException.class)
+            .extracting(e -> ((BusinessException) e).getErrorCode())
+            .isEqualTo(ErrorCode.ALADIN_API_ERROR);
+        server.verify();
+    }
+
+    @Test
+    void getBookDetailByIsbn_ThrowsAladinApiErrorOnUnsupportedContentType() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AladinService aladinService = aladinService(builder.build());
+
+        String isbn = "9780132350884";
+        server.expect(once(), requestTo(containsString("ItemId=" + isbn)))
+            .andRespond(withSuccess(responseBody(isbn), MediaType.TEXT_PLAIN));
+
+        assertThatThrownBy(() -> aladinService.getBookDetailByIsbn(isbn, true))
+            .isInstanceOf(BusinessException.class)
+            .extracting(e -> ((BusinessException) e).getErrorCode())
+            .isEqualTo(ErrorCode.ALADIN_API_ERROR);
         server.verify();
     }
 
