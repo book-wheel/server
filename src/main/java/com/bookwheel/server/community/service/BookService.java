@@ -131,6 +131,7 @@ public class BookService {
                 if (!reviewerUserPK.equals(userPK)) {
                     eventPublisher.publishEvent(new ReviewLikedEvent(
                             review.getReviewId(),
+                            review.getBookInfo().getIsbn(),
                             reviewerUserPK,
                             userPK,
                             user.getNickname()

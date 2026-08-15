@@ -65,7 +65,11 @@ public class CommunityNotificationListener {
                 .title("리뷰 공감")
                 .body(nick + "님이 회원님의 리뷰에 공감했어요.")
                 .deepLink(NotificationDeepLink.review(event.reviewId()))
-                .payload(Map.of("reviewId", event.reviewId(), "likerUserPK", event.likerUserPK()))
+                .payload(Map.of(
+                        "reviewId", event.reviewId(),
+                        "isbn", event.isbn(),
+                        "likerUserPK", event.likerUserPK()
+                ))
                 .build());
     }
 }

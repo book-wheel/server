@@ -9,7 +9,10 @@ import lombok.*;
 @Builder
 @Table(
         name = "notification_preference",
-        uniqueConstraints = @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_pk")
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_notification_pref_user", columnNames = "user_pk"),
+                @UniqueConstraint(name = "uk_notification_pref_expo_token", columnNames = "expo_push_token")
+        }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
@@ -39,8 +42,8 @@ public class NotificationPreference {
     @Column(name = "push_enabled", nullable = false)
     private Boolean pushEnabled = true;
 
-    @Column(name = "fcm_token", length = 255)
-    private String fcmToken;
+    @Column(name = "expo_push_token", length = 255)
+    private String expoPushToken;
 
     public static NotificationPreference defaultsFor(String userPK) {
         return NotificationPreference.builder()
@@ -81,7 +84,7 @@ public class NotificationPreference {
         if (pushEnabled != null) this.pushEnabled = pushEnabled;
     }
 
-    public void updateFcmToken(String fcmToken) {
-        this.fcmToken = fcmToken;
+    public void updateExpoPushToken(String expoPushToken) {
+        this.expoPushToken = expoPushToken;
     }
 }
