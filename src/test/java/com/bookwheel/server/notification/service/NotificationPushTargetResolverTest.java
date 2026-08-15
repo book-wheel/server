@@ -63,13 +63,30 @@ class NotificationPushTargetResolverTest {
     }
 
     @Test
-    @DisplayName("커뮤니티 푸시를 끄면 토큰이 있어도 발송 대상에서 제외한다")
-    void resolveRespectsLatestPushPreference() {
+    @DisplayName("전체 푸시를 끄면 토큰이 있어도 발송 대상에서 제외한다")
+    void resolveRespectsLatestGlobalPushPreference() {
         Notification notification = notification(41L, "recipientUserPK");
         NotificationPreference preference = NotificationPreference.builder()
                 .userPK("recipientUserPK")
                 .communityEnabled(true)
                 .pushEnabled(false)
+                .expoPushToken("ExpoPushToken[current_token]")
+                .build();
+        given(notificationRepository.findAllById(List.of(41L))).willReturn(List.of(notification));
+        given(preferenceRepository.findAllByUserPKIn(List.of("recipientUserPK")))
+                .willReturn(List.of(preference));
+
+        assertThat(targetResolver.resolve(List.of(41L))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("저장 후 커뮤니티 알림을 끄면 전체 푸시가 켜져 있어도 발송하지 않는다")
+    void resolveRespectsLatestCategoryPreference() {
+        Notification notification = notification(41L, "recipientUserPK");
+        NotificationPreference preference = NotificationPreference.builder()
+                .userPK("recipientUserPK")
+                .communityEnabled(false)
+                .pushEnabled(true)
                 .expoPushToken("ExpoPushToken[current_token]")
                 .build();
         given(notificationRepository.findAllById(List.of(41L))).willReturn(List.of(notification));

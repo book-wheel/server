@@ -58,7 +58,9 @@ public class NotificationPushTargetResolver {
             Map<String, NotificationPreference> preferencesByUserPK
     ) {
         NotificationPreference preference = preferencesByUserPK.get(notification.getRecipientUserPK());
-        if (preference == null || !preference.allowsPush(notification.getCategory())) {
+        if (preference == null
+                || !preference.allows(notification.getCategory())
+                || !preference.allowsPush(notification.getCategory())) {
             return null;
         }
 
