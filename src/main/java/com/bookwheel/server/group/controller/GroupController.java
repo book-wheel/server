@@ -133,11 +133,14 @@ public class GroupController {
     @Operation(
             summary = "그룹 멤버 리스트",
             description = "특정 그룹의 ACTIVE 멤버 목록과 읽기 순서, 현재 라운드의 배정 도서 및 독서 상태를 조회합니다. " +
-                    "현재 진행 중인 라운드 또는 멤버 배정이 없으면 해당 정보는 null입니다."
+                    "요청자는 해당 그룹의 ACTIVE 멤버여야 하며, 현재 진행 중인 라운드 또는 멤버 배정이 없으면 해당 정보는 null입니다."
     )
     @GetMapping("/{groupId}/members")
-    public ApiResponse<GroupMemberListResponse> getGroupMembers(@PathVariable String groupId) {
-        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+    public ApiResponse<GroupMemberListResponse> getGroupMembers(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal Object principal
+    ) {
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId, getUserPK(principal));
         return ApiResponse.success(response);
     }
 }

@@ -189,7 +189,7 @@ class GroupControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "request-user-pk")
     @DisplayName("그룹 멤버 목록은 현재 라운드의 배정 도서와 독서 상태를 반환한다")
     void getGroupMembers_Success() throws Exception {
         String groupId = "group-1";
@@ -214,7 +214,7 @@ class GroupControllerTest {
                 new GroupCurrentRoundResponse("round-2", 2),
                 java.util.List.of(member)
         );
-        given(memberService.getGroupMembers(groupId)).willReturn(response);
+        given(memberService.getGroupMembers(groupId, "request-user-pk")).willReturn(response);
 
         mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
                 .andDo(print())
@@ -234,11 +234,11 @@ class GroupControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(username = "request-user-pk")
     @DisplayName("존재하지 않는 그룹의 멤버 목록 조회는 GROUP_NOT_FOUND를 반환한다")
     void getGroupMembers_ReturnsGroupNotFound_WhenGroupDoesNotExist() throws Exception {
         String groupId = "not-existing-group";
-        given(memberService.getGroupMembers(groupId))
+        given(memberService.getGroupMembers(groupId, "request-user-pk"))
                 .willThrow(new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
@@ -247,6 +247,23 @@ class GroupControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("GROUP_004"))
                 .andExpect(jsonPath("$.error.message").value("존재하지 않는 그룹입니다."));
+    }
+
+    @Test
+    @WithMockUser(username = "request-user-pk")
+    @DisplayName("ACTIVE 멤버가 아닌 사용자의 멤버 목록 조회는 GROUP_ACTIVE_MEMBER_ONLY를 반환한다")
+    void getGroupMembers_ReturnsGroupActiveMemberOnly_WhenRequesterIsNotActiveMember() throws Exception {
+        String groupId = "group-1";
+        given(memberService.getGroupMembers(groupId, "request-user-pk"))
+                .willThrow(new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY));
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("GROUP_011"))
+                .andExpect(jsonPath("$.error.message")
+                        .value("ACTIVE 멤버만 그룹 내부 기능을 사용할 수 있습니다."));
     }
 
     @Test

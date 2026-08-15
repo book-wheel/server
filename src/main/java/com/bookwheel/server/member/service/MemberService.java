@@ -9,6 +9,7 @@ import com.bookwheel.server.group.dto.member.GroupMemberCurrentRoundAssignmentRe
 import com.bookwheel.server.group.dto.member.GroupMemberResponse;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 public class MemberService {
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
+    private final GroupMemberPermissionValidator memberPermissionValidator;
     private final S3Service s3Service;
     private final RoundRepository roundRepository;
     private final WheelStateRepository wheelStateRepository;
@@ -44,8 +46,9 @@ public class MemberService {
         return memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE);
     }
 
-    public GroupMemberListResponse getGroupMembers(String groupId) {
+    public GroupMemberListResponse getGroupMembers(String groupId, String userPK) {
         validateGroupExists(groupId);
+        memberPermissionValidator.validateActiveMember(groupId, userPK);
 
         Optional<Round> currentRound = roundRepository.findCurrentRound(
                 groupId,

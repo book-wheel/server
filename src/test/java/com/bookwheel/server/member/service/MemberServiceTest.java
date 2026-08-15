@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import com.bookwheel.server.book.entity.Book;
 import com.bookwheel.server.book.entity.OwnBook;
@@ -14,6 +15,7 @@ import com.bookwheel.server.group.dto.member.GroupMemberListResponse;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.group.service.GroupMemberPermissionValidator;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -56,6 +58,9 @@ class MemberServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
+    private GroupMemberPermissionValidator memberPermissionValidator;
+
+    @Mock
     private S3Service s3Service;
 
     @Mock
@@ -71,6 +76,7 @@ class MemberServiceTest {
         memberService = new MemberService(
                 groupRepository,
                 memberRepository,
+                memberPermissionValidator,
                 s3Service,
                 roundRepository,
                 wheelStateRepository,
@@ -149,7 +155,7 @@ class MemberServiceTest {
         given(roundRepository.findCurrentRound(groupId, LocalDate.of(2026, 8, 14), State.IN_PROGRESS))
                 .willReturn(Optional.empty());
 
-        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId, user.getId());
 
         assertThat(response.currentRound()).isNull();
         assertThat(response.members()).singleElement().satisfies(item -> {
@@ -213,7 +219,7 @@ class MemberServiceTest {
         given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
                 .willReturn(List.of(member));
 
-        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId, reader.getId());
 
         assertThat(response.totalCount()).isEqualTo(1);
         assertThat(response.currentRound()).satisfies(round -> {
@@ -264,7 +270,7 @@ class MemberServiceTest {
         given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
                 .willReturn(List.of(member));
 
-        GroupMemberListResponse response = memberService.getGroupMembers(groupId);
+        GroupMemberListResponse response = memberService.getGroupMembers(groupId, member.getUser().getId());
 
         assertThat(response.currentRound()).isNotNull();
         assertThat(response.members()).singleElement().satisfies(item ->
@@ -278,7 +284,7 @@ class MemberServiceTest {
         String groupId = "not-existing-group";
         given(groupRepository.findById(groupId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> memberService.getGroupMembers(groupId))
+        assertThatThrownBy(() -> memberService.getGroupMembers(groupId, "request-user-pk"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.GROUP_NOT_FOUND);
@@ -286,6 +292,7 @@ class MemberServiceTest {
         then(roundRepository).shouldHaveNoInteractions();
         then(wheelStateRepository).shouldHaveNoInteractions();
         then(memberRepository).shouldHaveNoInteractions();
+        then(memberPermissionValidator).shouldHaveNoInteractions();
     }
 
     @Test
@@ -299,10 +306,36 @@ class MemberServiceTest {
                 .build();
         given(groupRepository.findById(groupId)).willReturn(Optional.of(deletedGroup));
 
-        assertThatThrownBy(() -> memberService.getGroupMembers(groupId))
+        assertThatThrownBy(() -> memberService.getGroupMembers(groupId, "request-user-pk"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.GROUP_NOT_FOUND);
+
+        then(roundRepository).shouldHaveNoInteractions();
+        then(wheelStateRepository).shouldHaveNoInteractions();
+        then(memberRepository).shouldHaveNoInteractions();
+        then(memberPermissionValidator).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("ACTIVE 멤버가 아닌 사용자는 그룹 멤버 목록을 조회할 수 없다")
+    void getGroupMembers_ThrowsGroupActiveMemberOnly_WhenRequesterIsNotActiveMember() {
+        String groupId = "group-1";
+        String requestUserPK = "request-user-pk";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("모임")
+                .groupState(State.IN_PROGRESS)
+                .build();
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        willThrow(new BusinessException(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY))
+                .given(memberPermissionValidator)
+                .validateActiveMember(groupId, requestUserPK);
+
+        assertThatThrownBy(() -> memberService.getGroupMembers(groupId, requestUserPK))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
 
         then(roundRepository).shouldHaveNoInteractions();
         then(wheelStateRepository).shouldHaveNoInteractions();
