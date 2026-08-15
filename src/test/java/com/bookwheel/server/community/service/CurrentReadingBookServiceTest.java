@@ -2,6 +2,8 @@ package com.bookwheel.server.community.service;
 
 import com.bookwheel.server.community.dto.CurrentReadingBookResponse;
 import com.bookwheel.server.community.dto.CurrentReadingBooksResponse;
+import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,12 +37,12 @@ class CurrentReadingBookServiceTest {
         List<CurrentReadingBookResponse> books = List.of(
             new CurrentReadingBookResponse("group-123", "달러구트 꿈 백화점", "https://example.com/cover.jpg")
         );
-        given(wheelStateRepository.findCurrentReadingBooks(userPK, TODAY)).willReturn(books);
+        given(wheelStateRepository.findCurrentReadingBooks(userPK, TODAY, MemberStatus.ACTIVE, State.IN_PROGRESS)).willReturn(books);
 
         CurrentReadingBooksResponse response = service.getCurrentReadingBooks(userPK);
 
         assertThat(response.books()).containsExactlyElementsOf(books);
-        then(wheelStateRepository).should().findCurrentReadingBooks(userPK, TODAY);
+        then(wheelStateRepository).should().findCurrentReadingBooks(userPK, TODAY, MemberStatus.ACTIVE, State.IN_PROGRESS);
     }
 
     @Test
@@ -48,7 +50,7 @@ class CurrentReadingBookServiceTest {
     void getCurrentReadingBooks_ReturnsEmptyList() {
         CurrentReadingBookService service = service();
         String userPK = "user-pk";
-        given(wheelStateRepository.findCurrentReadingBooks(userPK, TODAY)).willReturn(List.of());
+        given(wheelStateRepository.findCurrentReadingBooks(userPK, TODAY, MemberStatus.ACTIVE, State.IN_PROGRESS)).willReturn(List.of());
 
         CurrentReadingBooksResponse response = service.getCurrentReadingBooks(userPK);
 

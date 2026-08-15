@@ -1,6 +1,8 @@
 package com.bookwheel.server.wheel.repository;
 
 import com.bookwheel.server.community.dto.CurrentReadingBookResponse;
+import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import jakarta.persistence.LockModeType;
@@ -48,8 +50,8 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
             join ownBook.book b
             join Round r on r.roundId = ws.roundId
             where m.user.id = :userPK
-              and m.memberStatus = com.bookwheel.server.member.enums.MemberStatus.ACTIVE
-              and g.groupState = com.bookwheel.server.group.enums.State.IN_PROGRESS
+              and m.memberStatus = :memberStatus
+              and g.groupState = :groupState
               and r.startDate <= :today
               and r.endDate >= :today
               and r.roundNumber <= g.groupRoundCount
@@ -57,7 +59,9 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
             """)
     List<CurrentReadingBookResponse> findCurrentReadingBooks(
             @Param("userPK") String userPK,
-            @Param("today") LocalDate today
+            @Param("today") LocalDate today,
+            @Param("memberStatus") MemberStatus memberStatus,
+            @Param("groupState") State groupState
     );
 
     // 인증 시작부터 완료 저장까지 같은 WheelState를 단독으로 다룬다.
