@@ -45,3 +45,6 @@ build/
 
 .omc/
 .claude/
+
+### 측정 결과 ###
+aladin-latency-*.csv

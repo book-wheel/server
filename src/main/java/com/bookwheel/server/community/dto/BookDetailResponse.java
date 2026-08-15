@@ -1,5 +1,6 @@
 package com.bookwheel.server.community.dto;
 
+import com.bookwheel.server.community.entity.PopularLoanBook;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "도서 상세 정보 응답")
@@ -50,6 +51,20 @@ public record BookDetailResponse(
     }
 
     // 이용 분석은 도서 상세 조회의 부가 정보이므로 알라딘 응답 조립과 분리해서 덧붙인다.
+    public static BookDetailResponse from(PopularLoanBook book, boolean isInterested) {
+        return new BookDetailResponse(
+            book.getTitle(),
+            book.getAuthor(),
+            book.getPublisher(),
+            null,
+            book.getThumbnail(),
+            null,
+            book.getIsbn(),
+            isInterested,
+            null
+        );
+    }
+
     public BookDetailResponse withUsageAnalysis(BookUsageAnalysisResponse usageAnalysis) {
         return new BookDetailResponse(
             title,

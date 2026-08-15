@@ -14,9 +14,15 @@ public record GroupMemberResponse(
         String profileImageUrl,
         MemberRole role,
         @Schema(description = "현재 읽기 순서. 아직 지정되지 않았으면 null", nullable = true)
-        Integer readOrder
+        Integer readOrder,
+        @Schema(description = "현재 라운드 독서 배정 정보. 현재 라운드 또는 배정이 없으면 null", nullable = true)
+        GroupMemberCurrentRoundAssignmentResponse currentRoundAssignment
 ) {
-    public static GroupMemberResponse from(Member member, String profileImageUrl) {
+    public static GroupMemberResponse from(
+            Member member,
+            String profileImageUrl,
+            GroupMemberCurrentRoundAssignmentResponse currentRoundAssignment
+    ) {
         return GroupMemberResponse.builder()
                 .memberId(member.getMemberId())
                 .userPK(member.getUser().getId())
@@ -24,6 +30,7 @@ public record GroupMemberResponse(
                 .profileImageUrl(profileImageUrl)
                 .role(member.getMemberRole())
                 .readOrder(member.getReadOrder())
+                .currentRoundAssignment(currentRoundAssignment)
                 .build();
     }
 }

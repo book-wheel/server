@@ -28,6 +28,36 @@ class GroupMemberPermissionValidatorTest {
     private GroupMemberPermissionValidator validator;
 
     @Test
+    void validateActiveMember_AllowsActiveMember() {
+        String groupId = "group-1";
+        String userPK = "member-user-pk";
+        given(memberRepository.existsByGroup_GroupIdAndUser_IdAndMemberStatus(
+                groupId,
+                userPK,
+                MemberStatus.ACTIVE
+        )).willReturn(true);
+
+        assertThatCode(() -> validator.validateActiveMember(groupId, userPK))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateActiveMember_RejectsNonActiveMember() {
+        String groupId = "group-1";
+        String userPK = "non-active-user-pk";
+        given(memberRepository.existsByGroup_GroupIdAndUser_IdAndMemberStatus(
+                groupId,
+                userPK,
+                MemberStatus.ACTIVE
+        )).willReturn(false);
+
+        assertThatThrownBy(() -> validator.validateActiveMember(groupId, userPK))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_ACTIVE_MEMBER_ONLY);
+    }
+
+    @Test
     void validateLeader_AllowsActiveLeader() {
         String groupId = "group-1";
         String userPK = "leader-user-pk";
