@@ -130,11 +130,12 @@ public class BookController {
     }
 
     @Operation(
-        summary = "현재 읽고 있는 책 카드 조회",
-        description = "로그인한 사용자가 참여 중인 진행 중 교환독서 그룹에서 현재 읽고 있는 책의 표지 카드를 조회합니다. "
+        summary = "현재 읽는 책 및 시작 예정 책 카드 조회",
+        description = "로그인한 사용자의 진행 중인 현재 라운드 배정과 모집 중인 모임의 첫 라운드 PLANNED 배정을 조회합니다. "
+            + "upcoming이 true이면 roundStartDate와 dday로 시작 예정일을 표시할 수 있습니다. "
             + "각 항목에는 그룹 홈으로 이동할 때 필요한 groupId가 포함됩니다. "
             + "표지가 없는 도서는 coverImageUrl이 빈 문자열로 내려가므로, 이때는 title을 대체 텍스트로 표시하면 됩니다. "
-            + "현재 읽고 있는 책이 없으면 books는 빈 배열입니다."
+            + "현재 또는 시작 예정인 배정 책이 없으면 books는 빈 배열입니다."
     )
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",

@@ -1,6 +1,5 @@
 package com.bookwheel.server.wheel.repository;
 
-import com.bookwheel.server.community.dto.CurrentReadingBookResponse;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.wheel.entity.WheelState;
@@ -37,13 +36,12 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
 
     List<WheelState> findByRoundId(String roundId);
 
-    // 커뮤니티 홈에서 현재 읽고 있는 책 카드를 그리기 위해 그룹과 책 정보를 함께 조회한다.
+    // 커뮤니티 홈에서 현재 읽고 있는 책 카드를 그리기 위해 현재 라운드 배정을 조회한다.
     @Query("""
-            select new com.bookwheel.server.community.dto.CurrentReadingBookResponse(
-                g.groupId,
-                b.title,
-                b.coverImage
-            )
+            select g.groupId as groupId,
+                   b.title as title,
+                   b.coverImage as coverImageUrl,
+                   r.startDate as roundStartDate
             from WheelState ws
             join ws.member m
             join m.group g
@@ -58,12 +56,52 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
               and r.roundNumber <= g.groupRoundCount
             order by r.endDate asc, g.groupId asc
             """)
-    List<CurrentReadingBookResponse> findCurrentReadingBooks(
+    List<ReadingBookAssignmentProjection> findCurrentReadingBooks(
             @Param("userPK") String userPK,
             @Param("today") LocalDate today,
             @Param("memberStatus") MemberStatus memberStatus,
             @Param("groupState") State groupState
     );
+
+    // 모집 중 모임에서 첫 라운드의 PLANNED 배정이 존재할 때만 시작 예정 책 카드로 조회한다.
+    @Query("""
+            select g.groupId as groupId,
+                   b.title as title,
+                   b.coverImage as coverImageUrl,
+                   r.startDate as roundStartDate
+            from WheelState ws
+            join ws.member m
+            join m.group g
+            join ws.ownBook ownBook
+            join ownBook.book b
+            join Round r on r.roundId = ws.roundId
+            where m.user.id = :userPK
+              and m.memberStatus = :memberStatus
+              and g.groupState = :groupState
+              and g.startDate >= :today
+              and r.roundNumber = 1
+              and r.startDate = g.startDate
+              and r.roundNumber <= g.groupRoundCount
+              and ws.wheelState = :wheelStatus
+            order by r.startDate asc, g.groupId asc
+            """)
+    List<ReadingBookAssignmentProjection> findUpcomingReadingBooks(
+            @Param("userPK") String userPK,
+            @Param("today") LocalDate today,
+            @Param("memberStatus") MemberStatus memberStatus,
+            @Param("groupState") State groupState,
+            @Param("wheelStatus") WheelStatus wheelStatus
+    );
+
+    interface ReadingBookAssignmentProjection {
+        String getGroupId();
+
+        String getTitle();
+
+        String getCoverImageUrl();
+
+        LocalDate getRoundStartDate();
+    }
 
     // 멤버 목록에서 현재 라운드의 멤버별 배정과 책 정보를 한 번에 조회한다.
     @Query("""
