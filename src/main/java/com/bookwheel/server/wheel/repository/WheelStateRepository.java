@@ -54,6 +54,7 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
               and r.startDate <= :today
               and r.endDate >= :today
               and r.roundNumber <= g.groupRoundCount
+              and ws.isCompleted = false
             order by r.endDate asc, g.groupId asc
             """)
     List<ReadingBookAssignmentProjection> findCurrentReadingBooks(

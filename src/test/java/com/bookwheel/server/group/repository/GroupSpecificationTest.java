@@ -51,8 +51,8 @@ class GroupSpecificationTest {
     private Predicate conjunction;
 
     @Test
-    @DisplayName("탐색 조건은 시작일이 지났거나 인원이 찬 모집 모임을 제외한다")
-    void searchWith_ExcludesExpiredOrFullRecruitingGroups() {
+    @DisplayName("탐색 조건은 상태가 없거나 시작일이 지났거나 인원이 찬 모임을 제외한다")
+    void searchWith_ExcludesUnjoinableGroups() {
         LocalDate currentDate = LocalDate.of(2026, 8, 19);
         given(builder.conjunction()).willReturn(conjunction);
         given(root.<State>get("groupState")).willReturn(groupStatePath);
@@ -64,6 +64,7 @@ class GroupSpecificationTest {
 
         specification.toPredicate(root, query, builder);
 
+        then(builder).should().isNotNull(groupStatePath);
         then(builder).should(times(2)).equal(groupStatePath, State.RECRUITING);
         then(builder).should().lessThan(startDatePath, currentDate);
         then(builder).should().greaterThanOrEqualTo(currentMembersPath, maxMembersPath);

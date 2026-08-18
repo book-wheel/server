@@ -25,7 +25,7 @@ public record CurrentReadingBookResponse(
     @Schema(description = "현재 또는 시작 예정 라운드의 시작일", example = "2026-08-21")
     LocalDate roundStartDate,
 
-    @Schema(description = "시작 예정일까지 남은 일수. READING 상태에서는 null", example = "2", nullable = true)
+    @Schema(description = "시작 예정일까지 남은 일수. upcoming이 false이면 null", example = "2", nullable = true)
     Integer dday
 ) {
 
