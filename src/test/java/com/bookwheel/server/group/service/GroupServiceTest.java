@@ -8,9 +8,12 @@ import com.bookwheel.server.group.dto.GroupCreateResponse;
 import com.bookwheel.server.group.dto.member.GroupJoinRequest;
 import com.bookwheel.server.group.dto.search.GroupSearchCondition;
 import com.bookwheel.server.group.dto.search.GroupSearchResponse;
+import com.bookwheel.server.group.dto.setting.MemberRequestStatus;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.group.repository.GroupRepository;
+import com.bookwheel.server.member.entity.Member;
+import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
@@ -41,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class GroupServiceTest {
@@ -200,6 +204,45 @@ class GroupServiceTest {
         );
 
         then(memberRepository).should().save(any());
+    }
+
+    @Test
+    @DisplayName("시작일이 지난 모집 모임의 대기 중 가입 요청은 승인할 수 없다")
+    void updateMemberRequestStatus_RejectsApprovalWhenStartDatePassed() {
+        String groupId = "expired-recruiting-group";
+        String memberId = "pending-member";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("시작일 경과 모임")
+                .groupPublic(true)
+                .maxMembers(5)
+                .startDate(LocalDate.now(FIXED_CLOCK).minusDays(1))
+                .groupState(State.RECRUITING)
+                .build();
+        Member pendingMember = Member.builder()
+                .memberId(memberId)
+                .group(group)
+                .user(activeUser())
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.PENDING)
+                .build();
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId))
+                .willReturn(Optional.of(pendingMember));
+
+        assertThatThrownBy(() -> groupService.updateMemberRequestStatus(
+                groupId,
+                memberId,
+                "leader-user-pk",
+                MemberRequestStatus.APPROVED
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_JOIN_PERIOD_EXPIRED);
+
+        then(memberRepository).should(never()).countByGroup_GroupIdAndMemberStatus(any(), any());
+        then(recruitingScheduleAssignmentService).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     @Test

@@ -183,6 +183,9 @@ public class GroupService {
             if (group.getGroupState() != State.RECRUITING) {
                 throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
             }
+            if (group.getStartDate() != null && group.getStartDate().isBefore(LocalDate.now(clock))) {
+                throw new BusinessException(ErrorCode.GROUP_JOIN_PERIOD_EXPIRED);
+            }
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
