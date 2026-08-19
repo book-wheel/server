@@ -131,8 +131,8 @@ public class WheelService {
         validateGroupAccess(userPK, userPK, groupId);
         Map<String, Integer> roundNumberMap = getRoundNumberMap(groupId);
 
-        // 책이 존재하지 않으면 오류
-        OwnBook ownBook = ownBookRepository.findById(ownBookId)
+        // 요청한 모임에 속한 책이 아니면 존재 여부를 노출하지 않는다.
+        OwnBook ownBook = ownBookRepository.findByOwnBookIdAndGroup_GroupId(ownBookId, groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND));
 
         // 2. 특정 책의 완독 기록 가져오기
