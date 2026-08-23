@@ -1,13 +1,13 @@
 package com.bookwheel.server.user.service;
 
+import com.bookwheel.server.common.auth.AuthRole;
+import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
-import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.common.service.S3Service;
-import com.bookwheel.server.common.util.PathNormalizer;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.notification.service.NotificationPreferenceService;
@@ -15,14 +15,15 @@ import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.event.UserDeactivatedEvent;
+import com.bookwheel.server.user.image.ProfileImagePolicy;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import com.bookwheel.server.user.dto.ProfileSetupRequest;
 
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +41,7 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SocialUnlinkService socialUnlinkService;
     private final S3Service s3Service;
+    private final ProfileSetupTransactionService profileSetupTransactionService;
     private final MemberRepository memberRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationPreferenceService notificationPreferenceService;
@@ -80,42 +82,133 @@ public class UserService {
         return password != null && password.matches(regex);
     }
 
-    @Transactional
+    public ProfileImagePresignedUrlResponse createProfileImagePresignedUrl(
+            String userPK,
+            ProfileImagePresignedUrlRequest request
+    ) {
+        findByIdAndValidateActive(userPK);
+        ProfileImagePolicy.ValidatedImage validatedImage = ProfileImagePolicy.validateUploadRequest(
+                request.fileName(),
+                request.contentType(),
+                request.fileSize()
+        );
+        String objectKey = ProfileImagePolicy.createTemporaryObjectKey(
+                userPK,
+                validatedImage.extension()
+        );
+        String presignedUrl = s3Service.getPresignedPutUrl(
+                objectKey,
+                validatedImage.contentType(),
+                request.fileSize()
+        );
+        return new ProfileImagePresignedUrlResponse(
+                presignedUrl,
+                objectKey,
+                validatedImage.contentType()
+        );
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public LoginResponse setupProfile(String userPK, ProfileSetupRequest request) {
-        User user = findByIdAndValidateActive(userPK);
+        String temporaryObjectKey = null;
+        String finalObjectKey = null;
+        boolean copyAttempted = false;
+        boolean profilePersisted = false;
+        ProfileSetupTransactionService.Result result = null;
 
-        // 닉네임 중복 체크 및 업데이트
-        String newNickname = request.nickname();
-        if (newNickname != null && !newNickname.isBlank()) {
-            if (!user.getNickname().equals(newNickname)) {
-                if (userRepository.existsByNickname(newNickname)) {
-                    throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-                }
+        try {
+            ProfileSetupTransactionService.ProfileImageUpdate profileImageUpdate;
+            String requestedObjectKey = request.profileImageKey();
+            if (requestedObjectKey == null) {
+                profileImageUpdate = ProfileSetupTransactionService.ProfileImageUpdate.retain();
+            } else if (requestedObjectKey.isBlank()) {
+                profileImageUpdate = ProfileSetupTransactionService.ProfileImageUpdate.delete();
+            } else if (ProfileImagePolicy.isStoredProfileObjectKey(requestedObjectKey)) {
+                // 기존 클라이언트가 현재 최종 key를 다시 보내는 경우만 DB 트랜잭션에서 동일성을 확인한다.
+                profileImageUpdate = ProfileSetupTransactionService.ProfileImageUpdate.retainIfCurrent(
+                        requestedObjectKey
+                );
+            } else {
+                // 검증이 실패한 타 사용자 key를 삭제하지 않도록 소유권 확인 후에만 정리 대상으로 설정한다.
+                ProfileImagePolicy.validateOwnedTemporaryObjectKey(requestedObjectKey, userPK);
+                temporaryObjectKey = requestedObjectKey;
+                finalObjectKey = ProfileImagePolicy.createFinalObjectKey(temporaryObjectKey, userPK);
+
+                S3ObjectMetadata metadata = s3Service.getObjectMetadata(temporaryObjectKey);
+                byte[] signature = s3Service.getObjectSignature(
+                        temporaryObjectKey,
+                        metadata.eTag(),
+                        ProfileImagePolicy.SIGNATURE_LENGTH
+                );
+                ProfileImagePolicy.validateUploadedObject(temporaryObjectKey, metadata, signature);
+
+                // CopyObject 응답이 유실되어도 객체가 생성됐을 수 있으므로 호출 직전부터 보상 대상으로 본다.
+                copyAttempted = true;
+                s3Service.copyObjectIfUnchanged(
+                        temporaryObjectKey,
+                        finalObjectKey,
+                        metadata.eTag()
+                );
+                profileImageUpdate = ProfileSetupTransactionService.ProfileImageUpdate.replace(finalObjectKey);
             }
-        } else {
-            newNickname = user.getNickname(); // 입력이 없으면 기존 닉네임 유지
+
+            result = profileSetupTransactionService.persist(userPK, request, profileImageUpdate);
+            profilePersisted = true;
+            return result.response();
+        } finally {
+            if (temporaryObjectKey != null) {
+                deleteS3ObjectBestEffort("temporary-upload", userPK, temporaryObjectKey);
+            }
+            if (copyAttempted && !profilePersisted) {
+                deleteS3ObjectBestEffort("failed-final-copy", userPK, finalObjectKey);
+            }
+            if (profilePersisted && result != null) {
+                deletePreviousProfileImageBestEffort(
+                        userPK,
+                        result.previousProfileImageKey(),
+                        result.response().profileImageKey()
+                );
+            }
+        }
+    }
+
+    private void deletePreviousProfileImageBestEffort(
+            String userPK,
+            String previousObjectKey,
+            String currentObjectKey
+    ) {
+        if (!ProfileImagePolicy.isStoredProfileObjectKey(previousObjectKey)
+                || previousObjectKey.equals(currentObjectKey)) {
+            return;
         }
 
-        // S3 키 정규화 및 유효성 검사
-        String rawKey = request.profileImageKey();
-        String normalizedKey = null;
-
-        if (rawKey != null && !rawKey.isBlank()) {
-            // 전체 URL이 들어오는 경우 방어 (에러 처리)
-            if (rawKey.startsWith("http://") || rawKey.startsWith("https://")) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        try {
+            if (userRepository.existsByProfileImageKey(previousObjectKey)) {
+                log.warn("기존 프로필 이미지가 다른 계정에서 참조 중이어서 삭제를 건너뜁니다: "
+                                + "userPK={}, imageKey={}",
+                        userPK, previousObjectKey);
+                return;
             }
-            normalizedKey = PathNormalizer.normalizeSegment(rawKey);
+            deleteS3ObjectBestEffort("previous-profile", userPK, previousObjectKey);
+        } catch (RuntimeException exception) {
+            // DB 참조 여부를 확신할 수 없으면 안전을 위해 삭제하지 않는다.
+            log.error("기존 프로필 이미지 참조 여부 확인 실패: userPK={}, imageKey={}, error={}",
+                    userPK, previousObjectKey, exception.getMessage());
         }
+    }
 
-        // 3티티 통합 업데이트
-        user.updateProfile(newNickname, request.comment(), normalizedKey);
-        user.completeProfile();
-
-        log.info("프로필 설정 완료 (Stage 2): userPK={}, nickname={}, imageKey={}",
-                userPK, user.getNickname(), normalizedKey);
-
-        return getLoginResponse(user);
+    private void deleteS3ObjectBestEffort(String cleanupType, String userPK, String objectKey) {
+        try {
+            boolean deleted = s3Service.deleteObject(objectKey);
+            if (!deleted) {
+                log.warn("프로필 이미지 best-effort 삭제 실패: type={}, userPK={}, imageKey={}",
+                        cleanupType, userPK, objectKey);
+            }
+        } catch (RuntimeException exception) {
+            // 정리 실패가 이미 확정된 DB 처리 결과나 원래 예외를 덮지 않게 한다.
+            log.error("프로필 이미지 best-effort 삭제 예외: type={}, userPK={}, imageKey={}, error={}",
+                    cleanupType, userPK, objectKey, exception.getMessage());
+        }
     }
 
     @Transactional

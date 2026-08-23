@@ -25,6 +25,7 @@ class UserServiceLogoutTest {
                 null,
                 null,
                 null,
+                null,
                 preferenceService
         );
 
