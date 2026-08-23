@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 @Slf4j
 @Component
@@ -38,13 +37,12 @@ public class ChatTemporaryImageCleanupScheduler {
     public void deleteExpiredTemporaryImages() {
         Instant cutoff = Instant.now(clock).minus(retention);
         try {
-            List<String> expiredObjectKeys = s3Service.findObjectKeysOlderThan(
+            int deletedObjectCount = s3Service.deleteObjectsOlderThan(
                     TEMPORARY_IMAGE_PREFIX,
                     cutoff
             );
-            expiredObjectKeys.forEach(s3Service::deleteObject);
-            if (!expiredObjectKeys.isEmpty()) {
-                log.info("만료된 채팅 임시 이미지 정리 완료: count={}", expiredObjectKeys.size());
+            if (deletedObjectCount > 0) {
+                log.info("만료된 채팅 임시 이미지 정리 완료: count={}", deletedObjectCount);
             }
         } catch (RuntimeException exception) {
             // 한 번의 조회 실패가 이후 스케줄 실행까지 중단시키지 않도록 기록하고 종료한다.

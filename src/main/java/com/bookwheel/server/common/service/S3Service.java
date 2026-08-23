@@ -28,7 +28,6 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -84,9 +83,16 @@ public class S3Service {
 
     public String getPresignedUrl(String prefix, String fileName) {
         // 중복 방지를 위해 고유한 파일 경로 생성
-        // 결과: "profiles/123e4567..._cat.jpg"
+        // 결과: "attachments/123e4567..._file.jpg"
         String normalizedPrefix = PathNormalizer.normalizeSegment(prefix);
         String normalizedFileName = PathNormalizer.normalizeFileName(fileName);
+        if (normalizedPrefix.equals("profiles")
+                || normalizedPrefix.startsWith("profiles/")
+                || normalizedPrefix.equals("profiles-temp")
+                || normalizedPrefix.startsWith("profiles-temp/")) {
+            // 프로필 이미지는 userPK 귀속·용량 제한이 적용되는 전용 API로만 발급한다.
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         String objectKey = normalizedPrefix + "/" + UUID.randomUUID() + "_" + normalizedFileName;
 
         // S3에 올릴 객체 정보 세팅
@@ -203,12 +209,12 @@ public class S3Service {
         }
     }
 
-    public List<String> findObjectKeysOlderThan(String prefix, Instant cutoff) {
+    public int deleteObjectsOlderThan(String prefix, Instant cutoff) {
         if (prefix == null || prefix.isBlank() || cutoff == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        List<String> objectKeys = new ArrayList<>();
+        int deletedObjectCount = 0;
         String continuationToken = null;
         try {
             do {
@@ -217,22 +223,24 @@ public class S3Service {
                         .prefix(prefix)
                         .continuationToken(continuationToken)
                         .build());
-                response.contents().stream()
-                        .filter(object -> object.lastModified() != null)
-                        .filter(object -> object.lastModified().isBefore(cutoff))
-                        .map(software.amazon.awssdk.services.s3.model.S3Object::key)
-                        .forEach(objectKeys::add);
+                for (software.amazon.awssdk.services.s3.model.S3Object object : response.contents()) {
+                    if (object.lastModified() != null
+                            && object.lastModified().isBefore(cutoff)
+                            && deleteObject(object.key())) {
+                        deletedObjectCount++;
+                    }
+                }
                 continuationToken = Boolean.TRUE.equals(response.isTruncated())
                         ? response.nextContinuationToken()
                         : null;
             } while (continuationToken != null);
-            return objectKeys;
+            return deletedObjectCount;
         } catch (S3Exception exception) {
-            log.error("S3 만료 객체 조회 실패: prefix={}, status={}, error={}",
+            log.error("S3 만료 객체 정리 실패: prefix={}, status={}, error={}",
                     prefix, exception.statusCode(), exception.getMessage());
             throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
         } catch (RuntimeException exception) {
-            log.error("S3 만료 객체 조회 실패: prefix={}, error={}", prefix, exception.getMessage());
+            log.error("S3 만료 객체 정리 실패: prefix={}, error={}", prefix, exception.getMessage());
             throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
         }
     }
@@ -338,9 +346,9 @@ public class S3Service {
             String contentType
     ) {}
 
-    public void deleteObject(String objectKey) {
+    public boolean deleteObject(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
-            return;
+            return false;
         }
 
         try {
@@ -357,8 +365,10 @@ public class S3Service {
 
             s3Client.deleteObject(deleteObjectRequest);
             log.info("S3 객체 삭제 완료: key={}", normalizedKey);
+            return true;
         } catch (Exception e) {
             log.error("S3 객체 삭제 실패: key={}, error={}", objectKey, e.getMessage());
+            return false;
         }
     }
 }
