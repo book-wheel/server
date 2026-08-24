@@ -26,7 +26,7 @@ public record GroupSearchResponse(
         LocalDate startDate,
         String status,
         GroupDetailButtonType bottomButtonType,
-        int dday
+        Integer dday // null을 내려주기 위한 Integer
 ) {
     public static GroupSearchResponse from(Group group) {
         // 개인화 정보가 없을 때는 기본 버튼 상태를 JOIN으로 내려준다.
@@ -44,6 +44,11 @@ public record GroupSearchResponse(
             LocalDate currentDate
     ) {
         State normalizedState = normalizeState(group.getGroupState());
+        boolean rescheduleRequired = isRescheduleRequired(
+                normalizedState,
+                group.getStartDate(),
+                currentDate
+        );
 
         return GroupSearchResponse.builder()
                 .groupId(group.getGroupId())
@@ -56,11 +61,11 @@ public record GroupSearchResponse(
                 .groupRoundCount(group.getGroupRoundCount())
                 .maxMembers(group.getMaxMembers())
                 .groupState(normalizedState)
-                .groupStateLabel(mapStateLabel(normalizedState))
+                .groupStateLabel(mapStateLabel(normalizedState, rescheduleRequired))
                 .startDate(group.getStartDate())
-                .status(mapStatus(normalizedState))
+                .status(mapStatus(normalizedState, rescheduleRequired))
                 .bottomButtonType(bottomButtonType)
-                .dday(calculateDday(group.getStartDate(), currentDate))
+                .dday(calculateDday(group.getStartDate(), currentDate, rescheduleRequired))
                 .build();
     }
 
@@ -71,7 +76,10 @@ public record GroupSearchResponse(
         return state;
     }
 
-    private static String mapStatus(State state) {
+    private static String mapStatus(State state, boolean rescheduleRequired) {
+        if (rescheduleRequired) {
+            return "reschedule_required";
+        }
         return switch (state) {
             case RECRUITING -> "scheduled";
             case IN_PROGRESS -> "active";
@@ -80,7 +88,10 @@ public record GroupSearchResponse(
         };
     }
 
-    private static String mapStateLabel(State state) {
+    private static String mapStateLabel(State state, boolean rescheduleRequired) {
+        if (rescheduleRequired) {
+            return "일정 재설정 필요";
+        }
         return switch (state) {
             case RECRUITING -> "시작전";
             case IN_PROGRESS -> "진행중";
@@ -89,10 +100,27 @@ public record GroupSearchResponse(
         };
     }
 
-    private static int calculateDday(LocalDate startDate, LocalDate currentDate) {
+    private static Integer calculateDday(
+            LocalDate startDate,
+            LocalDate currentDate,
+            boolean rescheduleRequired
+    ) {
+        if (rescheduleRequired) {
+            return null;
+        }
         if (startDate == null) {
             return 0;
         }
         return (int) ChronoUnit.DAYS.between(currentDate, startDate);
+    }
+
+    private static boolean isRescheduleRequired(
+            State state,
+            LocalDate startDate,
+            LocalDate currentDate
+    ) {
+        return state == State.RECRUITING
+                && startDate != null
+                && startDate.isBefore(currentDate);
     }
 }

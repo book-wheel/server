@@ -4,6 +4,7 @@ import com.bookwheel.server.community.dto.CurrentReadingBookResponse;
 import com.bookwheel.server.community.dto.CurrentReadingBooksResponse;
 import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.member.enums.MemberStatus;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,19 +31,95 @@ class CurrentReadingBookServiceTest {
     private WheelStateRepository wheelStateRepository;
 
     @Test
-    @DisplayName("현재 읽고 있는 책을 로그인한 사용자와 오늘 날짜로 조회한다.")
-    void getCurrentReadingBooks_ReturnsRepositoryResult() {
+    @DisplayName("진행 중인 책 다음에 시작 예정 책과 남은 일수를 반환한다")
+    void getCurrentReadingBooks_ReturnsCurrentAndUpcomingBooks() {
         CurrentReadingBookService service = service();
         String userPK = "user-pk";
-        List<CurrentReadingBookResponse> books = List.of(
-            new CurrentReadingBookResponse("group-123", "달러구트 꿈 백화점", "https://example.com/cover.jpg")
+        List<WheelStateRepository.ReadingBookAssignmentProjection> currentBooks = List.of(
+                assignment(
+                        "current-group",
+                        "현재 읽는 책",
+                        "https://example.com/current.jpg",
+                        TODAY.minusDays(2)
+                )
         );
-        given(wheelStateRepository.findCurrentReadingBooks(userPK, TODAY, MemberStatus.ACTIVE, State.IN_PROGRESS)).willReturn(books);
+        List<WheelStateRepository.ReadingBookAssignmentProjection> upcomingBooks = List.of(
+                assignment(
+                        "upcoming-group",
+                        "읽을 예정인 책",
+                        "https://example.com/upcoming.jpg",
+                        TODAY.plusDays(2)
+                )
+        );
+        given(wheelStateRepository.findCurrentReadingBooks(
+                userPK,
+                TODAY,
+                MemberStatus.ACTIVE,
+                State.IN_PROGRESS
+        )).willReturn(currentBooks);
+        given(wheelStateRepository.findUpcomingReadingBooks(
+                userPK,
+                TODAY,
+                MemberStatus.ACTIVE,
+                State.RECRUITING,
+                WheelStatus.PLANNED
+        )).willReturn(upcomingBooks);
 
         CurrentReadingBooksResponse response = service.getCurrentReadingBooks(userPK);
 
-        assertThat(response.books()).containsExactlyElementsOf(books);
+        assertThat(response.books()).hasSize(2);
+        assertThat(response.books().get(0)).satisfies(book -> {
+            assertThat(book.groupId()).isEqualTo("current-group");
+            assertThat(book.upcoming()).isFalse();
+            assertThat(book.roundStartDate()).isEqualTo(TODAY.minusDays(2));
+            assertThat(book.dday()).isNull();
+        });
+        assertThat(response.books().get(1)).satisfies(book -> {
+            assertThat(book.groupId()).isEqualTo("upcoming-group");
+            assertThat(book.upcoming()).isTrue();
+            assertThat(book.roundStartDate()).isEqualTo(TODAY.plusDays(2));
+            assertThat(book.dday()).isEqualTo(2);
+        });
         then(wheelStateRepository).should().findCurrentReadingBooks(userPK, TODAY, MemberStatus.ACTIVE, State.IN_PROGRESS);
+        then(wheelStateRepository).should().findUpcomingReadingBooks(
+                userPK,
+                TODAY,
+                MemberStatus.ACTIVE,
+                State.RECRUITING,
+                WheelStatus.PLANNED
+        );
+    }
+
+    @Test
+    @DisplayName("시작 당일의 예정 책은 D-Day를 의미하는 0일로 반환한다")
+    void getCurrentReadingBooks_ReturnsZeroDdayOnStartDate() {
+        CurrentReadingBookService service = service();
+        String userPK = "user-pk";
+        given(wheelStateRepository.findCurrentReadingBooks(
+                userPK,
+                TODAY,
+                MemberStatus.ACTIVE,
+                State.IN_PROGRESS
+        )).willReturn(List.of());
+        given(wheelStateRepository.findUpcomingReadingBooks(
+                userPK,
+                TODAY,
+                MemberStatus.ACTIVE,
+                State.RECRUITING,
+                WheelStatus.PLANNED
+        )).willReturn(List.of(assignment(
+                "today-group",
+                "오늘 시작할 책",
+                null,
+                TODAY
+        )));
+
+        CurrentReadingBooksResponse response = service.getCurrentReadingBooks(userPK);
+
+        assertThat(response.books()).singleElement().satisfies(book -> {
+            assertThat(book.upcoming()).isTrue();
+            assertThat(book.dday()).isZero();
+        });
     }
 
     @Test
@@ -51,6 +128,13 @@ class CurrentReadingBookServiceTest {
         CurrentReadingBookService service = service();
         String userPK = "user-pk";
         given(wheelStateRepository.findCurrentReadingBooks(userPK, TODAY, MemberStatus.ACTIVE, State.IN_PROGRESS)).willReturn(List.of());
+        given(wheelStateRepository.findUpcomingReadingBooks(
+                userPK,
+                TODAY,
+                MemberStatus.ACTIVE,
+                State.RECRUITING,
+                WheelStatus.PLANNED
+        )).willReturn(List.of());
 
         CurrentReadingBooksResponse response = service.getCurrentReadingBooks(userPK);
 
@@ -60,5 +144,34 @@ class CurrentReadingBookServiceTest {
     private CurrentReadingBookService service() {
         Clock clock = Clock.fixed(TODAY.atStartOfDay(KST).toInstant(), KST);
         return new CurrentReadingBookService(wheelStateRepository, clock);
+    }
+
+    private WheelStateRepository.ReadingBookAssignmentProjection assignment(
+            String groupId,
+            String title,
+            String coverImageUrl,
+            LocalDate roundStartDate
+    ) {
+        return new WheelStateRepository.ReadingBookAssignmentProjection() {
+            @Override
+            public String getGroupId() {
+                return groupId;
+            }
+
+            @Override
+            public String getTitle() {
+                return title;
+            }
+
+            @Override
+            public String getCoverImageUrl() {
+                return coverImageUrl;
+            }
+
+            @Override
+            public LocalDate getRoundStartDate() {
+                return roundStartDate;
+            }
+        };
     }
 }
