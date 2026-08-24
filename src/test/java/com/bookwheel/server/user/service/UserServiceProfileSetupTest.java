@@ -14,6 +14,7 @@ import com.bookwheel.server.user.dto.ProfileImagePresignedUrlResponse;
 import com.bookwheel.server.user.dto.ProfileSetupRequest;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
+import com.bookwheel.server.user.image.ProfileImagePolicy;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -178,7 +182,11 @@ class UserServiceProfileSetupTest {
 
         InOrder order = inOrder(s3Service, profileSetupTransactionService);
         order.verify(s3Service).getObjectMetadata(TEMPORARY_OBJECT_KEY);
-        order.verify(s3Service).getObjectSignature(TEMPORARY_OBJECT_KEY, ETAG, 12);
+        order.verify(s3Service).getObjectSignature(
+                TEMPORARY_OBJECT_KEY,
+                ETAG,
+                ProfileImagePolicy.SIGNATURE_PROBE_LENGTH
+        );
         order.verify(s3Service).copyObjectIfUnchanged(
                 eq(TEMPORARY_OBJECT_KEY),
                 finalKeyCaptor.capture(),
@@ -194,6 +202,48 @@ class UserServiceProfileSetupTest {
         then(s3Service).should().deleteObject(TEMPORARY_OBJECT_KEY);
         then(s3Service).should().deleteObject(CURRENT_OBJECT_KEY);
         then(s3Service).should(never()).deleteObject(promotedObjectKey);
+    }
+
+    @Test
+    @DisplayName("ftyp probe 뒤에 HEIC compatible brand가 있으면 박스 전체를 재조회한다")
+    void setupProfile_HeicBrandAfterProbe_ReadsEntireFileTypeBox() {
+        String temporaryObjectKey = "profiles-temp/" + USER_PK + "/" + UUID_VALUE + ".heic";
+        ProfileSetupRequest request = new ProfileSetupRequest(temporaryObjectKey, "comment", null);
+        byte[] fileTypeBox = fileTypeBox(
+                "mif1",
+                "mif1", "MiHB", "MiHE", "MiPr", "miaf", "MiAB",
+                "mif1", "MiHB", "MiHE", "MiPr", "miaf", "MiAB", "heic"
+        );
+        byte[] probe = Arrays.copyOf(fileTypeBox, ProfileImagePolicy.SIGNATURE_PROBE_LENGTH);
+        given(s3Service.getObjectMetadata(temporaryObjectKey))
+                .willReturn(new S3ObjectMetadata(123_456L, "image/heic", ETAG));
+        given(s3Service.getObjectSignature(
+                temporaryObjectKey,
+                ETAG,
+                ProfileImagePolicy.SIGNATURE_PROBE_LENGTH
+        )).willReturn(probe);
+        given(s3Service.getObjectSignature(temporaryObjectKey, ETAG, fileTypeBox.length))
+                .willReturn(fileTypeBox);
+        given(profileSetupTransactionService.persist(eq(USER_PK), eq(request), any()))
+                .willAnswer(invocation -> {
+                    ProfileSetupTransactionService.ProfileImageUpdate update = invocation.getArgument(2);
+                    return new ProfileSetupTransactionService.Result(
+                            loginResponse(update.finalObjectKey()),
+                            null
+                    );
+                });
+        given(s3Service.deleteObject(temporaryObjectKey)).willReturn(true);
+
+        LoginResponse response = userService.setupProfile(USER_PK, request);
+
+        assertThat(response.profileImageKey())
+                .matches("profiles/" + USER_PK + "/[0-9a-f-]{36}\\.heic");
+        then(s3Service).should().getObjectSignature(
+                temporaryObjectKey,
+                ETAG,
+                ProfileImagePolicy.SIGNATURE_PROBE_LENGTH
+        );
+        then(s3Service).should().getObjectSignature(temporaryObjectKey, ETAG, fileTypeBox.length);
     }
 
     @Test
@@ -218,7 +268,11 @@ class UserServiceProfileSetupTest {
     void setupProfile_InvalidUploadedObject_DeletesTemporaryObject() {
         given(s3Service.getObjectMetadata(TEMPORARY_OBJECT_KEY))
                 .willReturn(new S3ObjectMetadata(123_456L, "image/png", ETAG));
-        given(s3Service.getObjectSignature(TEMPORARY_OBJECT_KEY, ETAG, 12))
+        given(s3Service.getObjectSignature(
+                TEMPORARY_OBJECT_KEY,
+                ETAG,
+                ProfileImagePolicy.SIGNATURE_PROBE_LENGTH
+        ))
                 .willReturn(new byte[12]);
         given(s3Service.deleteObject(TEMPORARY_OBJECT_KEY)).willReturn(true);
 
@@ -278,7 +332,11 @@ class UserServiceProfileSetupTest {
     private void givenValidUploadedObject() {
         given(s3Service.getObjectMetadata(TEMPORARY_OBJECT_KEY))
                 .willReturn(new S3ObjectMetadata(123_456L, "image/png", ETAG));
-        given(s3Service.getObjectSignature(TEMPORARY_OBJECT_KEY, ETAG, 12))
+        given(s3Service.getObjectSignature(
+                TEMPORARY_OBJECT_KEY,
+                ETAG,
+                ProfileImagePolicy.SIGNATURE_PROBE_LENGTH
+        ))
                 .willReturn(PNG_SIGNATURE);
     }
 
@@ -299,5 +357,18 @@ class UserServiceProfileSetupTest {
                 .userPK(USER_PK)
                 .profileImageKey(profileImageKey)
                 .build();
+    }
+
+    private byte[] fileTypeBox(String majorBrand, String... compatibleBrands) {
+        int boxSize = 16 + compatibleBrands.length * 4;
+        ByteBuffer buffer = ByteBuffer.allocate(boxSize);
+        buffer.putInt(boxSize);
+        buffer.put("ftyp".getBytes(StandardCharsets.US_ASCII));
+        buffer.put(majorBrand.getBytes(StandardCharsets.US_ASCII));
+        buffer.putInt(0);
+        for (String compatibleBrand : compatibleBrands) {
+            buffer.put(compatibleBrand.getBytes(StandardCharsets.US_ASCII));
+        }
+        return buffer.array();
     }
 }

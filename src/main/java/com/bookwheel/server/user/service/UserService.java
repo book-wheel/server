@@ -135,11 +135,24 @@ public class UserService {
                 finalObjectKey = ProfileImagePolicy.createFinalObjectKey(temporaryObjectKey, userPK);
 
                 S3ObjectMetadata metadata = s3Service.getObjectMetadata(temporaryObjectKey);
-                byte[] signature = s3Service.getObjectSignature(
+                int signatureProbeLength = ProfileImagePolicy.getSignatureProbeLength(metadata);
+                byte[] signatureProbe = s3Service.getObjectSignature(
                         temporaryObjectKey,
                         metadata.eTag(),
-                        ProfileImagePolicy.SIGNATURE_LENGTH
+                        signatureProbeLength
                 );
+                int requiredSignatureLength = ProfileImagePolicy.determineSignatureLength(
+                        temporaryObjectKey,
+                        metadata,
+                        signatureProbe
+                );
+                byte[] signature = requiredSignatureLength > signatureProbe.length
+                        ? s3Service.getObjectSignature(
+                                temporaryObjectKey,
+                                metadata.eTag(),
+                                requiredSignatureLength
+                        )
+                        : signatureProbe;
                 ProfileImagePolicy.validateUploadedObject(temporaryObjectKey, metadata, signature);
 
                 // CopyObject 응답이 유실되어도 객체가 생성됐을 수 있으므로 호출 직전부터 보상 대상으로 본다.

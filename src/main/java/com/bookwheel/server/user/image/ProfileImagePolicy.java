@@ -12,9 +12,13 @@ import java.util.UUID;
 public final class ProfileImagePolicy {
 
     public static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
-    public static final int SIGNATURE_LENGTH = 12;
+    public static final int SIGNATURE_PROBE_LENGTH = 64;
     public static final String TEMPORARY_PREFIX = "profiles-temp/";
     public static final String FINAL_PREFIX = "profiles/";
+
+    private static final int STANDARD_BOX_HEADER_LENGTH = 8;
+    private static final int LARGE_BOX_HEADER_LENGTH = 16;
+    private static final int FILE_TYPE_FIELDS_LENGTH = 8;
 
     private static final Map<String, String> CONTENT_TYPE_BY_EXTENSION = Map.of(
             "jpg", "image/jpeg",
@@ -79,21 +83,49 @@ public final class ProfileImagePolicy {
         return StringUtils.hasText(objectKey) && objectKey.startsWith(FINAL_PREFIX);
     }
 
+    public static int getSignatureProbeLength(S3ObjectMetadata metadata) {
+        validateMetadataBasics(metadata);
+        return (int) Math.min(metadata.contentLength(), SIGNATURE_PROBE_LENGTH);
+    }
+
+    public static int determineSignatureLength(
+            String objectKey,
+            S3ObjectMetadata metadata,
+            byte[] signatureProbe
+    ) {
+        String extension = validateUploadedMetadata(objectKey, metadata);
+        if (signatureProbe == null || signatureProbe.length == 0) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+        if (!extension.equals("heic") && !extension.equals("heif")) {
+            return signatureProbe.length;
+        }
+        return parseFileTypeBoxHeader(signatureProbe, metadata.contentLength()).boxSize();
+    }
+
     public static void validateUploadedObject(
             String objectKey,
             S3ObjectMetadata metadata,
             byte[] signature
     ) {
-        if (metadata == null || metadata.contentLength() <= 0 || !StringUtils.hasText(metadata.eTag())) {
-            throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
-        }
-        validateFileSize(metadata.contentLength());
+        String extension = validateUploadedMetadata(objectKey, metadata);
+        validateImageSignature(extension, metadata.contentLength(), signature);
+    }
 
+    private static String validateUploadedMetadata(String objectKey, S3ObjectMetadata metadata) {
+        validateMetadataBasics(metadata);
         String fileName = objectKey.substring(objectKey.lastIndexOf('/') + 1);
         String extension = extractExtension(fileName);
         String normalizedContentType = normalizeContentType(metadata.contentType());
         validateContentTypeMatchesExtension(extension, normalizedContentType);
-        validateImageSignature(extension, signature);
+        return extension;
+    }
+
+    private static void validateMetadataBasics(S3ObjectMetadata metadata) {
+        if (metadata == null || metadata.contentLength() <= 0 || !StringUtils.hasText(metadata.eTag())) {
+            throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+        }
+        validateFileSize(metadata.contentLength());
     }
 
     private static void validateFileSize(Long fileSize) {
@@ -143,14 +175,18 @@ public final class ProfileImagePolicy {
         }
     }
 
-    private static void validateImageSignature(String extension, byte[] signature) {
+    private static void validateImageSignature(String extension, long contentLength, byte[] signature) {
         boolean validSignature = switch (extension) {
             case "jpg", "jpeg" -> hasBytes(signature, 0, 0xFF, 0xD8, 0xFF);
             case "png" -> hasBytes(signature, 0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
             case "webp" -> hasBytes(signature, 0, 'R', 'I', 'F', 'F')
                     && hasBytes(signature, 8, 'W', 'E', 'B', 'P');
-            case "heic" -> hasFileTypeBrand(signature, "heic", "heix", "hevc", "hevx");
-            case "heif" -> hasFileTypeBrand(signature, "mif1", "msf1");
+            case "heic" -> hasFileTypeBrand(
+                    signature,
+                    contentLength,
+                    "heic", "heix", "hevc", "hevx"
+            );
+            case "heif" -> hasFileTypeBrand(signature, contentLength, "mif1", "msf1");
             default -> false;
         };
         if (!validSignature) {
@@ -158,16 +194,86 @@ public final class ProfileImagePolicy {
         }
     }
 
-    private static boolean hasFileTypeBrand(byte[] signature, String... brands) {
-        if (!hasBytes(signature, 4, 'f', 't', 'y', 'p')) {
-            return false;
+    private static boolean hasFileTypeBrand(
+            byte[] signature,
+            long contentLength,
+            String... supportedBrands
+    ) {
+        FileTypeBoxHeader header = parseFileTypeBoxHeader(signature, contentLength);
+        if (signature.length < header.boxSize()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
         }
-        for (String brand : brands) {
-            if (hasBytes(signature, 8, brand.charAt(0), brand.charAt(1), brand.charAt(2), brand.charAt(3))) {
+
+        int majorBrandOffset = header.headerSize();
+        if (hasSupportedBrand(signature, majorBrandOffset, supportedBrands)) {
+            return true;
+        }
+
+        int compatibleBrandOffset = majorBrandOffset + FILE_TYPE_FIELDS_LENGTH;
+        for (int offset = compatibleBrandOffset; offset < header.boxSize(); offset += 4) {
+            if (hasSupportedBrand(signature, offset, supportedBrands)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static FileTypeBoxHeader parseFileTypeBoxHeader(byte[] bytes, long contentLength) {
+        if (bytes == null
+                || bytes.length < STANDARD_BOX_HEADER_LENGTH
+                || !hasBytes(bytes, 4, 'f', 't', 'y', 'p')) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        long declaredSize = readUnsignedInt(bytes, 0);
+        int headerSize = STANDARD_BOX_HEADER_LENGTH;
+        if (declaredSize == 1) {
+            if (bytes.length < LARGE_BOX_HEADER_LENGTH) {
+                throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+            }
+            declaredSize = readPositiveLong(bytes, 8);
+            headerSize = LARGE_BOX_HEADER_LENGTH;
+        } else if (declaredSize == 0) {
+            // ftyp 뒤에는 실제 이미지 박스가 이어져야 하므로 EOF까지 확장되는 크기는 허용하지 않는다.
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+
+        long minimumSize = headerSize + FILE_TYPE_FIELDS_LENGTH;
+        if (declaredSize < minimumSize
+                || declaredSize > contentLength
+                || declaredSize > MAX_FILE_SIZE
+                || (declaredSize - minimumSize) % 4 != 0) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+        return new FileTypeBoxHeader((int) declaredSize, headerSize);
+    }
+
+    private static boolean hasSupportedBrand(byte[] bytes, int offset, String... supportedBrands) {
+        for (String brand : supportedBrands) {
+            if (hasBytes(bytes, offset, brand.charAt(0), brand.charAt(1), brand.charAt(2), brand.charAt(3))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long readUnsignedInt(byte[] bytes, int offset) {
+        long value = 0;
+        for (int index = 0; index < 4; index++) {
+            value = (value << 8) | Byte.toUnsignedInt(bytes[offset + index]);
+        }
+        return value;
+    }
+
+    private static long readPositiveLong(byte[] bytes, int offset) {
+        if ((bytes[offset] & 0x80) != 0) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
+        }
+        long value = 0;
+        for (int index = 0; index < Long.BYTES; index++) {
+            value = (value << 8) | Byte.toUnsignedInt(bytes[offset + index]);
+        }
+        return value;
     }
 
     private static boolean hasBytes(byte[] actual, int offset, int... expected) {
@@ -183,5 +289,8 @@ public final class ProfileImagePolicy {
     }
 
     public record ValidatedImage(String extension, String contentType) {
+    }
+
+    private record FileTypeBoxHeader(int boxSize, int headerSize) {
     }
 }
