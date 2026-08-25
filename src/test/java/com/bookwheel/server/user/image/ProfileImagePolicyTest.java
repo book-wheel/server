@@ -5,6 +5,8 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -105,6 +107,56 @@ class ProfileImagePolicyTest {
         )).doesNotThrowAnyException();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"heic", "heix", "heim", "heis"})
+    @DisplayName("IANA가 image/heic에 등록한 정지 이미지 compatible brand를 허용한다")
+    void validateUploadedObject_HeicStillImageCompatibleBrands_Accepts(String compatibleBrand) {
+        String objectKey = "profiles-temp/" + USER_PK + "/" + UUID_VALUE + ".heic";
+        byte[] fileTypeBox = fileTypeBox("mif1", "mif1", compatibleBrand);
+        S3ObjectMetadata metadata = new S3ObjectMetadata(123_456L, "image/heic", "\"etag\"");
+
+        assertThatCode(() -> ProfileImagePolicy.validateUploadedObject(
+                objectKey,
+                metadata,
+                fileTypeBox
+        )).doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"hevc", "hevx", "hevm", "hevs"})
+    @DisplayName("HEIC 시퀀스 compatible brand를 image/heic 정지 이미지로 허용하지 않는다")
+    void validateUploadedObject_HeicSequenceCompatibleBrands_Rejects(String sequenceBrand) {
+        String objectKey = "profiles-temp/" + USER_PK + "/" + UUID_VALUE + ".heic";
+        byte[] fileTypeBox = fileTypeBox("mif1", "mif1", sequenceBrand);
+        S3ObjectMetadata metadata = new S3ObjectMetadata(123_456L, "image/heic", "\"etag\"");
+
+        assertThatThrownBy(() -> ProfileImagePolicy.validateUploadedObject(
+                objectKey,
+                metadata,
+                fileTypeBox
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
+    }
+
+    @Test
+    @DisplayName("허용 brand가 major brand에만 있고 compatible brands에 없으면 거부한다")
+    void validateUploadedObject_HeicBrandOnlyInMajorBrand_Rejects() {
+        String objectKey = "profiles-temp/" + USER_PK + "/" + UUID_VALUE + ".heic";
+        byte[] fileTypeBox = fileTypeBox("heic", "mif1");
+        S3ObjectMetadata metadata = new S3ObjectMetadata(123_456L, "image/heic", "\"etag\"");
+
+        assertThatThrownBy(() -> ProfileImagePolicy.validateUploadedObject(
+                objectKey,
+                metadata,
+                fileTypeBox
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
+    }
+
     @Test
     @DisplayName("HEIF brand가 compatible brands에만 있어도 정상 파일로 인정한다")
     void validateUploadedObject_HeifCompatibleBrand_Accepts() {
@@ -117,6 +169,23 @@ class ProfileImagePolicyTest {
                 metadata,
                 fileTypeBox
         )).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("HEIF 시퀀스 compatible brand인 msf1을 image/heif 정지 이미지로 허용하지 않는다")
+    void validateUploadedObject_HeifSequenceCompatibleBrand_Rejects() {
+        String objectKey = "profiles-temp/" + USER_PK + "/" + UUID_VALUE + ".heif";
+        byte[] fileTypeBox = fileTypeBox("msf1", "msf1");
+        S3ObjectMetadata metadata = new S3ObjectMetadata(123_456L, "image/heif", "\"etag\"");
+
+        assertThatThrownBy(() -> ProfileImagePolicy.validateUploadedObject(
+                objectKey,
+                metadata,
+                fileTypeBox
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
     }
 
     @Test

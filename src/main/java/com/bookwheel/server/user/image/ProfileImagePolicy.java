@@ -181,12 +181,12 @@ public final class ProfileImagePolicy {
             case "png" -> hasBytes(signature, 0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
             case "webp" -> hasBytes(signature, 0, 'R', 'I', 'F', 'F')
                     && hasBytes(signature, 8, 'W', 'E', 'B', 'P');
-            case "heic" -> hasFileTypeBrand(
+            case "heic" -> hasCompatibleFileTypeBrand(
                     signature,
                     contentLength,
-                    "heic", "heix", "hevc", "hevx"
+                    "heic", "heix", "heim", "heis"
             );
-            case "heif" -> hasFileTypeBrand(signature, contentLength, "mif1", "msf1");
+            case "heif" -> hasCompatibleFileTypeBrand(signature, contentLength, "mif1");
             default -> false;
         };
         if (!validSignature) {
@@ -194,7 +194,7 @@ public final class ProfileImagePolicy {
         }
     }
 
-    private static boolean hasFileTypeBrand(
+    private static boolean hasCompatibleFileTypeBrand(
             byte[] signature,
             long contentLength,
             String... supportedBrands
@@ -204,12 +204,7 @@ public final class ProfileImagePolicy {
             throw new BusinessException(ErrorCode.INVALID_FILE_FORMAT);
         }
 
-        int majorBrandOffset = header.headerSize();
-        if (hasSupportedBrand(signature, majorBrandOffset, supportedBrands)) {
-            return true;
-        }
-
-        int compatibleBrandOffset = majorBrandOffset + FILE_TYPE_FIELDS_LENGTH;
+        int compatibleBrandOffset = header.headerSize() + FILE_TYPE_FIELDS_LENGTH;
         for (int offset = compatibleBrandOffset; offset < header.boxSize(); offset += 4) {
             if (hasSupportedBrand(signature, offset, supportedBrands)) {
                 return true;
