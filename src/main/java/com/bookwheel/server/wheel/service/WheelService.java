@@ -100,16 +100,16 @@ public class WheelService {
     }
 
     @Transactional(readOnly = true)
-    public List<WheelHistoryUserResponse> historyReading(String userPK, String targetUserPk, String groupId) {
+    public List<WheelHistoryUserResponse> historyReading(String userPK, String targetUserPK, String groupId) {
 
         // 1. 소속 권한 확인
-        validateGroupAccess(userPK, targetUserPk, groupId);
+        validateGroupAccess(userPK, targetUserPK, groupId);
 
         // 2. roundId -> roundNumber
         Map<String, Integer> roundNumberMap = getRoundNumberMap(groupId);
 
         // 3. 해당 멤버의 기록 중 COMPLETED 상태인 WheelState 리스트 가져오기
-        List<WheelState> wheelStates = wheelStateRepository.findMyCompletedHistories(groupId, targetUserPk, WheelStatus.COMPLETED);
+        List<WheelState> wheelStates = wheelStateRepository.findMyCompletedHistories(groupId, targetUserPK, WheelStatus.COMPLETED);
 
         // 4. WheelState 리스트를 WheelHistoryUserResponse 리스트로 변환하기
         return wheelStates.stream()
@@ -157,19 +157,27 @@ public class WheelService {
         return WheelHistoryBookResponse.of(ownBook, histories);
     }
 
-    private void validateGroupAccess(String userPK, String targetId, String groupId) {
+    private void validateGroupAccess(String userPK, String targetUserPK, String groupId) {
         // 1. 내 기록을 내가 보는 경우 (또는 책 상세페이지처럼 userPK만 넘어온 경우)
-        if (userPK.equals(targetId)) {
-            boolean isMember = memberRepository.existsByGroup_GroupIdAndUser_Id(groupId, userPK);
-            if (!isMember) {
+        if (userPK.equals(targetUserPK)) {
+            boolean isActiveMember = memberRepository.existsByGroup_GroupIdAndUser_IdAndMemberStatus(
+                    groupId,
+                    userPK,
+                    MemberStatus.ACTIVE
+            );
+            if (!isActiveMember) {
                 throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
             }
             return;
         }
 
-        // 2. 다른 사람의 기록을 보는 경우 (IN 절을 사용해 쿼리 1번으로 2명 동시 검사!)
-        long memberCount = memberRepository.countByGroup_GroupIdAndUser_IdIn(groupId, List.of(userPK, targetId));
-        if (memberCount != 2) { // 2명 모두 그룹에 속해있어야 하므로 count가 2여야 함
+        // 2. 다른 사람의 기록을 보는 경우 두 사용자 모두 ACTIVE인지 한 번에 확인한다.
+        long activeMemberCount = memberRepository.countByGroup_GroupIdAndUser_IdInAndMemberStatus(
+                groupId,
+                List.of(userPK, targetUserPK),
+                MemberStatus.ACTIVE
+        );
+        if (activeMemberCount != 2) {
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
     }
