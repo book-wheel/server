@@ -102,8 +102,12 @@ public interface MemberRepository extends JpaRepository<Member, String> {
 
     List<Member> findByGroup_GroupIdAndMemberStatusOrderByReadOrderAsc(String groupId, MemberStatus memberStatus);
 
-    // IN 절을 사용하여 여러 유저가 그룹에 속해있는지 한 번에 확인
-    long countByGroup_GroupIdAndUser_IdIn(String groupId, List<String> userPK);
+    // IN 절을 사용하여 여러 유저가 특정 상태로 그룹에 속해있는지 한 번에 확인
+    long countByGroup_GroupIdAndUser_IdInAndMemberStatus(
+            String groupId,
+            List<String> userPKs,
+            MemberStatus memberStatus
+    );
 
     // 그룹의 리더(또는 임의 역할)를 단건 조회 - 알림 수신자 결정용
     @EntityGraph(attributePaths = "user")
