@@ -27,6 +27,9 @@ public record GroupScheduleAssignmentResponse(
         @Schema(description = "저장된 책바퀴 상태", example = "PLANNED", nullable = true)
         WheelStatus wheelStatus,
 
+        @Schema(description = "모임에 등록된 도서 식별자. 도서별 완독 히스토리 조회 시 사용", example = "own-book-uuid-123", nullable = true)
+        String ownBookId,
+
         @Schema(description = "배정된 책 ID", example = "book-uuid-123", nullable = true)
         String bookId,
 
@@ -47,7 +50,7 @@ public record GroupScheduleAssignmentResponse(
     ) {
         return new GroupScheduleAssignmentResponse(
                 roundNumber, startDate, endDate, executable,
-                null, null, null, null, null, null
+                null, null, null, null, null, null, null
         );
     }
 
@@ -73,6 +76,7 @@ public record GroupScheduleAssignmentResponse(
                 executable,
                 wheelState.getWheelStateId(),
                 wheelState.getWheelState(),
+                wheelState.getOwnBook().getOwnBookId(),
                 wheelState.getOwnBook().getBook().getBookId(),
                 wheelState.getOwnBook().getBook().getTitle(),
                 wheelState.getOwnBook().getBook().getCoverImage(),

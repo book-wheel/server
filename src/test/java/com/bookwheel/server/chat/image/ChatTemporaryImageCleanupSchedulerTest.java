@@ -13,7 +13,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;
@@ -38,13 +37,11 @@ class ChatTemporaryImageCleanupSchedulerTest {
                 retention
         );
         Instant cutoff = NOW.minus(retention);
-        given(s3Service.findObjectKeysOlderThan("chat-temp/", cutoff))
-                .willReturn(List.of("chat-temp/old-1.png", "chat-temp/old-2.png"));
+        given(s3Service.deleteObjectsOlderThan("chat-temp/", cutoff)).willReturn(2);
 
         scheduler.deleteExpiredTemporaryImages();
 
-        then(s3Service).should().deleteObject("chat-temp/old-1.png");
-        then(s3Service).should().deleteObject("chat-temp/old-2.png");
+        then(s3Service).should().deleteObjectsOlderThan("chat-temp/", cutoff);
     }
 
     @Test
@@ -57,11 +54,11 @@ class ChatTemporaryImageCleanupSchedulerTest {
                 clock,
                 retention
         );
-        given(s3Service.findObjectKeysOlderThan("chat-temp/", NOW.minus(retention)))
+        given(s3Service.deleteObjectsOlderThan("chat-temp/", NOW.minus(retention)))
                 .willThrow(new BusinessException(ErrorCode.FILE_UPLOAD_ERROR));
 
         assertThatCode(scheduler::deleteExpiredTemporaryImages).doesNotThrowAnyException();
 
-        then(s3Service).shouldHaveNoMoreInteractions();
+        then(s3Service).should().deleteObjectsOlderThan("chat-temp/", NOW.minus(retention));
     }
 }

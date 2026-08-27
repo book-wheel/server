@@ -22,7 +22,27 @@ public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "프로필 설정", description = "가입 후 첫 로그인 시 프로필 사진과 코멘트를 설정합니다.")
+    @Operation(
+            summary = "프로필 이미지 Presigned URL 발급",
+            description = "최대 5MB 프로필 이미지의 임시 업로드 URL과 userPK에 귀속된 objectKey를 발급합니다. "
+                    + "업로드 후 objectKey를 setupProfile에 전달하세요."
+    )
+    @PostMapping("/profile-image/presigned-url")
+    public ApiResponse<ProfileImagePresignedUrlResponse> createProfileImagePresignedUrl(
+            @AuthenticationPrincipal Object principal,
+            @Valid @RequestBody ProfileImagePresignedUrlRequest request
+    ) {
+        String userPK = getUserPK(principal);
+        return ApiResponse.success(userService.createProfileImagePresignedUrl(userPK, request));
+    }
+
+    @Operation(
+            summary = "프로필 설정",
+            description = "프로필 사진과 코멘트를 설정합니다. profileImageKey는 누락 시 기존 이미지를 유지하고, "
+                    + "빈 문자열이면 삭제하며, 전용 Presigned URL API가 발급한 profiles-temp/ key이면 "
+                    + "검증 후 최종 이미지로 교체합니다. 기존 profiles/ key 재전송은 "
+                    + "DB와 일치할 때만 유지로 처리합니다."
+    )
     @PatchMapping("/setup-profile")
     public ApiResponse<LoginResponse> setupProfile(
             @AuthenticationPrincipal Object principal,

@@ -77,6 +77,9 @@ public class GroupService {
         if (group.getGroupState() != State.RECRUITING) {
             throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
         }
+        if (group.getStartDate() != null && group.getStartDate().isBefore(LocalDate.now(clock))) {
+            throw new BusinessException(ErrorCode.GROUP_JOIN_PERIOD_EXPIRED);
+        }
 
         validateJoinRequest(group, request);
 
@@ -106,10 +109,13 @@ public class GroupService {
     }
 
     public Page<GroupSearchResponse> getGroups(GroupSearchCondition condition, Pageable pageable, String userPK) {
-        Page<Group> groupPage = groupRepository.findAll(GroupSpecification.searchWith(condition), pageable);
+        LocalDate currentDate = LocalDate.now(clock);
+        Page<Group> groupPage = groupRepository.findAll(
+                GroupSpecification.searchWith(condition, currentDate),
+                pageable
+        );
         // 페이지 내 그룹들의 버튼 상태를 한 번에 계산해 응답에 채운다.
         Map<String, GroupDetailButtonType> bottomButtonTypes = resolveBottomButtonTypes(groupPage.getContent(), userPK);
-        LocalDate currentDate = LocalDate.now(clock);
         return groupPage.map(group -> GroupSearchResponse.from(
                 group,
                 bottomButtonTypes.getOrDefault(group.getGroupId(), GroupDetailButtonType.JOIN),
@@ -170,6 +176,9 @@ public class GroupService {
         if (status == MemberRequestStatus.APPROVED) {
             if (group.getGroupState() != State.RECRUITING) {
                 throw new BusinessException(ErrorCode.GROUP_RECRUITING_STATE_REQUIRED);
+            }
+            if (group.getStartDate() != null && group.getStartDate().isBefore(LocalDate.now(clock))) {
+                throw new BusinessException(ErrorCode.GROUP_JOIN_PERIOD_EXPIRED);
             }
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);

@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -225,8 +226,8 @@ class S3ServiceTest {
     }
 
     @Test
-    @DisplayName("prefix 아래 객체를 페이지 끝까지 조회하고 기준 시각보다 오래된 키만 반환한다")
-    void findObjectKeysOlderThan_PaginatesAndFiltersByCutoff() {
+    @DisplayName("prefix 아래 객체를 페이지 단위로 조회하고 기준 시각보다 오래된 객체만 삭제한다")
+    void deleteObjectsOlderThan_PaginatesAndDeletesOnlyExpiredObjects() {
         Instant cutoff = Instant.parse("2026-08-03T00:00:00Z");
         ListObjectsV2Response firstPage = ListObjectsV2Response.builder()
                 .contents(
@@ -252,13 +253,37 @@ class S3ServiceTest {
         given(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
                 .willReturn(firstPage, secondPage);
 
-        List<String> result = s3Service.findObjectKeysOlderThan("chat-temp/", cutoff);
+        int deletedObjectCount = s3Service.deleteObjectsOlderThan("chat-temp/", cutoff);
 
-        assertThat(result).containsExactly("chat-temp/old.png", "chat-temp/older.png");
+        assertThat(deletedObjectCount).isEqualTo(2);
         ArgumentCaptor<ListObjectsV2Request> captor = ArgumentCaptor.forClass(ListObjectsV2Request.class);
         then(s3Client).should(org.mockito.Mockito.times(2)).listObjectsV2(captor.capture());
         assertThat(captor.getAllValues().get(0).prefix()).isEqualTo("chat-temp/");
         assertThat(captor.getAllValues().get(0).continuationToken()).isNull();
         assertThat(captor.getAllValues().get(1).continuationToken()).isEqualTo("next-page");
+
+        ArgumentCaptor<DeleteObjectRequest> deleteCaptor = ArgumentCaptor.forClass(DeleteObjectRequest.class);
+        then(s3Client).should(org.mockito.Mockito.times(2)).deleteObject(deleteCaptor.capture());
+        assertThat(deleteCaptor.getAllValues())
+                .extracting(DeleteObjectRequest::key)
+                .containsExactly("chat-temp/old.png", "chat-temp/older.png");
+    }
+
+    @Test
+    @DisplayName("S3 객체 삭제 실패를 호출자가 관측할 수 있도록 false를 반환한다")
+    void deleteObject_S3Failure_ReturnsFalse() {
+        given(s3Client.deleteObject(any(DeleteObjectRequest.class)))
+                .willThrow(new IllegalStateException("S3 unavailable"));
+
+        assertThat(s3Service.deleteObject("profiles-temp/user-pk/image.png")).isFalse();
+    }
+
+    @Test
+    @DisplayName("공통 Presigned URL API는 프로필 예약 prefix 사용을 거부한다")
+    void getPresignedUrl_ProfileReservedPrefix_Rejects() {
+        assertThatThrownBy(() -> s3Service.getPresignedUrl("profiles-temp/user-pk", "profile.png"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
     }
 }

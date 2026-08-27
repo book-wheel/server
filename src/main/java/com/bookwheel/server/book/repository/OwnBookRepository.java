@@ -22,6 +22,9 @@ public interface OwnBookRepository extends JpaRepository<OwnBook, String> {
     // 그룹 ID와 사용자 PK로 특정 소유 도서 정보 단건 조회
     Optional<OwnBook> findByGroup_GroupIdAndOwner_Id(String groupId, String userPK);
 
+    // 도서별 완독 히스토리 조회 시, 요청한 모임에 속한 도서인지 함께 검증한다.
+    Optional<OwnBook> findByOwnBookIdAndGroup_GroupId(String ownBookId, String groupId);
+
     // 리스트 안의 그룹 ID에 속한 책들을 전부 가져오기
     List<OwnBook> findByGroup_GroupIdIn(List<String> groupIds);
 

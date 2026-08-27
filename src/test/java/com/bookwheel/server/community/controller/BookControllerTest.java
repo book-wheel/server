@@ -235,10 +235,17 @@ class BookControllerTest {
 
     @Test
     @WithMockUser(username = "user-pk")
-    @DisplayName("현재 읽고 있는 책 조회 응답에는 그룹 ID와 제목, 표지 이미지만 포함된다.")
-    void getCurrentReadingBooks_ReturnsGroupIdTitleAndCoverImage() throws Exception {
+    @DisplayName("시작 예정 책 조회 응답에는 상태와 라운드 시작일, D-day가 포함된다")
+    void getCurrentReadingBooks_ReturnsUpcomingBookStatusAndDday() throws Exception {
         CurrentReadingBooksResponse response = new CurrentReadingBooksResponse(List.of(
-            new CurrentReadingBookResponse("group-123", "달러구트 꿈 백화점", "https://image.aladin.co.kr/cover.jpg")
+            new CurrentReadingBookResponse(
+                    "group-123",
+                    "달러구트 꿈 백화점",
+                    "https://image.aladin.co.kr/cover.jpg",
+                    true,
+                    LocalDate.of(2026, 8, 21),
+                    2
+            )
         ));
         given(currentReadingBookService.getCurrentReadingBooks("user-pk")).willReturn(response);
 
@@ -249,6 +256,9 @@ class BookControllerTest {
             .andExpect(jsonPath("$.data.books[0].groupId").value("group-123"))
             .andExpect(jsonPath("$.data.books[0].title").value("달러구트 꿈 백화점"))
             .andExpect(jsonPath("$.data.books[0].coverImageUrl").value("https://image.aladin.co.kr/cover.jpg"))
+            .andExpect(jsonPath("$.data.books[0].upcoming").value(true))
+            .andExpect(jsonPath("$.data.books[0].roundStartDate").value("2026-08-21"))
+            .andExpect(jsonPath("$.data.books[0].dday").value(2))
             .andExpect(jsonPath("$.data.books[0].bookId").doesNotExist())
             .andExpect(jsonPath("$.data.books[0].isbn").doesNotExist())
             .andExpect(jsonPath("$.data.books[0].author").doesNotExist());

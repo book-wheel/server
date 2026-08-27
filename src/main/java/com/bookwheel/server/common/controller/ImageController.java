@@ -20,7 +20,8 @@ public class ImageController {
 
     @Operation(
             summary = "S3 Presigned URL 발급",
-            description = "S3에 직접 파일을 업로드하기 위한 임시 주소를 발급합니다. 발급받은 URL로 PUT 요청을 보내 파일을 업로드하세요."
+            description = "S3에 직접 파일을 업로드하기 위한 임시 주소를 발급합니다. "
+                    + "profiles, profiles-temp prefix는 사용할 수 없으며 프로필 이미지는 전용 사용자 API를 사용해야 합니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -29,7 +30,7 @@ public class ImageController {
     )
     @GetMapping("/presigned-url")
     public String getPresignedUrl(
-            @Parameter(description = "저장 경로(폴더명)", example = "profiles")
+            @Parameter(description = "저장 경로(프로필 예약 prefix 제외)", example = "attachments")
             @RequestParam String prefix,
 
             @Parameter(description = "원본 파일명", example = "my_photo.png")

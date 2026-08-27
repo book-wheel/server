@@ -46,7 +46,11 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "그룹 목록 조회", description = "조건(상태/유형/지역/키워드)에 맞는 그룹 목록을 조회합니다.")
+    @Operation(
+            summary = "그룹 목록 조회",
+            description = "조건(상태/유형/지역/키워드)에 맞는 그룹 목록을 조회합니다. "
+                    + "시작일이 지났거나 최대 정원 또는 일정 목표 인원에 도달한 모집 중 모임은 제외합니다."
+    )
     @GetMapping
     public ResponseEntity<ApiResponse<Page<GroupSearchResponse>>> getGroups(
             @Parameter(description = "모집 상태", example = "RECRUITING")
@@ -88,7 +92,7 @@ public class GroupController {
 
     @Operation(
             summary = "그룹 가입 신청",
-            description = "그룹에 가입 신청을 보냅니다. 일정 목표 인원에 도달한 모임은 GROUP_051로 거절합니다."
+            description = "그룹에 가입 신청을 보냅니다. 시작일이 지난 모임은 GROUP_056, 일정 목표 인원에 도달한 모임은 GROUP_051로 거절합니다."
     )
     @PostMapping("/{groupId}/join")
     public ResponseEntity<ApiResponse<GroupJoinResponse>> joinGroup(
