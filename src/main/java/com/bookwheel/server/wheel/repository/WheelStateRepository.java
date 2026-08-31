@@ -146,6 +146,21 @@ public interface WheelStateRepository extends JpaRepository<WheelState, String> 
             """)
     List<WheelState> findAllByRoundIdInWithMemberAndBook(@Param("roundIds") Collection<String> roundIds);
 
+    // 홈 독서 카드의 내 배정, 등록 도서의 보유자, 직전 전달자를 한 번에 계산할 수 있도록 조회한다.
+    @Query("""
+            select ws
+            from WheelState ws
+            join fetch ws.member member
+            join fetch member.user
+            join fetch ws.ownBook ownBook
+            join fetch ownBook.book
+            join fetch ownBook.owner
+            where ws.roundId in :roundIds
+            """)
+    List<WheelState> findAllByRoundIdInWithReadingCardDetails(
+            @Param("roundIds") Collection<String> roundIds
+    );
+
     void deleteByRoundIdIn(Collection<String> roundIds);
 
     void deleteByRoundIdInAndWheelState(Collection<String> roundIds, WheelStatus wheelState);

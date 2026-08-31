@@ -43,6 +43,20 @@ public interface RoundRepository extends JpaRepository<Round, String> {
     
     // 시작일/종료일이 모두 존재하는 '유효한' 라운드만 회차순으로 조회 (날짜 비교 시 null로 인한 NPE 방지용)
     List<Round> findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(String groupId);
+
+    // 홈 독서 카드에서 여러 모임의 첫 회차와 현재 회차를 계산할 수 있도록 실행 범위를 일괄 조회한다.
+    @Query("""
+            select r
+            from Round r
+            join fetch r.group g
+            where g.groupId in :groupIds
+              and r.roundNumber <= g.groupRoundCount
+            order by g.groupId asc, r.roundNumber asc
+            """)
+    List<Round> findExecutableRoundsByGroupIds(
+            @Param("groupIds") Collection<String> groupIds
+    );
+
     // 실제 실행 범위 안에 있는 진행 중 라운드만 마감 대상으로 조회한다.
     @Query("""
             select r.roundId
