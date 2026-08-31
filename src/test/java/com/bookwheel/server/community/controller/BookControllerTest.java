@@ -9,8 +9,6 @@ import com.bookwheel.server.community.dto.BookExchangeRecommendationReview;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchResponse;
 import com.bookwheel.server.community.dto.BookUsageAnalysisResponse;
-import com.bookwheel.server.community.dto.CurrentReadingBookResponse;
-import com.bookwheel.server.community.dto.CurrentReadingBooksResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.dto.ReviewDetailResponse;
@@ -19,7 +17,6 @@ import com.bookwheel.server.community.dto.ReviewStatsResponse;
 import com.bookwheel.server.community.dto.VoteType;
 import com.bookwheel.server.community.service.BookExchangeRecommendationService;
 import com.bookwheel.server.community.service.BookService;
-import com.bookwheel.server.community.service.CurrentReadingBookService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -64,9 +61,6 @@ class BookControllerTest {
 
     @MockitoBean
     private BookExchangeRecommendationService bookExchangeRecommendationService;
-
-    @MockitoBean
-    private CurrentReadingBookService currentReadingBookService;
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -231,69 +225,6 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.books[0].isInterested").value(true))
                 .andExpect(jsonPath("$.data.ranking.source").value("KAKAO"))
                 .andExpect(jsonPath("$.data.ranking.sourceName").value("카카오 도서 검색 API"));
-    }
-
-    @Test
-    @WithMockUser(username = "user-pk")
-    @DisplayName("시작 예정 책 조회 응답에는 상태와 라운드 시작일, D-day가 포함된다")
-    void getCurrentReadingBooks_ReturnsUpcomingBookStatusAndDday() throws Exception {
-        CurrentReadingBooksResponse response = new CurrentReadingBooksResponse(List.of(
-            new CurrentReadingBookResponse(
-                    "group-123",
-                    "달러구트 꿈 백화점",
-                    "https://image.aladin.co.kr/cover.jpg",
-                    true,
-                    LocalDate.of(2026, 8, 21),
-                    2
-            )
-        ));
-        given(currentReadingBookService.getCurrentReadingBooks("user-pk")).willReturn(response);
-
-        mockMvc.perform(get("/api/v1/books/current-reading"))
-            .andDo(print())
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.books[0].groupId").value("group-123"))
-            .andExpect(jsonPath("$.data.books[0].title").value("달러구트 꿈 백화점"))
-            .andExpect(jsonPath("$.data.books[0].coverImageUrl").value("https://image.aladin.co.kr/cover.jpg"))
-            .andExpect(jsonPath("$.data.books[0].upcoming").value(true))
-            .andExpect(jsonPath("$.data.books[0].roundStartDate").value("2026-08-21"))
-            .andExpect(jsonPath("$.data.books[0].dday").value(2))
-            .andExpect(jsonPath("$.data.books[0].bookId").doesNotExist())
-            .andExpect(jsonPath("$.data.books[0].isbn").doesNotExist())
-            .andExpect(jsonPath("$.data.books[0].author").doesNotExist());
-
-        verify(currentReadingBookService).getCurrentReadingBooks("user-pk");
-    }
-
-    @Test
-    @WithMockUser(username = "user-pk")
-    @DisplayName("표지가 없는 도서는 표지 이미지 URL이 빈 문자열로 내려간다.")
-    void getCurrentReadingBooks_ReturnsEmptyCoverImageUrl() throws Exception {
-        CurrentReadingBooksResponse response = new CurrentReadingBooksResponse(List.of(
-            new CurrentReadingBookResponse("group-123", "달러구트 꿈 백화점", null)
-        ));
-        given(currentReadingBookService.getCurrentReadingBooks("user-pk")).willReturn(response);
-
-        mockMvc.perform(get("/api/v1/books/current-reading"))
-            .andDo(print())
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.books[0].title").value("달러구트 꿈 백화점"))
-            .andExpect(jsonPath("$.data.books[0].coverImageUrl").value(""));
-    }
-
-    @Test
-    @WithMockUser(username = "user-pk")
-    @DisplayName("현재 배정된 책이 없으면 빈 목록을 반환한다.")
-    void getCurrentReadingBooks_ReturnsEmptyList() throws Exception {
-        given(currentReadingBookService.getCurrentReadingBooks("user-pk"))
-            .willReturn(new CurrentReadingBooksResponse(List.of()));
-
-        mockMvc.perform(get("/api/v1/books/current-reading"))
-            .andDo(print())
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.books").isEmpty());
     }
 
     @Test
