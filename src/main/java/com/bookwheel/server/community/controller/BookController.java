@@ -7,7 +7,6 @@ import com.bookwheel.server.community.dto.BookExchangeRecommendationResponse;
 import com.bookwheel.server.community.dto.BookLikeResponse;
 import com.bookwheel.server.community.dto.BookSearchListResponse;
 import com.bookwheel.server.community.dto.BookSearchRequest;
-import com.bookwheel.server.community.dto.CurrentReadingBooksResponse;
 import com.bookwheel.server.community.dto.GalleryResponseDto;
 import com.bookwheel.server.community.dto.InterestBookResponseDto;
 import com.bookwheel.server.community.dto.ReviewCreateRequest;
@@ -18,7 +17,6 @@ import com.bookwheel.server.community.dto.ReviewVoteRequest;
 import com.bookwheel.server.community.dto.ReviewVoteResponse;
 import com.bookwheel.server.community.service.BookExchangeRecommendationService;
 import com.bookwheel.server.community.service.BookService;
-import com.bookwheel.server.community.service.CurrentReadingBookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -50,7 +48,6 @@ public class BookController {
 
     private final BookService bookService;
     private final BookExchangeRecommendationService bookExchangeRecommendationService;
-    private final CurrentReadingBookService currentReadingBookService;
 
     @Operation(summary = "도서 검색(목록 조회)",
         description = "카카오 API를 사용해 후보 도서 목록을 검색한 뒤, "
@@ -126,27 +123,6 @@ public class BookController {
             size,
             getUserPK(principal)
         );
-        return ApiResponse.success(response);
-    }
-
-    @Operation(
-        summary = "현재 읽는 책 및 시작 예정 책 카드 조회",
-        description = "로그인한 사용자의 진행 중인 현재 라운드 배정과 모집 중인 모임의 첫 라운드 PLANNED 배정을 조회합니다. "
-            + "upcoming이 true이면 roundStartDate와 dday로 시작 예정일을 표시할 수 있습니다. "
-            + "각 항목에는 그룹 홈으로 이동할 때 필요한 groupId가 포함됩니다. "
-            + "표지가 없는 도서는 coverImageUrl이 빈 문자열로 내려가므로, 이때는 title을 대체 텍스트로 표시하면 됩니다. "
-            + "현재 또는 시작 예정인 배정 책이 없으면 books는 빈 배열입니다."
-    )
-    @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
-            description = "현재 읽고 있는 책 카드 조회 성공")
-    })
-    @GetMapping("/current-reading")
-    public ApiResponse<CurrentReadingBooksResponse> getCurrentReadingBooks(
-        @AuthenticationPrincipal Object principal
-    ) {
-        CurrentReadingBooksResponse response =
-            currentReadingBookService.getCurrentReadingBooks(getUserPK(principal));
         return ApiResponse.success(response);
     }
 
