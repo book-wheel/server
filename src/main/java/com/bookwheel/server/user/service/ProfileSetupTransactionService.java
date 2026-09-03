@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Slf4j
@@ -25,6 +27,7 @@ public class ProfileSetupTransactionService {
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final Clock clock;
 
     @Transactional
     public Result persist(
@@ -69,7 +72,7 @@ public class ProfileSetupTransactionService {
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new BusinessException(ErrorCode.INACTIVE_USER);
         }
-        if (!"ACTIVE".equals(user.getBanStatus())) {
+        if (!"ACTIVE".equals(user.getBanStatus(LocalDateTime.now(clock)))) {
             throw new BusinessException(ErrorCode.BANNED_USER);
         }
         return user;

@@ -25,6 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,6 +47,7 @@ public class UserService {
     private final MemberRepository memberRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationPreferenceService notificationPreferenceService;
+    private final Clock clock;
 
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
@@ -376,7 +379,7 @@ public class UserService {
         }
 
         // 밴 상태 확인
-        String banStatus = user.getBanStatus();
+        String banStatus = user.getBanStatus(LocalDateTime.now(clock));
         if (!"ACTIVE".equals(banStatus)) {
             // "BANNED"나 "PERMANENT_BANNED"인 경우 에러 발생
             throw new BusinessException(ErrorCode.BANNED_USER);
@@ -393,7 +396,7 @@ public class UserService {
             throw new BusinessException(ErrorCode.INACTIVE_USER);
         }
 
-        String banStatus = user.getBanStatus();
+        String banStatus = user.getBanStatus(LocalDateTime.now(clock));
         if (!"ACTIVE".equals(banStatus)) {
             throw new BusinessException(ErrorCode.BANNED_USER);
         }
