@@ -202,7 +202,7 @@ public class NotificationService {
 
     @Transactional
     public int markAllRead(String userPK) {
-        return notificationRepository.markAllRead(userPK);
+        return notificationRepository.markAllRead(userPK, LocalDateTime.now(clock));
     }
 
     @Transactional
