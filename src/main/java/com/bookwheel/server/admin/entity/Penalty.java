@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "penalty")
@@ -37,11 +38,11 @@ public class Penalty {
     private LocalDateTime releaseDate;
 
     @Builder
-    public Penalty(User user, String banType, String reasonMessage, LocalDateTime releaseDate) {
+    public Penalty(User user, String banType, String reasonMessage, LocalDateTime releaseDate, LocalDateTime bannedAt) {
         this.user = user;
         this.banType = banType;
         this.reasonMessage = reasonMessage;
-        this.bannedAt = LocalDateTime.now();
+        this.bannedAt = Objects.requireNonNull(bannedAt, "제재 시각은 필수입니다.");
         this.releaseDate = releaseDate;
     }
 }

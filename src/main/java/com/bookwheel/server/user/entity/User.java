@@ -93,19 +93,19 @@ public class User {
         this.password = "DELETED_USER_" + java.util.UUID.randomUUID();
     }
 
-    public void applyBan(String banType) {
+    public void applyBan(String banType, LocalDateTime now) {
         if ("PERMANENT".equals(banType)) {
             this.banExpiredAt = LocalDateTime.of(9999, 12, 31, 23, 59, 59);
         }else if ("SEVEN_DAYS".equals(banType)) {
-            this.banExpiredAt = LocalDateTime.now().plusDays(7);
+            this.banExpiredAt = now.plusDays(7);
         }else if ("THREE_DAYS".equals(banType)) {
-            this.banExpiredAt = LocalDateTime.now().plusDays(3);
+            this.banExpiredAt = now.plusDays(3);
         }
 
     }
 
-    public String getBanStatus() {
-        if (this.banExpiredAt == null || LocalDateTime.now().isAfter(this.banExpiredAt)) {
+    public String getBanStatus(LocalDateTime now) {
+        if (this.banExpiredAt == null || now.isAfter(this.banExpiredAt)) {
             return "ACTIVE"; //정지기록 x, 이미 기간 지남
         }
         if (this.banExpiredAt.getYear() == 9999) {

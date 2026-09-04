@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
@@ -30,7 +31,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     int deleteAllByDeepLink(@Param("deepLink") String deepLink);
 
     @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP " +
+    // CURRENT_TIMESTAMP는 DB 서버의 time_zone을 따르므로, 단건 읽음 처리와 같은 기준이 되도록 시각을 주입받는다.
+    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = :readAt " +
             "WHERE n.recipientUserPK = :recipientUserPK AND n.isRead = false")
-    int markAllRead(@Param("recipientUserPK") String recipientUserPK);
+    int markAllRead(@Param("recipientUserPK") String recipientUserPK, @Param("readAt") LocalDateTime readAt);
 }
