@@ -1,12 +1,13 @@
 package com.bookwheel.server.common.controller;
 
 import com.bookwheel.server.common.dto.ImagePresignedUrlResponse;
+import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.common.service.S3Service;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -25,19 +26,32 @@ public class ImageController {
                     + "클라이언트는 presignedUrl을 파싱하지 말고 응답의 objectKey를 그대로 사용해야 합니다. "
                     + "profiles, profiles-temp prefix는 사용할 수 없으며 프로필 이미지는 전용 사용자 API를 사용해야 합니다."
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "URL 발급 성공 (5분간 유효)",
-            content = @Content(schema = @Schema(implementation = ImagePresignedUrlResponse.class))
-    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "URL 발급 성공 (5분간 유효)",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "presignedUrlResult",
+                                    summary = "발급 결과",
+                                    value = "{\n  \"success\": true,\n  \"data\": {\n    \"presignedUrl\": \"https://s3.bookwheel.kr/bucket/attachments/550e8400-e29b-41d4-a716-446655440000_my_photo.png?...\",\n    \"objectKey\": \"attachments/550e8400-e29b-41d4-a716-446655440000_my_photo.png\"\n  }\n}"
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "프로필 예약 prefix 사용 등 잘못된 요청 (COMMON_001)"
+            )
+    })
     @GetMapping("/presigned-url")
-    public ImagePresignedUrlResponse getPresignedUrl(
+    public ApiResponse<ImagePresignedUrlResponse> getPresignedUrl(
             @Parameter(description = "저장 경로(프로필 예약 prefix 제외)", example = "attachments")
             @RequestParam String prefix,
 
             @Parameter(description = "원본 파일명", example = "my_photo.png")
             @RequestParam String fileName
     ) {
-        return s3Service.getPresignedUrl(prefix, fileName);
+        return ApiResponse.success(s3Service.getPresignedUrl(prefix, fileName));
     }
 }
