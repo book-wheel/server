@@ -1,5 +1,6 @@
 package com.bookwheel.server.common.service;
 
+import com.bookwheel.server.common.dto.ImagePresignedUrlResponse;
 import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -276,6 +277,29 @@ class S3ServiceTest {
                 .willThrow(new IllegalStateException("S3 unavailable"));
 
         assertThat(s3Service.deleteObject("profiles-temp/user-pk/image.png")).isFalse();
+    }
+
+    @Test
+    @DisplayName("공통 Presigned URL API는 서명한 objectKey를 응답에 함께 반환한다")
+    void getPresignedUrl_ReturnsSignedObjectKey() throws MalformedURLException {
+        given(presignedPutObjectRequest.url())
+                .willReturn(new URL("https://s3.example.com/" + BUCKET + "/attachments/uuid_my_photo.png?signature=abc"));
+        given(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class)))
+                .willReturn(presignedPutObjectRequest);
+
+        ImagePresignedUrlResponse response = s3Service.getPresignedUrl("attachments", "my_photo.png");
+
+        ArgumentCaptor<PutObjectPresignRequest> captor = ArgumentCaptor.forClass(PutObjectPresignRequest.class);
+        then(s3Presigner).should().presignPutObject(captor.capture());
+        // 클라이언트가 URL을 파싱하지 않아도 되도록, 실제로 서명한 키가 그대로 응답에 담겨야 한다.
+        assertThat(response.objectKey()).isEqualTo(captor.getValue().putObjectRequest().key());
+        assertThat(response.objectKey())
+                .startsWith("attachments/")
+                .endsWith("_my_photo.png")
+                .doesNotContain(BUCKET)
+                .doesNotStartWith("/");
+        assertThat(response.presignedUrl())
+                .isEqualTo("https://s3.example.com/" + BUCKET + "/attachments/uuid_my_photo.png?signature=abc");
     }
 
     @Test
