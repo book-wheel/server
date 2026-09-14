@@ -20,12 +20,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestWatcher;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,6 +57,10 @@ class AdminServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    // 제재 시각이 실행 환경 시간대에 흔들리지 않는지 확인하기 위해 KST로 고정한다.
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-09-03T03:00:00Z"), ZoneId.of("Asia/Seoul"));
 
     @RegisterExtension
     TestWatcher watcher = new TestWatcher() {
@@ -87,7 +95,7 @@ class AdminServiceTest {
         // then
         assertNotNull(response);
         assertEquals(userPK, response.userPK());
-        verify(mockUser, times(1)).applyBan(request.banType()); // 도메인 로직 호출 검증
+        verify(mockUser, times(1)).applyBan(request.banType(), LocalDateTime.of(2026, 9, 3, 12, 0, 0)); // 도메인 로직 호출 검증
         verify(penaltyRepository, times(1)).save(any(Penalty.class)); // 패널티 이력 저장 검증
     }
 

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +28,20 @@ public interface OwnBookRepository extends JpaRepository<OwnBook, String> {
 
     // 리스트 안의 그룹 ID에 속한 책들을 전부 가져오기
     List<OwnBook> findByGroup_GroupIdIn(List<String> groupIds);
+
+    // 홈 독서 카드에 필요한 사용자의 등록 도서와 서지 정보를 모임별로 일괄 조회한다.
+    @Query("""
+            select ownBook
+            from OwnBook ownBook
+            join fetch ownBook.group
+            join fetch ownBook.book
+            where ownBook.owner.id = :userPK
+              and ownBook.group.groupId in :groupIds
+            """)
+    List<OwnBook> findAllByOwnerIdAndGroupIdInWithBook(
+            @Param("userPK") String userPK,
+            @Param("groupIds") Collection<String> groupIds
+    );
 
     @Modifying
     @Query("delete from OwnBook ownBook where ownBook.group.groupId = :groupId")

@@ -23,10 +23,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -77,6 +81,10 @@ class UserServiceProfileSetupTest {
     private ApplicationEventPublisher eventPublisher;
     @Mock
     private NotificationPreferenceService notificationPreferenceService;
+
+    // 정지 상태 판정 시각이 실행 환경 시간대에 흔들리지 않도록 KST로 고정한다.
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-09-03T03:00:00Z"), ZoneId.of("Asia/Seoul"));
 
     @InjectMocks
     private UserService userService;

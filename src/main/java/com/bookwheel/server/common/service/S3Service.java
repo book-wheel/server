@@ -1,5 +1,6 @@
 package com.bookwheel.server.common.service;
 
+import com.bookwheel.server.common.dto.ImagePresignedUrlResponse;
 import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -81,7 +82,7 @@ public class S3Service {
         return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
-    public String getPresignedUrl(String prefix, String fileName) {
+    public ImagePresignedUrlResponse getPresignedUrl(String prefix, String fileName) {
         // 중복 방지를 위해 고유한 파일 경로 생성
         // 결과: "attachments/123e4567..._file.jpg"
         String normalizedPrefix = PathNormalizer.normalizeSegment(prefix);
@@ -107,8 +108,9 @@ public class S3Service {
                 .putObjectRequest(putObjectRequest)
                 .build();
 
-        // 최종 URL 문자열 반환
-        return s3Presigner.presignPutObject(presignRequest).url().toString();
+        // 프론트가 URL을 파싱하지 않도록 Presigned URL과 objectKey를 함께 반환한다.
+        String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+        return new ImagePresignedUrlResponse(presignedUrl, objectKey);
     }
 
     public String getPresignedPutUrl(String objectKey, String contentType, long contentLength) {

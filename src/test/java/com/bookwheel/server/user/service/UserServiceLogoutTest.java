@@ -26,7 +26,8 @@ class UserServiceLogoutTest {
                 null,
                 null,
                 null,
-                preferenceService
+                preferenceService,
+                null
         );
 
         userService.logout("userPK");

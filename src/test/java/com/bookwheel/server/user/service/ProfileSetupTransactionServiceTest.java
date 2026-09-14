@@ -16,8 +16,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +42,10 @@ class ProfileSetupTransactionServiceTest {
     private JwtTokenProvider jwtTokenProvider;
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+
+    // 정지 상태 판정 시각이 실행 환경 시간대에 흔들리지 않도록 KST로 고정한다.
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-09-03T03:00:00Z"), ZoneId.of("Asia/Seoul"));
 
     @InjectMocks
     private ProfileSetupTransactionService transactionService;

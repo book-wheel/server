@@ -1,6 +1,7 @@
 package com.bookwheel.server.member.repository;
 
 import com.bookwheel.server.group.entity.Group;
+import com.bookwheel.server.group.enums.State;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -8,6 +9,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -139,6 +141,22 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     List<Group> findGroupsByUserPKAndMemberStatus(
             @Param("userPK") String userPK,
             @Param("status") MemberStatus status
+    );
+
+    // 홈 독서 카드에 표시할 현재 사용자의 활성 모임을 그룹과 함께 일괄 조회한다.
+    @Query("""
+            select m
+            from Member m
+            join fetch m.group g
+            where m.user.id = :userPK
+              and m.memberStatus = :memberStatus
+              and g.groupState in :groupStates
+            order by m.requestDate desc, g.groupId asc
+            """)
+    List<Member> findReadingCardMemberships(
+            @Param("userPK") String userPK,
+            @Param("memberStatus") MemberStatus memberStatus,
+            @Param("groupStates") Collection<State> groupStates
     );
 
     @Modifying

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,7 @@ public class WheelService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        wheelState.complete(request.reviewText(), normalizedKeys);
+        wheelState.complete(request.reviewText(), normalizedKeys, LocalDateTime.now(clock));
 
         OwnBook ownBook = wheelState.getOwnBook();
         eventPublisher.publishEvent(new WheelCompletedEvent(

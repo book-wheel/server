@@ -72,7 +72,7 @@ public class WheelState {
         this.wheelState = WheelStatus.READY;
     }
 
-    public void complete(String reviewText, List<String> objectKeys) {
+    public void complete(String reviewText, List<String> objectKeys, LocalDateTime now) {
         // 이미 정보가 존재한다면 실행 X
         if (this.isCompleted) {
             throw new BusinessException(ErrorCode.WHEEL_ALREADY_CERTIFIED);
@@ -89,7 +89,7 @@ public class WheelState {
         this.reviewText = reviewText;
         this.wheelState = WheelStatus.COMPLETED;
         this.isCompleted = true;
-        this.reviewedAt = LocalDateTime.now();
+        this.reviewedAt = now;
 
         // 2. 저장
         List<WheelStateImage> images = objectKeys.stream()

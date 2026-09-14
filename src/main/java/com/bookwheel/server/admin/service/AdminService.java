@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,6 +35,7 @@ public class AdminService {
     private final PostRepository postRepository;
     private final PostDeletionService postDeletionService;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     //회원 강제 탈퇴/정지 시키기
     @Transactional
@@ -46,7 +48,8 @@ public class AdminService {
             throw new BusinessException(ErrorCode.ALREADY_BANNED_USER);
         }
 
-        user.applyBan(request.banType());
+        LocalDateTime now = LocalDateTime.now(clock);
+        user.applyBan(request.banType(), now);
 
 
 
@@ -58,6 +61,7 @@ public class AdminService {
             .user(user)
             .banType(request.banType())
             .reasonMessage(reasonMessage)
+            .bannedAt(now)
             .releaseDate(user.getBanExpiredAt())
             .build();
 
@@ -73,10 +77,10 @@ public class AdminService {
         return AdminBanResponse.builder()
             .userPK(user.getId())
             .nickname(user.getNickname())
-            .status(user.getBanStatus())
+            .status(user.getBanStatus(now))
             .banType(request.banType())
             .reasonMessage(reasonMessage)
-            .bannedAt(LocalDateTime.now())
+            .bannedAt(now)
             .releaseDate(user.getBanExpiredAt())
             .build();
     }

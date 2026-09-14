@@ -68,12 +68,12 @@ public class Notification {
     @Column(name = "read_at")
     private LocalDateTime readAt;
 
-    public void markRead() {
+    public void markRead(LocalDateTime now) {
         if (Boolean.TRUE.equals(this.isRead)) {
             return;
         }
         this.isRead = true;
-        this.readAt = LocalDateTime.now();
+        this.readAt = now;
     }
 
     public void assignGroupId(String groupId) {

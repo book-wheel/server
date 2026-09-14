@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,6 +51,7 @@ public class NotificationService {
     private final NotificationPreferenceService preferenceService;
     private final NotificationPushService notificationPushService;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     /**
      * 단건 알림 생성. 카테고리 off 인 사용자에게는 인앱/푸시 모두 보내지 않는다.
@@ -194,12 +197,12 @@ public class NotificationService {
         if (!notification.getRecipientUserPK().equals(userPK)) {
             throw new BusinessException(ErrorCode.NOTIFICATION_FORBIDDEN);
         }
-        notification.markRead();
+        notification.markRead(LocalDateTime.now(clock));
     }
 
     @Transactional
     public int markAllRead(String userPK) {
-        return notificationRepository.markAllRead(userPK);
+        return notificationRepository.markAllRead(userPK, LocalDateTime.now(clock));
     }
 
     @Transactional
