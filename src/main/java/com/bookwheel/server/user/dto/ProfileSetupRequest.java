@@ -1,6 +1,7 @@
 package com.bookwheel.server.user.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 
 public record ProfileSetupRequest (
     @Schema(
@@ -12,5 +13,24 @@ public record ProfileSetupRequest (
     )
     String profileImageKey,
     String comment,
-    String nickname
-) {}
+    String nickname,
+    @Schema(description = "소셜 최초 가입 시 이용약관 필수 동의", example = "true")
+    Boolean termsAgreed,
+    @Schema(description = "소셜 최초 가입 시 개인정보처리방침 필수 동의", example = "true")
+    Boolean privacyAgreed,
+    @Schema(description = "마케팅 수신 선택 동의. 누락 시 false", example = "false")
+    Boolean marketingAgreed,
+    @Schema(description = "동의한 이용약관 버전", example = "2026-09-01")
+    @Size(max = 50)
+    String termsVersion,
+    @Schema(description = "동의한 개인정보처리방침 버전", example = "2026-09-01")
+    @Size(max = 50)
+    String privacyVersion,
+    @Schema(description = "동의한 마케팅 수신 정책 버전. 마케팅 동의 시 필수", example = "2026-09-01")
+    @Size(max = 50)
+    String marketingVersion
+) {
+    public ProfileSetupRequest(String profileImageKey, String comment, String nickname) {
+        this(profileImageKey, comment, nickname, null, null, null, null, null, null);
+    }
+}

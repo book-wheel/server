@@ -14,13 +14,15 @@ public class CustomOAuth2User extends DefaultOAuth2User {
     private String userPK;
     private AuthRole role;
     private String nickname;
+    private boolean profileSet;
 
     public CustomOAuth2User(Collection<? extends GrantedAuthority> authorities,
                             Map<String, Object> attributes, String nameAttributeKey,
-                            String userPK, AuthRole role, String nickname) {
+                            String userPK, AuthRole role, String nickname, boolean profileSet) {
         super(authorities, attributes, nameAttributeKey);
         this.userPK = userPK;
         this.role = role;
         this.nickname = nickname;
-        }
+        this.profileSet = profileSet;
+    }
 }

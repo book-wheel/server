@@ -66,9 +66,16 @@ public class OAuth2LoginCodeService {
             throw new BusinessException(ErrorCode.INVALID_OAUTH2_LOGIN_CODE);
         }
 
-        String accessToken = jwtTokenProvider.createAccessToken(storedLoginCode.userPK(), storedLoginCode.role());
-        String refreshToken = jwtTokenProvider.createRefreshToken(storedLoginCode.userPK(), storedLoginCode.role());
-        refreshTokenRepository.save(new RefreshToken(storedLoginCode.userPK(), refreshToken));
+        String accessToken;
+        String refreshToken;
+        if (storedLoginCode.isFirstLogin()) {
+            accessToken = jwtTokenProvider.createOnboardingToken(storedLoginCode.userPK());
+            refreshToken = null;
+        } else {
+            accessToken = jwtTokenProvider.createAccessToken(storedLoginCode.userPK(), storedLoginCode.role());
+            refreshToken = jwtTokenProvider.createRefreshToken(storedLoginCode.userPK(), storedLoginCode.role());
+            refreshTokenRepository.save(new RefreshToken(storedLoginCode.userPK(), refreshToken));
+        }
 
         return new OAuth2TokenResponse(accessToken, refreshToken, storedLoginCode.isFirstLogin());
     }

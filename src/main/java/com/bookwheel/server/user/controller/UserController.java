@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import static com.bookwheel.server.common.util.SecurityUtil.getUserPK;
@@ -41,15 +42,22 @@ public class UserController {
             description = "프로필 사진과 코멘트를 설정합니다. profileImageKey는 누락 시 기존 이미지를 유지하고, "
                     + "빈 문자열이면 삭제하며, 전용 Presigned URL API가 발급한 profiles-temp/ key이면 "
                     + "검증 후 최종 이미지로 교체합니다. 기존 profiles/ key 재전송은 "
-                    + "DB와 일치할 때만 유지로 처리합니다."
+                    + "DB와 일치할 때만 유지로 처리합니다. 소셜 최초 가입자는 필수 동의 여부와 약관 버전을 "
+                    + "함께 전달해야 하며, 기존 프로필 수정에서는 동의 필드를 생략할 수 있습니다. "
+                    + "최초 설정 완료 시 일반 Access Token과 Refresh Token을 발급합니다."
     )
     @PatchMapping("/setup-profile")
     public ApiResponse<LoginResponse> setupProfile(
             @AuthenticationPrincipal Object principal,
+            Authentication authentication,
             @Valid @RequestBody ProfileSetupRequest request) {
 
         String userPK = getUserPK(principal);
-        LoginResponse response = userService.setupProfile(userPK, request);
+        boolean onboardingRequest = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ONBOARDING".equals(authority.getAuthority()));
+        LoginResponse response = onboardingRequest
+                ? userService.setupProfile(userPK, request, true)
+                : userService.setupProfile(userPK, request);
         return ApiResponse.success(response);
     }
 
@@ -73,7 +81,11 @@ public class UserController {
         return ApiResponse.success(null);
     }
 
-    @Operation(summary = "회원 탈퇴", description = "비밀번호 확인 후 계정을 비활성화 처리합니다.")
+    @Operation(
+            summary = "회원 탈퇴",
+            description = "비밀번호 확인 후 계정을 즉시 비활성화하고 30일 후 영구 삭제 대상으로 예약합니다. "
+                    + "동의 증빙은 별도로 3년간 보관합니다."
+    )
     @DeleteMapping("/me")
     public ApiResponse<Void> withdraw(
             @AuthenticationPrincipal Object principal,

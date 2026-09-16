@@ -5,6 +5,7 @@ import com.bookwheel.server.common.dto.S3ObjectMetadata;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
 import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.common.service.S3Service;
@@ -12,6 +13,7 @@ import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.notification.service.NotificationPreferenceService;
 import com.bookwheel.server.user.dto.*;
+import com.bookwheel.server.user.entity.ConsentSource;
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.event.UserDeactivatedEvent;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +38,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
+
+    private static final Duration WITHDRAWAL_GRACE_PERIOD = Duration.ofDays(30);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -47,10 +52,13 @@ public class UserService {
     private final MemberRepository memberRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationPreferenceService notificationPreferenceService;
+    private final UserConsentService userConsentService;
+    private final S3DeletionQueueService s3DeletionQueueService;
+    private final AccessTokenRevocationService accessTokenRevocationService;
     private final Clock clock;
 
     @Transactional
-    public UserResponse signup(UserSignupRequest request) {
+    public LoginResponse signup(UserSignupRequest request) {
         if (!emailService.isVerified(request.mail())) {
             throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
@@ -75,9 +83,20 @@ public class UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
+        userConsentService.recordRequiredConsents(
+                savedUser.getId(),
+                savedUser.getMail(),
+                request.termsAgreed(),
+                request.termsVersion(),
+                request.privacyAgreed(),
+                request.privacyVersion(),
+                request.marketingAgreed(),
+                request.marketingVersion(),
+                ConsentSource.LOCAL_SIGNUP
+        );
         log.info("일반 회원가입 1단계 완료: loginId={}, tempNickname={}", savedUser.getLoginId(), tempNickname);
 
-        return UserResponse.from(savedUser, null);
+        return getLoginResponse(savedUser);
     }
 
     private boolean isValidPassword(String password) {
@@ -113,6 +132,23 @@ public class UserService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public LoginResponse setupProfile(String userPK, ProfileSetupRequest request) {
+        return setupProfileInternal(userPK, request, false);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public LoginResponse setupProfile(
+            String userPK,
+            ProfileSetupRequest request,
+            boolean onboardingRequest
+    ) {
+        return setupProfileInternal(userPK, request, onboardingRequest);
+    }
+
+    private LoginResponse setupProfileInternal(
+            String userPK,
+            ProfileSetupRequest request,
+            boolean onboardingRequest
+    ) {
         String temporaryObjectKey = null;
         String finalObjectKey = null;
         boolean copyAttempted = false;
@@ -168,7 +204,9 @@ public class UserService {
                 profileImageUpdate = ProfileSetupTransactionService.ProfileImageUpdate.replace(finalObjectKey);
             }
 
-            result = profileSetupTransactionService.persist(userPK, request, profileImageUpdate);
+            result = onboardingRequest
+                    ? profileSetupTransactionService.persist(userPK, request, profileImageUpdate, true)
+                    : profileSetupTransactionService.persist(userPK, request, profileImageUpdate);
             profilePersisted = true;
             return result.response();
         } finally {
@@ -243,9 +281,12 @@ public class UserService {
     }
 
     public void checkEmailDuplication(String mail) {
-        if (userRepository.existsByMailAndSocialTypeAndIsActiveTrue(mail, SocialType.NONE)) {
+        userRepository.findByMailAndSocialType(mail, SocialType.NONE).ifPresent(user -> {
+            if (!Boolean.TRUE.equals(user.getIsActive())) {
+                throw new BusinessException(ErrorCode.INACTIVE_USER);
+            }
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
-        }
+        });
     }
 
     @Transactional
@@ -320,47 +361,66 @@ public class UserService {
 
         String imageKey = user.getProfileImageKey();
         if (imageKey != null) {
-            s3Service.deleteObject(imageKey);
+            // 실제 S3 삭제가 실패해도 유실되지 않도록 DB 트랜잭션에 재시도 작업을 먼저 남긴다.
+            s3DeletionQueueService.enqueue(userPK, imageKey);
         }
 
         log.info("회원 탈퇴 처리 시작 - userPK: {}, socialType: {}", userPK, user.getSocialType());
 
-        // 탈퇴 직전 메일 보존 (deactivate 호출 후에는 nickname/profile 등이 마스킹될 수 있음)
-        String mail = user.getMail();
-
         // 계정 비활성화 (Soft Delete)
         // deleteByUser_IdAndMemberStatus의 clearAutomatically=true가 영속성 컨텍스트를 비워
         // user 엔티티가 detach된 상태이므로 save()로 명시적으로 병합한다
-        user.deactivate();
+        LocalDateTime withdrawalRequestedAt = LocalDateTime.now(clock);
+        user.deactivate(
+                withdrawalRequestedAt,
+                withdrawalRequestedAt.plus(WITHDRAWAL_GRACE_PERIOD)
+        );
         userRepository.save(user);
+
+        // 회원 본체가 삭제된 뒤에도 동의 증빙만 3년간 별도 보관한다.
+        userConsentService.scheduleRetention(userPK, withdrawalRequestedAt);
 
         // Redis에 저장된 Refresh Token 삭제
         refreshTokenRepository.deleteById(userPK);
+        notificationPreferenceService.clearExpoPushTokenForUser(userPK);
 
         // 소셜 연동 해제 (카카오만 서버에서 처리, 구글은 사용자가 직접 처리)
         if (user.getSocialType() != SocialType.NONE) {
             socialUnlinkService.unlink(user.getSocialType(), user.getSocialId());
         }
 
-        eventPublisher.publishEvent(new UserDeactivatedEvent(userPK, mail));
+        // 이미 발급된 Access Token도 즉시 인증에서 거부한다.
+        accessTokenRevocationService.revokeAllAccessTokens(userPK);
+
+        eventPublisher.publishEvent(new UserDeactivatedEvent(userPK));
 
         log.info("회원 탈퇴 완료: userPK={}, socialType={}", userPK, user.getSocialType());
     }
 
     private void handleExistingUser(String loginId, String mail, SocialType socialType) {
-        // 아이디는 가입 방식 상관없이 전체 중복 불가능 (Spring Security 시스템 특징상 고유해야 함)
+        // 30일 보존 기간에는 재가입으로 기존 탈퇴 데이터를 즉시 hard delete하지 않는다.
         userRepository.findByLoginId(loginId).ifPresent(user -> {
-            if (user.getIsActive()) throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
-            userRepository.delete(user);
+            if (!Boolean.TRUE.equals(user.getIsActive())) {
+                throw new BusinessException(ErrorCode.INACTIVE_USER);
+            }
+            throw new BusinessException(ErrorCode.DUPLICATE_USER_ID);
         });
 
-        // 같은 이메일인데 같은 방식(NONE)으로 탈퇴한 기록이 있다면 삭제 후 재가입 허용
         userRepository.findByMailAndSocialType(mail, socialType)
-                .filter(user -> !user.getIsActive())
-                .ifPresent(userRepository::delete);
+                .ifPresent(user -> {
+                    if (!Boolean.TRUE.equals(user.getIsActive())) {
+                        throw new BusinessException(ErrorCode.INACTIVE_USER);
+                    }
+                    throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
+                });
     }
 
     private LoginResponse getLoginResponse(User user) {
+        if (!Boolean.TRUE.equals(user.getIsProfileSet())) {
+            String onboardingToken = jwtTokenProvider.createOnboardingToken(user.getId());
+            return LoginResponse.of(user, onboardingToken, null);
+        }
+
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), AuthRole.USER);
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), AuthRole.USER);
 

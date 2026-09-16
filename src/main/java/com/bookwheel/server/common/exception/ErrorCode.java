@@ -33,6 +33,10 @@ public enum ErrorCode {
     INVALID_PASSWORD_FORMAT(HttpStatus.BAD_REQUEST, "AUTH_022", "비밀번호는 8~20자이며, 영문, 숫자, 특수문자를 포함해야 합니다."),
     INVALID_OAUTH2_LOGIN_CODE(HttpStatus.UNAUTHORIZED, "AUTH_023", "유효하지 않거나 만료된 소셜 로그인 코드입니다."),
     INVALID_PKCE_VALUE(HttpStatus.BAD_REQUEST, "AUTH_024", "유효하지 않은 PKCE 값입니다."),
+    REQUIRED_CONSENT_MISSING(HttpStatus.BAD_REQUEST, "AUTH_025", "필수 약관에 동의해야 합니다."),
+    CONSENT_VERSION_REQUIRED(HttpStatus.BAD_REQUEST, "AUTH_026", "동의한 약관 버전은 필수입니다."),
+    MARKETING_CONSENT_VERSION_REQUIRED(HttpStatus.BAD_REQUEST, "AUTH_027", "마케팅 수신 동의 버전은 필수입니다."),
+    CONSENT_POLICY_VERSION_MISMATCH(HttpStatus.CONFLICT, "AUTH_028", "최신 약관을 다시 확인하고 동의해주세요."),
 
     // JWT 토큰 관련 에러
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_011", "유효하지 않은 토큰입니다."),

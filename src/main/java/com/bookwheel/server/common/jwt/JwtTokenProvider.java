@@ -26,6 +26,7 @@ public class JwtTokenProvider {
 
     private final Key key;
     private static final long ACCESS_TOKEN_EXPIRE_TIME = 1000 * 60 * 30;            // 30분
+    private static final long ONBOARDING_TOKEN_EXPIRE_TIME = 1000 * 60 * 30;        // 30분
     private static final long REFRESH_TOKEN_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 14; // 2주
 
     public JwtTokenProvider(@Value("${jwt.secret}") String secretKey) {
@@ -35,8 +36,16 @@ public class JwtTokenProvider {
 
     // Access Token 생성
     public String createAccessToken(String subjectPK, AuthRole role) {
+        return createToken(subjectPK, role, ACCESS_TOKEN_EXPIRE_TIME);
+    }
+
+    public String createOnboardingToken(String subjectPK) {
+        return createToken(subjectPK, AuthRole.ONBOARDING, ONBOARDING_TOKEN_EXPIRE_TIME);
+    }
+
+    private String createToken(String subjectPK, AuthRole role, long expirationMillis) {
         long now = (new Date()).getTime();
-        Date accessTokenExpiresIn = new Date(now + ACCESS_TOKEN_EXPIRE_TIME);
+        Date accessTokenExpiresIn = new Date(now + expirationMillis);
 
         return Jwts.builder()
                 .setSubject(subjectPK)

@@ -8,6 +8,8 @@ import com.bookwheel.server.common.jwt.RefreshToken;
 import com.bookwheel.server.common.jwt.RefreshTokenRepository;
 import com.bookwheel.server.user.dto.LoginResponse;
 import com.bookwheel.server.user.dto.ProfileSetupRequest;
+import com.bookwheel.server.user.entity.ConsentSource;
+import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class ProfileSetupTransactionService {
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserConsentService userConsentService;
     private final Clock clock;
 
     @Transactional
@@ -35,8 +38,37 @@ public class ProfileSetupTransactionService {
             ProfileSetupRequest request,
             ProfileImageUpdate profileImageUpdate
     ) {
+        return persist(userPK, request, profileImageUpdate, false);
+    }
+
+    @Transactional
+    public Result persist(
+            String userPK,
+            ProfileSetupRequest request,
+            ProfileImageUpdate profileImageUpdate,
+            boolean onboardingRequest
+    ) {
         User user = findByUserPKForUpdateAndValidateActive(userPK);
+        if (onboardingRequest && Boolean.TRUE.equals(user.getIsProfileSet())) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
+        }
         String previousProfileImageKey = user.getProfileImageKey();
+        boolean firstSocialProfileSetup = !Boolean.TRUE.equals(user.getIsProfileSet())
+                && user.getSocialType() != SocialType.NONE;
+
+        if (firstSocialProfileSetup) {
+            userConsentService.recordRequiredConsents(
+                    userPK,
+                    user.getMail(),
+                    request.termsAgreed(),
+                    request.termsVersion(),
+                    request.privacyAgreed(),
+                    request.privacyVersion(),
+                    request.marketingAgreed(),
+                    request.marketingVersion(),
+                    ConsentSource.SOCIAL_PROFILE_SETUP
+            );
+        }
 
         String newNickname = request.nickname();
         if (newNickname != null && !newNickname.isBlank()) {

@@ -8,6 +8,7 @@ import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.service.EmailService;
 import com.bookwheel.server.user.service.UserService;
+import com.bookwheel.server.user.service.UserConsentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,14 +34,28 @@ public class AuthController {
     private final UserService userService;
     private final EmailService emailService;
     private final OAuth2LoginCodeService oAuth2LoginCodeService;
+    private final UserConsentService userConsentService;
 
-    @Operation(summary = "일반 회원가입 (Stage 1)", description = "이메일 인증 완료 후 아이디와 비밀번호만 입력해 계정을 생성합니다. 닉네임은 추후 프로필 설정에서 입력합니다.")
+    @Operation(summary = "현재 약관 버전 조회", description = "회원가입 화면에서 표시하고 제출할 현재 약관 버전을 조회합니다.")
+    @GetMapping("/consent-policies/current")
+    public ApiResponse<CurrentConsentPolicyResponse> getCurrentConsentPolicies() {
+        return ApiResponse.success(CurrentConsentPolicyResponse.from(userConsentService.getCurrentPolicies()));
+    }
+
+    @Operation(
+            summary = "일반 회원가입 (Stage 1)",
+            description = "이메일 인증 완료 후 아이디, 비밀번호, 필수 동의 여부와 약관 버전을 전달해 "
+                    + "계정을 생성합니다. 마케팅 수신 동의는 선택이며 프로필 설정 전용 온보딩 토큰만 반환합니다."
+    )
     @PostMapping("/signup")
-    public ApiResponse<UserResponse> signup(@Valid @RequestBody UserSignupRequest request) {
+    public ApiResponse<LoginResponse> signup(@Valid @RequestBody UserSignupRequest request) {
         return ApiResponse.success(userService.signup(request));
     }
 
-    @Operation(summary = "로그인", description = "아이디와 비밀번호를 입력해 JWT 토큰을 발급받습니다.")
+    @Operation(
+            summary = "로그인",
+            description = "프로필 설정이 끝난 회원은 일반 JWT를, 미완료 회원은 프로필 설정 전용 온보딩 토큰을 발급받습니다."
+    )
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody UserLoginRequest request) {
         return ApiResponse.success(userService.login(request));
@@ -85,7 +100,8 @@ public class AuthController {
 
     @Operation(
             summary = "소셜 로그인 코드 교환",
-            description = "앱 딥링크로 전달된 일회용 코드와 PKCE verifier를 검증한 뒤 JWT 토큰을 발급합니다. 코드는 1분간 한 번만 사용할 수 있습니다."
+            description = "앱 딥링크로 전달된 일회용 코드와 PKCE verifier를 검증합니다. 최초 가입자는 "
+                    + "Refresh Token 없이 온보딩 토큰만 받고, 프로필 완료 회원은 일반 JWT를 받습니다."
     )
     @PostMapping("/oauth2/token")
     public ResponseEntity<ApiResponse<OAuth2TokenResponse>> exchangeOAuth2LoginCode(
