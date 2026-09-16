@@ -49,7 +49,7 @@ public class PostThumbnailService {
     // 갤러리 조회는 썸네일 키가 없으면 원본으로 폴백한다.
     public String createThumbnail(String originalKey) {
         try {
-            byte[] original = s3Service.getObjectBytes(originalKey);
+            byte[] original = s3Service.getObjectBytes(originalKey, PostThumbnailGenerator.MAX_SOURCE_BYTES);
             byte[] thumbnail = PostThumbnailGenerator.generate(original);
             String thumbnailKey = PostThumbnailGenerator.toThumbnailKey(originalKey);
 

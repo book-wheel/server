@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
@@ -28,6 +29,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -189,18 +191,38 @@ public class S3Service {
     }
 
 
-    // 객체 전체를 바이트로 읽는다. 썸네일 생성처럼 원본 내용이 필요한 경우에만 쓴다.
-    public byte[] getObjectBytes(String objectKey) {
+    // 원본을 메모리에 올리기 전에 크기를 확인하고, 실제 읽는 양도 제한한다.
+    public byte[] getObjectBytes(String objectKey, long maxBytes) {
         if (objectKey == null || objectKey.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_FILE_KEY);
         }
 
-        try {
-            ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+        if (maxBytes <= 0 || maxBytes >= Integer.MAX_VALUE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try (ResponseInputStream<GetObjectResponse> response = s3Client.getObject(GetObjectRequest.builder()
                     .bucket(bucket)
                     .key(objectKey)
-                    .build());
-            return response.asByteArray();
+                    .build())) {
+            try {
+                Long contentLength = response.response().contentLength();
+                if (contentLength != null && contentLength > maxBytes) {
+                    throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED);
+                }
+
+                byte[] content = response.readNBytes((int) maxBytes + 1);
+                if (content.length > maxBytes) {
+                    throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED);
+                }
+                return content;
+            } catch (IOException | RuntimeException exception) {
+                // close()가 남은 본문을 읽지 않도록 실패한 다운로드는 즉시 중단한다.
+                response.abort();
+                throw exception;
+            }
+        } catch (BusinessException exception) {
+            throw exception;
         } catch (S3Exception exception) {
             if (exception.statusCode() == 404) {
                 throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
@@ -208,7 +230,7 @@ public class S3Service {
             log.error("S3 객체 조회 실패: key={}, status={}, error={}",
                     objectKey, exception.statusCode(), exception.getMessage());
             throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
-        } catch (RuntimeException exception) {
+        } catch (IOException | RuntimeException exception) {
             log.error("S3 객체 조회 실패: key={}, error={}", objectKey, exception.getMessage());
             throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
         }

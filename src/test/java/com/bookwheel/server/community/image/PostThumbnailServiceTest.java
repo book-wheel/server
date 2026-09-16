@@ -29,6 +29,7 @@ import javax.imageio.ImageIO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -57,7 +58,7 @@ class PostThumbnailServiceTest {
     @Test
     @DisplayName("축소본을 업로드하고 썸네일 objectKey를 반환한다")
     void createThumbnail_UploadsAndReturnsKey() throws IOException {
-        given(s3Service.getObjectBytes(ORIGINAL_KEY)).willReturn(createImage(1600, 1200));
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(1600, 1200));
 
         String result = postThumbnailService.createThumbnail(ORIGINAL_KEY);
 
@@ -77,7 +78,7 @@ class PostThumbnailServiceTest {
     @Test
     @DisplayName("원본을 읽지 못하면 업로드하지 않고 null을 반환한다")
     void createThumbnail_ReturnsNullWhenOriginalMissing() {
-        given(s3Service.getObjectBytes(ORIGINAL_KEY))
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES))
                 .willThrow(new BusinessException(ErrorCode.FILE_NOT_FOUND));
 
         String result = postThumbnailService.createThumbnail(ORIGINAL_KEY);
@@ -89,7 +90,7 @@ class PostThumbnailServiceTest {
     @Test
     @DisplayName("이미지로 열 수 없는 원본이면 null을 반환한다")
     void createThumbnail_ReturnsNullWhenOriginalIsNotImage() {
-        given(s3Service.getObjectBytes(ORIGINAL_KEY)).willReturn("not an image".getBytes());
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn("not an image".getBytes());
 
         String result = postThumbnailService.createThumbnail(ORIGINAL_KEY);
 
@@ -100,7 +101,7 @@ class PostThumbnailServiceTest {
     @Test
     @DisplayName("업로드가 실패해도 예외를 밖으로 던지지 않고 null을 반환한다")
     void createThumbnail_ReturnsNullWhenUploadFails() {
-        given(s3Service.getObjectBytes(ORIGINAL_KEY)).willReturn(createImage(800, 600));
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(800, 600));
         willThrow(new BusinessException(ErrorCode.FILE_UPLOAD_ERROR))
                 .given(s3Service).putObject(anyString(), any(), anyString());
 
@@ -113,13 +114,13 @@ class PostThumbnailServiceTest {
     @DisplayName("커밋 전에는 썸네일을 만들지 않고, 커밋 이후에 만들어 반영한다")
     void registerPostCommitThumbnailGeneration_RunsAfterCommit() {
         TransactionSynchronizationManager.initSynchronization();
-        given(s3Service.getObjectBytes(ORIGINAL_KEY)).willReturn(createImage(800, 600));
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(800, 600));
 
         postThumbnailService.registerPostCommitThumbnailGeneration(
                 List.of(postImage(1L, ORIGINAL_KEY)));
 
         // 아직 커밋 전이다.
-        then(s3Service).should(never()).getObjectBytes(anyString());
+        then(s3Service).should(never()).getObjectBytes(anyString(), anyLong());
         then(postThumbnailStore).should(never()).applyThumbnailKeys(any());
 
         triggerAfterCommit();
@@ -133,8 +134,8 @@ class PostThumbnailServiceTest {
     void registerPostCommitThumbnailGeneration_SkipsFailedImage() {
         TransactionSynchronizationManager.initSynchronization();
         String brokenKey = "posts/9791161571188/broken_image.png";
-        given(s3Service.getObjectBytes(brokenKey)).willReturn("not an image".getBytes());
-        given(s3Service.getObjectBytes(ORIGINAL_KEY)).willReturn(createImage(800, 600));
+        given(s3Service.getObjectBytes(brokenKey, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn("not an image".getBytes());
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(800, 600));
 
         postThumbnailService.registerPostCommitThumbnailGeneration(
                 List.of(postImage(1L, brokenKey), postImage(2L, ORIGINAL_KEY)));
@@ -147,7 +148,7 @@ class PostThumbnailServiceTest {
     @DisplayName("커밋 이후 반영이 실패해도 예외를 밖으로 던지지 않는다")
     void registerPostCommitThumbnailGeneration_SwallowsStoreFailure() {
         TransactionSynchronizationManager.initSynchronization();
-        given(s3Service.getObjectBytes(ORIGINAL_KEY)).willReturn(createImage(800, 600));
+        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(800, 600));
         willThrow(new IllegalStateException("DB 연결 끊김"))
                 .given(postThumbnailStore).applyThumbnailKeys(any());
 
