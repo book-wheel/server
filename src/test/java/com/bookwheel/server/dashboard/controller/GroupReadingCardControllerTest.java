@@ -49,7 +49,8 @@ class GroupReadingCardControllerTest {
                         WheelStatus.PLANNED,
                         "내가 읽을 책",
                         "https://example.com/book-1.jpg",
-                        "전달자"
+                        "전달자",
+                        "책 주인"
                 ))
                 .myBookStep(MyBookStepResponse.of(
                         "book-2",
@@ -71,6 +72,8 @@ class GroupReadingCardControllerTest {
                 .andExpect(jsonPath("$.data[0].currentRound").value(0))
                 .andExpect(jsonPath("$.data[0].dDay").value(14))
                 .andExpect(jsonPath("$.data[0].myStep.status").value("PLANNED"))
+                .andExpect(jsonPath("$.data[0].myStep.senderNickname").value("전달자"))
+                .andExpect(jsonPath("$.data[0].myStep.ownerNickname").value("책 주인"))
                 .andExpect(jsonPath("$.data[0].myBookStep.bookId").value("book-2"));
 
         then(groupReadingCardService).should().getReadingCards("user-pk");

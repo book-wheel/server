@@ -24,7 +24,8 @@ public class GroupDashboardController {
 
     @Operation(
             summary = "그룹 대시보드 조회",
-            description = "시작 전에는 currentRound=0을 반환합니다. 책 등록 전 myBookStep은 null, 등록 후에는 내 책 정보를 반환합니다."
+            description = "시작 전에는 currentRound=0을 반환합니다. 책 등록 전 myBookStep은 null, 등록 후에는 내 책 정보를 반환합니다. " +
+                    "myStep.senderNickname은 직전 전달자, ownerNickname은 책의 원래 소유자를 의미합니다."
     )
     @GetMapping("/{groupId}/dashboard")
     public ApiResponse<DashboardResponse> getDashboard(

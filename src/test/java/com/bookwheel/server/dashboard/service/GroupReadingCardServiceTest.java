@@ -121,6 +121,7 @@ class GroupReadingCardServiceTest {
             assertThat(myStep.bookId()).isEqualTo("book-incoming");
             assertThat(myStep.status()).isEqualTo(WheelStatus.PLANNED);
             assertThat(myStep.senderNickname()).isEqualTo("책 주인");
+            assertThat(myStep.ownerNickname()).isEqualTo("책 주인");
         });
         assertThat(response.myBookStep()).satisfies(myBookStep -> {
             assertThat(myBookStep.bookId()).isEqualTo("book-mine");
@@ -271,6 +272,7 @@ class GroupReadingCardServiceTest {
         assertThat(response.myStep()).satisfies(myStep -> {
             assertThat(myStep.status()).isEqualTo(WheelStatus.READY);
             assertThat(myStep.senderNickname()).isEqualTo("직전 전달자");
+            assertThat(myStep.ownerNickname()).isEqualTo("원래 책 주인");
         });
         assertThat(response.myBookStep()).satisfies(myBookStep -> {
             assertThat(myBookStep.status()).isEqualTo(WheelStatus.READING);
