@@ -131,8 +131,8 @@ class GroupScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("일정 목표 인원은 12명을 초과할 수 없다")
-    void createSchedule_RejectsTargetMemberCountAboveLimit() {
+    @DisplayName("일정 목표로 사용할 모임 최대 인원은 12명을 초과할 수 없다")
+    void createSchedule_RejectsGroupMaxMembersAboveLimit() {
         String groupId = "group-1";
         Group group = Group.builder()
                 .groupId(groupId)
@@ -150,11 +150,6 @@ class GroupScheduleServiceTest {
         );
         given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
         given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
-        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
-                groupId,
-                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
-        )).willReturn(1L);
-
         assertThatThrownBy(() -> groupScheduleService.createSchedule(groupId, request, "leader-user-pk"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
@@ -164,15 +159,15 @@ class GroupScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("일정 미리보기는 목표 인원 기준 날짜만 계산하고 저장하지 않는다")
-    void previewSchedule_CalculatesTargetMemberRoundsWithoutSaving() {
+    @DisplayName("일정 미리보기는 요청의 현재 인원 대신 모임 최대 인원으로 계산한다")
+    void previewSchedule_UsesGroupMaxMembersInsteadOfRequestedCurrentMemberCount() {
         String groupId = "group-1";
         LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
         Group group = Group.builder()
                 .groupId(groupId)
                 .groupName("모임")
                 .groupState(State.RECRUITING)
-                .maxMembers(12)
+                .maxMembers(10)
                 .build();
         GroupScheduleCreateRequest request = new GroupScheduleCreateRequest(
                 startDate,
@@ -180,16 +175,12 @@ class GroupScheduleServiceTest {
                 startDate.plusDays(60),
                 List.of(),
                 List.of(),
-                10
+                2
         );
         ScheduleCalendarService.ExcludedCalendar excludedCalendar =
                 mock(ScheduleCalendarService.ExcludedCalendar.class);
         given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
-        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
-                groupId,
-                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
-        )).willReturn(1L);
         given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
                 .willReturn(excludedCalendar);
         given(scheduleCalendarService.countUsableDaysUntilDeadline(
@@ -272,10 +263,6 @@ class GroupScheduleServiceTest {
                 mock(ScheduleCalendarService.ExcludedCalendar.class);
         given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
-        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
-                groupId,
-                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
-        )).willReturn(1L);
         given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
                 .willReturn(excludedCalendar);
 
@@ -316,10 +303,6 @@ class GroupScheduleServiceTest {
                 mock(ScheduleCalendarService.ExcludedCalendar.class);
         given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(userRepository.findById("leader-user-pk")).willReturn(Optional.of(activeUser()));
-        given(memberRepository.countByGroup_GroupIdAndMemberStatus(
-                groupId,
-                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
-        )).willReturn(1L);
         given(scheduleCalendarService.normalizeExcludedCalendar(List.of(), List.of()))
                 .willReturn(excludedCalendar);
         given(scheduleCalendarService.countUsableDaysUntilDeadline(
@@ -420,8 +403,8 @@ class GroupScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("현재 멤버가 1명이어도 목표 인원 기준 라운드를 생성한다")
-    void createSchedule_CreatesTargetMemberRoundsWithOneCurrentMember() {
+    @DisplayName("현재 멤버 수가 요청에 담겨도 모임 최대 인원 기준 라운드를 생성한다")
+    void createSchedule_CreatesGroupMaxMemberRoundsWhenRequestContainsCurrentMemberCount() {
         String groupId = "group-1";
         LocalDate startDate = LocalDate.now(FIXED_CLOCK).plusDays(3);
         Group group = Group.builder()
@@ -436,7 +419,7 @@ class GroupScheduleServiceTest {
                 startDate.plusDays(60),
                 List.of(),
                 List.of(),
-                10
+                1
         );
         Member member = mock(Member.class);
         given(member.getMemberStatus()).willReturn(com.bookwheel.server.member.enums.MemberStatus.ACTIVE);

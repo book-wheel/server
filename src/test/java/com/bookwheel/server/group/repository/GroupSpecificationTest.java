@@ -45,9 +45,6 @@ class GroupSpecificationTest {
     private Path<Integer> maxMembersPath;
 
     @Mock
-    private Path<Integer> targetMemberCountPath;
-
-    @Mock
     private Predicate conjunction;
 
     @Test
@@ -59,7 +56,6 @@ class GroupSpecificationTest {
         given(root.<LocalDate>get("startDate")).willReturn(startDatePath);
         given(root.<Integer>get("currentMembers")).willReturn(currentMembersPath);
         given(root.<Integer>get("maxMembers")).willReturn(maxMembersPath);
-        given(root.<Integer>get("targetMemberCount")).willReturn(targetMemberCountPath);
         Specification<Group> specification = GroupSpecification.searchWith(null, currentDate);
 
         specification.toPredicate(root, query, builder);
@@ -68,6 +64,5 @@ class GroupSpecificationTest {
         then(builder).should(times(2)).equal(groupStatePath, State.RECRUITING);
         then(builder).should().lessThan(startDatePath, currentDate);
         then(builder).should().greaterThanOrEqualTo(currentMembersPath, maxMembersPath);
-        then(builder).should().greaterThanOrEqualTo(currentMembersPath, targetMemberCountPath);
     }
 }

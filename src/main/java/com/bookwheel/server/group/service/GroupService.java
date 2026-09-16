@@ -189,14 +189,6 @@ public class GroupService {
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
-            Integer targetMemberCount = group.getTargetMemberCount();
-            long activeMemberCount = memberRepository.countByGroup_GroupIdAndMemberStatus(
-                    groupId,
-                    MemberStatus.ACTIVE
-            );
-            if (targetMemberCount != null && activeMemberCount >= targetMemberCount) {
-                throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
-            }
             targetMember.approve();
             // 라운드는 유지하고 새 멤버 구성을 기준으로 모집 중 PLANNED 배정만 다시 판단한다.
             recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
@@ -243,11 +235,6 @@ public class GroupService {
 
         if (group.getCurrentMembers() >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
-        }
-
-        Integer targetMemberCount = group.getTargetMemberCount();
-        if (targetMemberCount != null && group.getCurrentMembers() >= targetMemberCount) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
         }
     }
 

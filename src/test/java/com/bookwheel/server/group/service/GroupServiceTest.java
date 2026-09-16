@@ -13,6 +13,7 @@ import com.bookwheel.server.group.dto.search.GroupSearchResponse;
 import com.bookwheel.server.group.dto.setting.MemberRequestStatus;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
@@ -128,8 +129,8 @@ class GroupServiceTest {
     }
 
     @Test
-    @DisplayName("일정 목표 인원을 채운 모임에는 가입 신청을 만들지 않는다")
-    void joinGroup_RejectsWhenTargetMemberCountReached() {
+    @DisplayName("일정 목표 인원을 채워도 모임 최대 정원 이하면 가입을 신청할 수 있다")
+    void joinGroup_AllowsWhenScheduleTargetMemberCountReached() {
         String groupId = "group-1";
         Group group = Group.builder()
                 .groupId(groupId)
@@ -142,17 +143,15 @@ class GroupServiceTest {
                 .build();
         given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
         given(userRepository.findById("member-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> groupService.joinGroup(
+        groupService.joinGroup(
                 groupId,
                 new GroupJoinRequest(null, "가입하고 싶습니다"),
                 "member-user-pk"
-        ))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
+        );
 
-        then(memberRepository).shouldHaveNoInteractions();
+        then(memberRepository).should().save(any());
     }
 
     @Test
@@ -245,6 +244,43 @@ class GroupServiceTest {
         then(memberRepository).should(never()).countByGroup_GroupIdAndMemberStatus(any(), any());
         then(recruitingScheduleAssignmentService).shouldHaveNoInteractions();
         then(eventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("현재 2명인 상태에서 일정을 생성해도 모임 최대 인원까지 추가 가입을 승인할 수 있다")
+    void updateMemberRequestStatus_AllowsApprovalUpToGroupMaxMembers() {
+        String groupId = "group-1";
+        String memberId = "pending-member";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("추가 모집 모임")
+                .groupPublic(true)
+                .maxMembers(10)
+                .targetMemberCount(2)
+                .currentMembers(2)
+                .startDate(LocalDate.now(FIXED_CLOCK).plusDays(7))
+                .groupState(State.RECRUITING)
+                .build();
+        Member pendingMember = Member.builder()
+                .memberId(memberId)
+                .group(group)
+                .user(activeUser())
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.PENDING)
+                .build();
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId))
+                .willReturn(Optional.of(pendingMember));
+        groupService.updateMemberRequestStatus(
+                groupId,
+                memberId,
+                "leader-user-pk",
+                MemberRequestStatus.APPROVED
+        );
+
+        assertThat(pendingMember.getMemberStatus()).isEqualTo(MemberStatus.ACTIVE);
+        then(recruitingScheduleAssignmentService).should().refreshPlannedAssignments(group);
+        then(eventPublisher).should().publishEvent(any(GroupJoinDecidedEvent.class));
     }
 
     @Test

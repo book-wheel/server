@@ -79,7 +79,7 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
 
-        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+        int targetMemberCount = resolveScheduleTargetMemberCount(group);
 
         LocalDate requestedEndDate = request.endDate();
         if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
@@ -152,7 +152,7 @@ public class GroupScheduleService {
         LocalDate today = LocalDate.now(clock);
         validateRecruitingScheduleChange(group, today);
 
-        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+        int targetMemberCount = resolveScheduleTargetMemberCount(group);
         Integer readingPeriod = request.readingPeriod();
         if (readingPeriod == null || readingPeriod < 1) {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
@@ -423,18 +423,13 @@ public class GroupScheduleService {
         return readiness.ready() ? GroupScheduleStatus.READY : GroupScheduleStatus.CONFIGURED;
     }
 
-    private int validateTargetMemberCount(Group group, Integer targetMemberCount) {
-        long currentMemberCount = memberRepository.countByGroup_GroupIdAndMemberStatus(
-                group.getGroupId(),
-                MemberStatus.ACTIVE
-        );
-        // 목표 인원은 일정 틀의 상한이므로 현재 인원보다 작거나 모임 최대 인원보다 클 수 없다.
+    private int resolveScheduleTargetMemberCount(Group group) {
+        Integer targetMemberCount = group.getMaxMembers();
+        // 일정 생성 시점의 멤버 수가 아니라 모임 정원을 목표 인원으로 사용해
+        // 일정을 먼저 저장한 뒤에도 정원 내 추가 가입을 승인할 수 있게 한다.
         if (targetMemberCount == null
                 || targetMemberCount < 2
-                || targetMemberCount > Group.MAX_MEMBER_COUNT
-                || group.getMaxMembers() == null
-                || targetMemberCount > group.getMaxMembers()
-                || targetMemberCount < currentMemberCount) {
+                || targetMemberCount > Group.MAX_MEMBER_COUNT) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
         }
         return targetMemberCount;
