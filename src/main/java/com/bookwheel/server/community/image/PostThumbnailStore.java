@@ -3,6 +3,7 @@ package com.bookwheel.server.community.image;
 import com.bookwheel.server.admin.repository.PostImageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
@@ -15,7 +16,8 @@ public class PostThumbnailStore {
 
     private final PostImageRepository postImageRepository;
 
-    @Transactional
+    // afterCommit에서는 기존 트랜잭션 리소스가 남아 있으므로 별도 트랜잭션에서 커밋한다.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyThumbnailKeys(Map<Long, String> thumbnailKeysByPostImageId) {
         if (thumbnailKeysByPostImageId.isEmpty()) {
             return;
