@@ -32,4 +32,9 @@ public class PostImage {
     public void setPost(Post post) {
         this.post = post;
     }
+
+    // 썸네일 도입 이전에 올라온 이미지를 나중에 채워 넣기 위한 경로다.
+    public void applyThumbnailKey(String thumbnailKey) {
+        this.thumbnailKey = thumbnailKey;
+    }
 }
