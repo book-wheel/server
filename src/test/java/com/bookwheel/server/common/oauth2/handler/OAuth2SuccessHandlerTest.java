@@ -41,7 +41,7 @@ class OAuth2SuccessHandlerTest {
     @Test
     @DisplayName("소셜 로그인 성공 시 토큰 대신 일회용 코드만 앱으로 전달한다")
     void redirectsToAppWithOneTimeCodeOnly() throws Exception {
-        CustomOAuth2User oAuth2User = createOAuth2User("USER_temporary");
+        CustomOAuth2User oAuth2User = createOAuth2User("USER_temporary", false);
         Authentication authentication = createAuthentication(oAuth2User);
         given(loginCodeService.issue("user-pk", AuthRole.USER, true, CODE_CHALLENGE))
                 .willReturn("one-time-code");
@@ -63,7 +63,7 @@ class OAuth2SuccessHandlerTest {
     @Test
     @DisplayName("기존 사용자의 일회용 코드에는 최초 로그인 여부 false를 저장한다")
     void issuesCodeForExistingUserWithFirstLoginFalse() throws Exception {
-        CustomOAuth2User oAuth2User = createOAuth2User("책바퀴");
+        CustomOAuth2User oAuth2User = createOAuth2User("책바퀴", true);
         Authentication authentication = createAuthentication(oAuth2User);
         given(loginCodeService.issue("user-pk", AuthRole.USER, false, CODE_CHALLENGE))
                 .willReturn("one-time-code");
@@ -79,7 +79,7 @@ class OAuth2SuccessHandlerTest {
     @Test
     @DisplayName("PKCE challenge가 없으면 일회용 코드를 발급하지 않는다")
     void rejectsLoginWithoutPkceChallenge() throws Exception {
-        CustomOAuth2User oAuth2User = createOAuth2User("책바퀴");
+        CustomOAuth2User oAuth2User = createOAuth2User("책바퀴", true);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         successHandler.onAuthenticationSuccess(
@@ -106,14 +106,15 @@ class OAuth2SuccessHandlerTest {
         );
     }
 
-    private CustomOAuth2User createOAuth2User(String nickname) {
+    private CustomOAuth2User createOAuth2User(String nickname, boolean profileSet) {
         return new CustomOAuth2User(
                 List.of(new SimpleGrantedAuthority(AuthRole.USER.getKey())),
                 Map.of("id", "social-id"),
                 "id",
                 "user-pk",
                 AuthRole.USER,
-                nickname
+                nickname,
+                profileSet
         );
     }
 }

@@ -4,6 +4,7 @@ import com.bookwheel.server.notification.dto.NotificationPreferenceResponse;
 import com.bookwheel.server.notification.dto.NotificationPreferenceUpdateRequest;
 import com.bookwheel.server.notification.entity.NotificationPreference;
 import com.bookwheel.server.notification.repository.NotificationPreferenceRepository;
+import com.bookwheel.server.notification.repository.ExpoPushReceiptRepository;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,8 @@ class NotificationPreferenceServiceTest {
 
     @Mock
     private NotificationPreferenceRepository preferenceRepository;
+    @Mock
+    private ExpoPushReceiptRepository receiptRepository;
 
     @InjectMocks
     private NotificationPreferenceService preferenceService;
@@ -72,6 +75,21 @@ class NotificationPreferenceServiceTest {
         NotificationPreferenceResponse response = preferenceService.update("userPK", request(null));
 
         assertThat(response.expoPushToken()).isEqualTo("ExpoPushToken[current_token]");
+    }
+
+    @Test
+    @DisplayName("계정의 Expo Push Token을 해제할 때 미처리 Receipt도 함께 삭제한다")
+    void clearExpoPushTokenForUserDeletesReceipts() {
+        NotificationPreference preference = NotificationPreference.builder()
+                .userPK("userPK")
+                .expoPushToken("ExpoPushToken[old_token]")
+                .build();
+        given(preferenceRepository.findByUserPK("userPK")).willReturn(Optional.of(preference));
+
+        preferenceService.clearExpoPushTokenForUser("userPK");
+
+        then(receiptRepository).should().deleteByExpoPushToken("ExpoPushToken[old_token]");
+        then(preferenceRepository).should().clearExpoPushTokenByUserPK("userPK");
     }
 
     @Test
