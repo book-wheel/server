@@ -81,6 +81,17 @@ class GroupMemberPermissionValidatorTest {
     }
 
     @Test
+    void validateLeader_RejectsActiveSubLeader() {
+        String groupId = "group-1";
+        String userPK = "sub-leader-user-pk";
+        Member subLeader = member(MemberRole.SUB_LEADER, MemberStatus.ACTIVE);
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK))
+                .willReturn(Optional.of(subLeader));
+
+        assertLeaderOnly(() -> validator.validateLeader(groupId, userPK));
+    }
+
+    @Test
     void validateLeader_RejectsInactiveLeader() {
         String groupId = "group-1";
         String userPK = "inactive-leader-user-pk";
@@ -101,6 +112,36 @@ class GroupMemberPermissionValidatorTest {
         assertLeaderOnly(() -> validator.validateLeader(groupId, userPK));
     }
 
+    @Test
+    void validateManager_AllowsActiveLeader() {
+        assertManagerAllowed(MemberRole.LEADER, "leader-user-pk");
+    }
+
+    @Test
+    void validateManager_AllowsActiveSubLeader() {
+        assertManagerAllowed(MemberRole.SUB_LEADER, "sub-leader-user-pk");
+    }
+
+    @Test
+    void validateManager_RejectsRegularMember() {
+        assertManagerOnly(MemberRole.MEMBER, MemberStatus.ACTIVE, "member-user-pk");
+    }
+
+    @Test
+    void validateManager_RejectsInactiveSubLeader() {
+        assertManagerOnly(MemberRole.SUB_LEADER, MemberStatus.EXITED, "inactive-sub-leader-user-pk");
+    }
+
+    @Test
+    void validateManager_RejectsUnknownMember() {
+        String groupId = "group-1";
+        String userPK = "unknown-user-pk";
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK))
+                .willReturn(Optional.empty());
+
+        assertManagerOnly(() -> validator.validateManager(groupId, userPK));
+    }
+
     private Member member(MemberRole role, MemberStatus status) {
         return Member.builder()
                 .memberRole(role)
@@ -108,10 +149,34 @@ class GroupMemberPermissionValidatorTest {
                 .build();
     }
 
+    private void assertManagerAllowed(MemberRole role, String userPK) {
+        String groupId = "group-1";
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK))
+                .willReturn(Optional.of(member(role, MemberStatus.ACTIVE)));
+
+        assertThatCode(() -> validator.validateManager(groupId, userPK))
+                .doesNotThrowAnyException();
+    }
+
+    private void assertManagerOnly(MemberRole role, MemberStatus status, String userPK) {
+        String groupId = "group-1";
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK))
+                .willReturn(Optional.of(member(role, status)));
+
+        assertManagerOnly(() -> validator.validateManager(groupId, userPK));
+    }
+
     private void assertLeaderOnly(Runnable action) {
         assertThatThrownBy(action::run)
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.GROUP_LEADER_ONLY);
+    }
+
+    private void assertManagerOnly(Runnable action) {
+        assertThatThrownBy(action::run)
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GROUP_MANAGER_ONLY);
     }
 }

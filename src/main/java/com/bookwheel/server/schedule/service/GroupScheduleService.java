@@ -64,7 +64,7 @@ public class GroupScheduleService {
     ) {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
-        memberPermissionValidator.validateLeader(groupId, userPK);
+        memberPermissionValidator.validateManager(groupId, userPK);
         LocalDate today = LocalDate.now(clock);
         validateRecruitingScheduleChange(group, today);
 
@@ -148,7 +148,7 @@ public class GroupScheduleService {
     ) {
         Group group = findGroupById(groupId);
         findActiveUserById(userPK);
-        memberPermissionValidator.validateLeader(groupId, userPK);
+        memberPermissionValidator.validateManager(groupId, userPK);
         LocalDate today = LocalDate.now(clock);
         validateRecruitingScheduleChange(group, today);
 
@@ -511,7 +511,7 @@ public class GroupScheduleService {
     }
 
     // 오늘이 예정 시작일인 그룹만 진행 중으로 변경한다.
-    // 당일에 조건을 충족하지 못한 그룹은 리더가 새 시작일을 설정할 때까지 RECRUITING을 유지한다.
+    // 당일에 조건을 충족하지 못한 그룹은 모임장 또는 부모임장이 새 시작일을 설정할 때까지 RECRUITING을 유지한다.
     @Transactional
     public int updateStartedGroupsToInProgress() {
         LocalDate localDate = LocalDate.now(clock);

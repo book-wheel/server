@@ -72,13 +72,13 @@ public class GroupSettingService {
     private final EntityManager entityManager;
 
     @Transactional
-    public GroupDetailResponse updateGroup(String groupId, String leaderUserPK, GroupUpdateRequest request) {
+    public GroupDetailResponse updateGroup(String groupId, String requesterUserPK, GroupUpdateRequest request) {
         // 설정 변경 중 다른 요청이 같은 모임의 멤버·일정 상태를 바꾸지 못하도록 모임 행을 먼저 잠근다.
         Group group = groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
         validateGroupEditable(group);
-        memberPermissionValidator.validateLeader(groupId, leaderUserPK);
-        // 일정 진행 여부와 관계없이 일정 필드를 제외한 모임 정보는 리더가 수정할 수 있다.
+        memberPermissionValidator.validateManager(groupId, requesterUserPK);
+        // 일정 진행 여부와 관계없이 일정 필드를 제외한 모임 정보는 모임장과 부모임장이 수정할 수 있다.
         validateGroupUpdate(group, request);
 
         group.updateGroupInfo(
@@ -195,7 +195,7 @@ public class GroupSettingService {
             throw new BusinessException(ErrorCode.CANNOT_TRANSFER_TO_SELF);
         }
 
-        // 미래 일정 재생성의 리더 검증과 같은 그룹 잠금을 사용해 권한 변경을 직렬화한다.
+        // 그룹 잠금을 사용해 모임장 위임과 일정 변경을 직렬화한다.
         groupRepository.findByGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
         memberPermissionValidator.validateLeader(groupId, leaderUserPK);
@@ -409,7 +409,7 @@ public class GroupSettingService {
                 if (validateCurrentReading) {
                     validateCurrentRoundCompletion(group.getGroupId(), member);
                 }
-                // 기존 미래 일정은 리더의 수정 화면에 남기되 실행 범위에서 제외해 자동 시작을 막는다.
+                // 기존 미래 일정은 모임 관리자의 수정 화면에 남기되 실행 범위에서 제외해 자동 시작을 막는다.
                 return () -> pauseFutureRoundsForManualReconfiguration(group);
             }
             case RECRUITING -> {

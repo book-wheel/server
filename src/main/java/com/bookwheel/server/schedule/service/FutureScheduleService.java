@@ -61,7 +61,7 @@ public class FutureScheduleService {
     ) {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
-        memberPermissionValidator.validateLeader(groupId, userPK);
+        memberPermissionValidator.validateManager(groupId, userPK);
         validateFutureScheduleState(group.getGroupState());
         if (group.getScheduleReconfigurationStatus()
                 == ScheduleReconfigurationStatus.READ_ORDER_CONFIRMATION_REQUIRED) {

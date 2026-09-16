@@ -286,7 +286,7 @@ public class GroupService {
 
     private GroupDetailButtonType resolveBottomButtonType(MemberRole memberRole, MemberStatus memberStatus) {
         if (memberStatus == MemberStatus.ACTIVE) {
-            if (memberRole == MemberRole.LEADER) {
+            if (memberRole == MemberRole.LEADER || memberRole == MemberRole.SUB_LEADER) {
                 return GroupDetailButtonType.LEADER_SETTING;
             }
             return GroupDetailButtonType.JOINED;

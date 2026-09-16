@@ -96,6 +96,7 @@ public enum ErrorCode {
     GROUP_READ_ORDER_RECONFIRMATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "GROUP_054", "읽기 순서를 변경할 수 없는 상태입니다."),
     GROUP_READ_ORDER_RECONFIRMATION_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_055", "읽기 순서를 먼저 재확인해야 합니다."),
     GROUP_JOIN_PERIOD_EXPIRED(HttpStatus.BAD_REQUEST, "GROUP_056", "시작일이 지난 모임에는 가입을 신청할 수 없습니다."),
+    GROUP_MANAGER_ONLY(HttpStatus.FORBIDDEN, "GROUP_057", "ACTIVE 모임장 또는 부모임장만 수행할 수 있는 작업입니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

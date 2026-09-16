@@ -124,7 +124,7 @@ class GroupSettingServiceTest {
     private GroupSettingService groupSettingService;
 
     @Test
-    @DisplayName("리더가 모집 중인 모임 정보를 수정하면 변경된 상세 정보를 반환한다")
+    @DisplayName("모임장 또는 부모임장이 모집 중인 모임 정보를 수정하면 변경된 상세 정보를 반환한다")
     void updateGroup_UpdatesRecruitingGroup() {
         String groupId = "group-1";
         String leaderUserPK = "leader-user-pk";
@@ -152,7 +152,7 @@ class GroupSettingServiceTest {
         assertThat(response.bottomButtonType()).isEqualTo(GroupDetailButtonType.LEADER_SETTING);
         assertThat(group.getGroupPassword()).isEqualTo("encoded-password");
         assertThat(group.getGroupRegion()).isEqualTo(Region.SEOUL);
-        then(memberPermissionValidator).should().validateLeader(groupId, leaderUserPK);
+        then(memberPermissionValidator).should().validateManager(groupId, leaderUserPK);
         then(passwordEncoder).should().encode(request.groupPassword());
     }
 

@@ -30,10 +30,10 @@ public record GroupScheduleResponse(
         )
         GroupScheduleStatus scheduleStatus,
 
-        @Schema(description = "진행 중 멤버 변동 후 리더가 완료해야 하는 일정 재확정 단계")
+        @Schema(description = "진행 중 멤버 변동 후 모임장 또는 부모임장이 완료해야 하는 일정 재확정 단계")
         ScheduleReconfigurationStatus scheduleReconfigurationStatus,
 
-        @Schema(description = "전체 라운드 날짜 틀을 만드는 기준이자 시작 전 모집 가능한 상한 인원", example = "10", nullable = true)
+        @Schema(description = "전체 라운드 날짜 틀을 만드는 기준 인원. 신규 일정은 모임 최대 인원을 사용하며, 일정이 없으면 null", example = "10", nullable = true)
         Integer targetMemberCount,
 
         @Schema(description = "현재 ACTIVE 멤버 수", example = "7")

@@ -126,7 +126,7 @@ class GroupScheduleServiceTest {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.GROUP_SCHEDULE_START_DATE_NOT_FUTURE);
 
-        then(memberPermissionValidator).should().validateLeader(groupId, "leader-user-pk");
+        then(memberPermissionValidator).should().validateManager(groupId, "leader-user-pk");
         then(memberRepository).shouldHaveNoInteractions();
     }
 
@@ -413,7 +413,7 @@ class GroupScheduleServiceTest {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE);
 
-        then(memberPermissionValidator).should().validateLeader(groupId, "leader-user-pk");
+        then(memberPermissionValidator).should().validateManager(groupId, "leader-user-pk");
         then(roundRepository).should().existsByGroup_GroupId(groupId);
         then(roundRepository).should(never()).saveAll(anyList());
         then(roundRepository).should(never()).deleteByGroup_GroupId(groupId);

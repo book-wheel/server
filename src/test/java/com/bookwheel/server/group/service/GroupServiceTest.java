@@ -5,6 +5,8 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.GroupCreateRequest;
 import com.bookwheel.server.group.dto.GroupCreateResponse;
+import com.bookwheel.server.group.dto.GroupDetailButtonType;
+import com.bookwheel.server.group.dto.GroupDetailResponse;
 import com.bookwheel.server.group.dto.member.GroupJoinRequest;
 import com.bookwheel.server.group.dto.search.GroupSearchCondition;
 import com.bookwheel.server.group.dto.search.GroupSearchResponse;
@@ -309,6 +311,51 @@ class GroupServiceTest {
             assertThat(expiredGroup.groupStateLabel()).isEqualTo("일정 재설정 필요");
             assertThat(expiredGroup.dday()).isNull();
         });
+    }
+
+    @Test
+    @DisplayName("부모임장은 모임 설정 버튼 상태를 반환한다")
+    void getGroup_ReturnsSettingButtonForSubLeader() {
+        String groupId = "group-1";
+        String userPK = "sub-leader-user-pk";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("독서 모임")
+                .maxMembers(5)
+                .groupState(State.RECRUITING)
+                .build();
+        Member subLeader = Member.builder()
+                .group(group)
+                .user(activeUser())
+                .memberRole(MemberRole.SUB_LEADER)
+                .memberStatus(MemberStatus.ACTIVE)
+                .build();
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK))
+                .willReturn(Optional.of(subLeader));
+
+        GroupDetailResponse response = groupService.getGroup(groupId, userPK);
+
+        assertThat(response.bottomButtonType()).isEqualTo(GroupDetailButtonType.LEADER_SETTING);
+    }
+
+    @Test
+    @DisplayName("가입 요청 목록은 부모임장이 아닌 모임장 전용 권한을 검증한다")
+    void getMemberRequests_UsesLeaderOnlyPermission() {
+        String groupId = "group-1";
+        String userPK = "leader-user-pk";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("독서 모임")
+                .build();
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.PENDING))
+                .willReturn(List.of());
+
+        groupService.getMemberRequests(groupId, userPK);
+
+        then(memberPermissionValidator).should().validateLeader(groupId, userPK);
+        then(memberPermissionValidator).should(never()).validateManager(groupId, userPK);
     }
 
     private GroupCreateRequest groupCreateRequest(LocalDate startDate) {

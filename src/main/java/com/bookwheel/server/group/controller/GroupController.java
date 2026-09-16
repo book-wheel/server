@@ -104,7 +104,7 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "가입 요청 목록 조회", description = "리더가 대기 중인 가입 요청 목록을 조회합니다.")
+    @Operation(summary = "가입 요청 목록 조회", description = "ACTIVE 모임장(LEADER)만 대기 중인 가입 요청 목록을 조회할 수 있습니다.")
     @GetMapping("/{groupId}/members/requests")
     public ResponseEntity<ApiResponse<List<MemberRequestResponse>>> getMemberRequests(
             @PathVariable String groupId,
