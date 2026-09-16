@@ -40,30 +40,39 @@ public class PostThumbnailBackfillRunner implements ApplicationRunner {
         int succeededCount = 0;
         int failedCount = 0;
 
-        while (true) {
-            List<PostImage> batch = postImageRepository
-                    .findByThumbnailKeyIsNullAndPostImageIdGreaterThan(lastPostImageId, batchRequest);
-            if (batch.isEmpty()) {
-                break;
-            }
-
-            for (PostImage image : batch) {
-                // 성공 여부와 무관하게 커서를 전진시킨다. 디코딩할 수 없는 원본에서 멈추지 않기 위함이다.
-                lastPostImageId = image.getPostImageId();
-
-                String thumbnailKey = postThumbnailService.createThumbnail(image.getObjectKey());
-                if (thumbnailKey == null) {
-                    failedCount++;
-                    continue;
+        try {
+            while (true) {
+                List<PostImage> batch = postImageRepository
+                        .findByThumbnailKeyIsNullAndPostImageIdGreaterThan(lastPostImageId, batchRequest);
+                if (batch.isEmpty()) {
+                    break;
                 }
 
-                image.applyThumbnailKey(thumbnailKey);
-                succeededCount++;
-            }
+                for (PostImage image : batch) {
+                    // 성공 여부와 무관하게 커서를 전진시킨다. 디코딩할 수 없는 원본에서 멈추지 않기 위함이다.
+                    lastPostImageId = image.getPostImageId();
 
-            postImageRepository.saveAll(batch);
-            log.info("썸네일 백필 진행: lastPostImageId={}, 성공={}, 실패={}",
-                    lastPostImageId, succeededCount, failedCount);
+                    String thumbnailKey = postThumbnailService.createThumbnail(image.getObjectKey());
+                    if (thumbnailKey == null) {
+                        failedCount++;
+                        continue;
+                    }
+
+                    image.applyThumbnailKey(thumbnailKey);
+                    succeededCount++;
+                }
+
+                postImageRepository.saveAll(batch);
+                log.info("썸네일 백필 진행: lastPostImageId={}, 성공={}, 실패={}",
+                        lastPostImageId, succeededCount, failedCount);
+            }
+        } catch (RuntimeException exception) {
+            // ApplicationRunner 에서 예외가 올라가면 Spring Boot 가 기동을 실패시켜 컨테이너가 죽는다.
+            // 백필이 중단됐다고 서버를 못 뜨게 할 이유는 없다. 이미 저장된 배치는 남아 있으므로
+            // 원인을 고치고 다시 켜서 돌리면 마지막 지점부터 이어진다.
+            log.error("썸네일 백필 중단: lastPostImageId={}, 성공={}, 실패={}, error={}",
+                    lastPostImageId, succeededCount, failedCount, exception.getMessage());
+            return;
         }
 
         // 실패한 행은 thumbnail_key 가 비어 있고, 갤러리는 그 행만 원본으로 폴백한다.

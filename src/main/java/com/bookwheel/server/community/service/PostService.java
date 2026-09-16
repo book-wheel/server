@@ -198,16 +198,18 @@ public class PostService {
 
         if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
             for (String key : request.objectKeys()) {
-                // 갤러리 목록이 원본(1.8MB 수준)을 그대로 내려받지 않도록 축소본을 함께 만들어 둔다.
                 PostImage postImage = PostImage.builder()
                     .objectKey(key)
-                    .thumbnailKey(postThumbnailService.createThumbnail(key))
                     .build();
                 post.addImage(postImage);
             }
         }
 
         Post savedPost = postRepository.save(post);
+
+        // 갤러리 목록이 원본(1.8MB 수준)을 그대로 내려받지 않도록 축소본을 만들어 둔다.
+        // MinIO 왕복이라 트랜잭션 안에서 돌리지 않는다. 자세한 이유는 등록 메서드 주석 참고.
+        postThumbnailService.registerPostCommitThumbnailGeneration(savedPost.getImages());
 
         return PostCreateResponse.from(savedPost);
 
