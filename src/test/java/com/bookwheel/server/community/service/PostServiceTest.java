@@ -18,6 +18,8 @@ import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostComment;
+import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.image.PostThumbnailService;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
@@ -34,6 +36,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -54,6 +57,7 @@ class PostServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private S3Service s3Service;
     @Mock private CursorUtils cursorUtils;
+    @Mock private PostThumbnailService postThumbnailService;
 
     @InjectMocks
     private PostService postService;
@@ -165,6 +169,43 @@ class PostServiceTest {
 
         assertThat(response.isbn()).isEqualTo(pathIsbn);
         then(bookInfoRepository).should().findOrCreateByIsbn(pathIsbn);
+    }
+
+    @Test
+    @DisplayName("이미지가 있으면 생성된 썸네일 objectKey를 함께 저장한다")
+    void create_StoresGeneratedThumbnailKey() {
+        stubCreate(BookInfo.builder().isbn(ISBN).build());
+        String objectKey = "posts/" + ISBN + "/abc_image.png";
+        String thumbnailKey = "posts/" + ISBN + "/abc_image_thumb.jpg";
+        given(postThumbnailService.createThumbnail(objectKey)).willReturn(thumbnailKey);
+        PostCreateRequest request =
+            new PostCreateRequest("Clean Code", "post content", List.of(objectKey), null);
+
+        postService.create(ISBN, request, UUID.randomUUID().toString());
+
+        ArgumentCaptor<Post> savedPost = ArgumentCaptor.forClass(Post.class);
+        then(postRepository).should().save(savedPost.capture());
+        PostImage savedImage = savedPost.getValue().getImages().get(0);
+        assertThat(savedImage.getObjectKey()).isEqualTo(objectKey);
+        assertThat(savedImage.getThumbnailKey()).isEqualTo(thumbnailKey);
+    }
+
+    @Test
+    @DisplayName("썸네일 생성이 실패해도 원본 이미지는 그대로 저장한다")
+    void create_KeepsImageWhenThumbnailGenerationFails() {
+        stubCreate(BookInfo.builder().isbn(ISBN).build());
+        String objectKey = "posts/" + ISBN + "/abc_image.png";
+        given(postThumbnailService.createThumbnail(objectKey)).willReturn(null);
+        PostCreateRequest request =
+            new PostCreateRequest("Clean Code", "post content", List.of(objectKey), null);
+
+        postService.create(ISBN, request, UUID.randomUUID().toString());
+
+        ArgumentCaptor<Post> savedPost = ArgumentCaptor.forClass(Post.class);
+        then(postRepository).should().save(savedPost.capture());
+        PostImage savedImage = savedPost.getValue().getImages().get(0);
+        assertThat(savedImage.getObjectKey()).isEqualTo(objectKey);
+        assertThat(savedImage.getThumbnailKey()).isNull();
     }
 
     @Test

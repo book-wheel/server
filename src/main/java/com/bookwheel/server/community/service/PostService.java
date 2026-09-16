@@ -14,6 +14,7 @@ import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostReportRequest;
 import com.bookwheel.server.community.entity.*;
 import com.bookwheel.server.community.event.PostCommentedEvent;
+import com.bookwheel.server.community.image.PostThumbnailService;
 import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.repository.*;
 import com.bookwheel.server.group.entity.Group;
@@ -47,6 +48,7 @@ public class PostService {
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
     private final CursorUtils cursorUtils;
+    private final PostThumbnailService postThumbnailService;
 
     private static final int DEFAULT_COMMENT_SIZE = 20;
     private static final int MAX_COMMENT_PAGE_SIZE = 50;
@@ -196,8 +198,10 @@ public class PostService {
 
         if (request.objectKeys() != null && !request.objectKeys().isEmpty()) {
             for (String key : request.objectKeys()) {
+                // 갤러리 목록이 원본(1.8MB 수준)을 그대로 내려받지 않도록 축소본을 함께 만들어 둔다.
                 PostImage postImage = PostImage.builder()
                     .objectKey(key)
+                    .thumbnailKey(postThumbnailService.createThumbnail(key))
                     .build();
                 post.addImage(postImage);
             }

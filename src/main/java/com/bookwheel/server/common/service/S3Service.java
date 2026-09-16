@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -187,6 +188,58 @@ public class S3Service {
         }
     }
 
+
+    // 객체 전체를 바이트로 읽는다. 썸네일 생성처럼 원본 내용이 필요한 경우에만 쓴다.
+    public byte[] getObjectBytes(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_FILE_KEY);
+        }
+
+        try {
+            ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .build());
+            return response.asByteArray();
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+            }
+            log.error("S3 객체 조회 실패: key={}, status={}, error={}",
+                    objectKey, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 조회 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
+
+    // 서버가 만든 바이트를 그대로 올린다. 클라이언트 업로드는 presigned URL 경로를 쓴다.
+    public void putObject(String objectKey, byte[] content, String contentType) {
+        if (objectKey == null || objectKey.isBlank()
+                || content == null || content.length == 0
+                || contentType == null || contentType.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(bucket)
+                            .key(objectKey)
+                            .contentType(contentType)
+                            .contentLength((long) content.length)
+                            .build(),
+                    RequestBody.fromBytes(content));
+        } catch (S3Exception exception) {
+            log.error("S3 객체 업로드 실패: key={}, status={}, error={}",
+                    objectKey, exception.statusCode(), exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        } catch (RuntimeException exception) {
+            log.error("S3 객체 업로드 실패: key={}, error={}", objectKey, exception.getMessage());
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR);
+        }
+    }
     public void copyObjectIfUnchanged(String sourceKey, String destinationKey, String expectedETag) {
         if (sourceKey == null || sourceKey.isBlank()
                 || destinationKey == null || destinationKey.isBlank()
