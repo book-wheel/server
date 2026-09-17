@@ -27,6 +27,7 @@ import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
+import com.bookwheel.server.schedule.service.RecruitingSchedulePlanSynchronizer;
 import com.bookwheel.server.wheel.entity.WheelState;
 import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
@@ -65,6 +66,7 @@ public class GroupSettingService {
     private final NotificationService notificationService;
     private final S3Service s3Service;
     private final WheelReassignmentService wheelReassignmentService;
+    private final RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
     private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
     private final GroupMemberPermissionValidator memberPermissionValidator;
     private final PasswordEncoder passwordEncoder;
@@ -91,6 +93,12 @@ public class GroupSettingService {
                 request.groupOffline() ? request.groupRegion() : null,
                 request.maxMembers()
         );
+
+        // 모집 중 정원을 늘리면 저장된 목표 인원과 날짜 틀도 함께 확장해 READY 판정을 유지한다.
+        if (group.getGroupState() == State.RECRUITING
+                && recruitingSchedulePlanSynchronizer.synchronizeToMaxMembers(group)) {
+            recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
+        }
 
         return GroupDetailResponse.from(group, GroupDetailButtonType.LEADER_SETTING);
     }

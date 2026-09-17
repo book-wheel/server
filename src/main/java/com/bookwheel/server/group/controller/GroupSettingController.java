@@ -23,7 +23,8 @@ public class GroupSettingController {
 
     @Operation(
             summary = "모임 정보 수정",
-            description = "ACTIVE 모임장(LEADER) 또는 부모임장(SUB_LEADER)이 모집 중(RECRUITING), 진행 중(IN_PROGRESS), 완료(COMPLETE) 모임의 기본 정보를 수정합니다. 시작일과 독서 기간은 일정 API에서 관리합니다."
+            description = "ACTIVE 모임장(LEADER) 또는 부모임장(SUB_LEADER)이 모집 중(RECRUITING), 진행 중(IN_PROGRESS), 완료(COMPLETE) 모임의 기본 정보를 수정합니다. " +
+                    "모집 중 정원을 늘리면 기존 일정의 목표 인원과 라운드도 함께 확장합니다. 시작일과 독서 기간은 일정 API에서 관리합니다."
     )
     @PatchMapping
     // 일정 변경과 분리된 기본 정보 수정 요청을 서비스에 위임한다.

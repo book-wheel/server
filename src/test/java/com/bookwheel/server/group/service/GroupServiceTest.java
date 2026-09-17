@@ -20,6 +20,7 @@ import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
+import com.bookwheel.server.schedule.service.RecruitingSchedulePlanSynchronizer;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +80,9 @@ class GroupServiceTest {
     private GroupMemberPermissionValidator memberPermissionValidator;
 
     @Mock
+    private RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
+
+    @Mock
     private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     private GroupService groupService;
@@ -93,6 +97,7 @@ class GroupServiceTest {
                 passwordEncoder,
                 eventPublisher,
                 memberPermissionValidator,
+                recruitingSchedulePlanSynchronizer,
                 recruitingScheduleAssignmentService,
                 FIXED_CLOCK
         );
@@ -279,6 +284,7 @@ class GroupServiceTest {
         );
 
         assertThat(pendingMember.getMemberStatus()).isEqualTo(MemberStatus.ACTIVE);
+        then(recruitingSchedulePlanSynchronizer).should().synchronizeToMaxMembers(group);
         then(recruitingScheduleAssignmentService).should().refreshPlannedAssignments(group);
         then(eventPublisher).should().publishEvent(any(GroupJoinDecidedEvent.class));
     }
@@ -298,6 +304,7 @@ class GroupServiceTest {
                 passwordEncoder,
                 eventPublisher,
                 memberPermissionValidator,
+                recruitingSchedulePlanSynchronizer,
                 recruitingScheduleAssignmentService,
                 kstBoundaryClock
         );

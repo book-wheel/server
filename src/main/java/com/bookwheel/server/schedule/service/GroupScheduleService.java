@@ -52,6 +52,7 @@ public class GroupScheduleService {
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
     private final FutureScheduleService futureScheduleService;
+    private final RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
     private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
     private final ScheduleCalendarService scheduleCalendarService;
     private final Clock clock;
@@ -526,9 +527,23 @@ public class GroupScheduleService {
 
             Group group = lockedGroup.get();
             boolean startsToday = localDate.equals(group.getStartDate());
-            if (group.getGroupState() == State.RECRUITING
-                    && startsToday
-                    && prepareStartableSchedule(group, localDate)) {
+            if (group.getGroupState() != State.RECRUITING || !startsToday) {
+                continue;
+            }
+
+            // 배포 전 생성된 일정도 자정 자동 시작 전에 현재 정원 기준 날짜 틀로 복구한다.
+            boolean scheduleSynchronized;
+            try {
+                scheduleSynchronized = recruitingSchedulePlanSynchronizer.synchronizeToMaxMembers(group);
+            } catch (BusinessException exception) {
+                // 설정된 종료 제한일 안에서 확장할 수 없는 모임은 모집 상태로 남긴다.
+                continue;
+            }
+            if (scheduleSynchronized) {
+                recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
+            }
+
+            if (prepareStartableSchedule(group, localDate)) {
                 startableGroups.add(group);
             }
         }
