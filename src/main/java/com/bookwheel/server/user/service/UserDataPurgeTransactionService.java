@@ -73,15 +73,20 @@ public class UserDataPurgeTransactionService {
                 .setParameter("userPK", userPK)
                 .executeUpdate();
 
-        // 다른 사용자의 읽음 위치가 삭제 대상 메시지를 참조할 수 있으므로 먼저 연결을 해제한다.
-        entityManager.createQuery("""
-                        update ChatRoomReadState state
-                        set state.lastReadMessage = null
-                        where state.lastReadMessage.chatMessageId in (
-                            select message.chatMessageId
-                            from ChatMessage message
-                            where message.sender.id = :userPK
+        // 삭제 대상 메시지를 가리키던 읽음 위치는 같은 방의 이전 미삭제 메시지로 이동한다.
+        // null로 초기화하면 남은 모든 메시지가 미읽음으로 재계산된다.
+        entityManager.createNativeQuery("""
+                        update chat_room_read_state read_state
+                        join chat_message deleted_message
+                          on deleted_message.chat_message_id = read_state.last_read_message_id
+                        set read_state.last_read_message_id = (
+                            select max(candidate.chat_message_id)
+                            from chat_message candidate
+                            where candidate.chat_room_id = deleted_message.chat_room_id
+                              and candidate.chat_message_id < deleted_message.chat_message_id
+                              and candidate.sender_user_pk <> :userPK
                         )
+                        where deleted_message.sender_user_pk = :userPK
                         """)
                 .setParameter("userPK", userPK)
                 .executeUpdate();
