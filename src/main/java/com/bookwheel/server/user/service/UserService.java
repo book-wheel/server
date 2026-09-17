@@ -293,7 +293,8 @@ public class UserService {
     public TokenResponse reissue(TokenReissueRequest request) {
         String refreshToken = request.refreshToken();
 
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
+        if (!jwtTokenProvider.validateToken(refreshToken)
+                || !jwtTokenProvider.isRefreshToken(refreshToken)) {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 

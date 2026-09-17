@@ -100,6 +100,7 @@ class AdminAuthServiceTest {
         );
 
         when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
+        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
         when(jwtTokenProvider.getAuthentication(refreshToken)).thenReturn(authentication);
         when(refreshTokenRepository.findById(admin.getAdminPK()))
                 .thenReturn(Optional.of(new RefreshToken(admin.getAdminPK(), refreshToken)));
@@ -123,6 +124,7 @@ class AdminAuthServiceTest {
         );
 
         when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
+        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
         when(jwtTokenProvider.getAuthentication(refreshToken)).thenReturn(authentication);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -131,5 +133,20 @@ class AdminAuthServiceTest {
         assertEquals(ErrorCode.INVALID_TOKEN, exception.getErrorCode());
         verify(refreshTokenRepository, never()).findById(any());
         verify(jwtTokenProvider, never()).createAccessToken(any(), any());
+    }
+
+    @Test
+    @DisplayName("관리자 토큰 재발급 실패 - Access Token을 Refresh Token으로 사용")
+    void reissue_Fail_AccessToken() {
+        String accessToken = "admin-access";
+        when(jwtTokenProvider.validateToken(accessToken)).thenReturn(true);
+        when(jwtTokenProvider.isRefreshToken(accessToken)).thenReturn(false);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> adminAuthService.reissue(new AdminTokenReissueRequest(accessToken)));
+
+        assertEquals(ErrorCode.INVALID_TOKEN, exception.getErrorCode());
+        verify(jwtTokenProvider, never()).getAuthentication(any());
+        verify(refreshTokenRepository, never()).findById(any());
     }
 }

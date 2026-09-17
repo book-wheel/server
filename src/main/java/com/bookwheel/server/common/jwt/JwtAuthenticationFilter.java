@@ -35,22 +35,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-    // Request Header에서 토큰 추출
-    String token = resolveToken(request);
+        // Request Header에서 토큰 추출
+        String token = resolveToken(request);
 
-        if(token !=null&&jwtTokenProvider.validateToken(token))
-
-    {
-        Authentication authentication = jwtTokenProvider.getAuthentication(token);
-        if (!accessTokenRevocationService.isRevoked(authentication.getName())) {
-            // 스프링 시큐리티 저장소(ContextHolder)에 인증됨 저장
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        if (token != null
+                && jwtTokenProvider.validateToken(token)
+                && jwtTokenProvider.isAuthenticationToken(token)) {
+            Authentication authentication = jwtTokenProvider.getAuthentication(token);
+            if (!accessTokenRevocationService.isRevoked(authentication.getName())) {
+                // 스프링 시큐리티 저장소(ContextHolder)에 인증됨 저장
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
-    }
 
-    // 다음 필터로 넘기기
-        filterChain.doFilter(request,response);
-}
+        // 다음 필터로 넘기기
+        filterChain.doFilter(request, response);
+    }
 
 
     // 순수 토큰만

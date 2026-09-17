@@ -24,6 +24,11 @@ import java.util.stream.Collectors;
 @Component
 public class JwtTokenProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "token_type";
+    private static final String ACCESS_TOKEN_TYPE = "ACCESS";
+    private static final String ONBOARDING_TOKEN_TYPE = "ONBOARDING";
+    private static final String REFRESH_TOKEN_TYPE = "REFRESH";
+
     private final Key key;
     private static final long ACCESS_TOKEN_EXPIRE_TIME = 1000 * 60 * 30;            // 30분
     private static final long ONBOARDING_TOKEN_EXPIRE_TIME = 1000 * 60 * 30;        // 30분
@@ -36,21 +41,22 @@ public class JwtTokenProvider {
 
     // Access Token 생성
     public String createAccessToken(String subjectPK, AuthRole role) {
-        return createToken(subjectPK, role, ACCESS_TOKEN_EXPIRE_TIME);
+        return createToken(subjectPK, role, ACCESS_TOKEN_TYPE, ACCESS_TOKEN_EXPIRE_TIME);
     }
 
     public String createOnboardingToken(String subjectPK) {
-        return createToken(subjectPK, AuthRole.ONBOARDING, ONBOARDING_TOKEN_EXPIRE_TIME);
+        return createToken(subjectPK, AuthRole.ONBOARDING, ONBOARDING_TOKEN_TYPE, ONBOARDING_TOKEN_EXPIRE_TIME);
     }
 
-    private String createToken(String subjectPK, AuthRole role, long expirationMillis) {
+    private String createToken(String subjectPK, AuthRole role, String tokenType, long expirationMillis) {
         long now = (new Date()).getTime();
-        Date accessTokenExpiresIn = new Date(now + expirationMillis);
+        Date tokenExpiresIn = new Date(now + expirationMillis);
 
         return Jwts.builder()
                 .setSubject(subjectPK)
                 .claim("auth", role.getKey())
-                .setExpiration(accessTokenExpiresIn)
+                .claim(TOKEN_TYPE_CLAIM, tokenType)
+                .setExpiration(tokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -63,9 +69,19 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .setSubject(subjectPK)
                 .claim("auth", role.getKey())
+                .claim(TOKEN_TYPE_CLAIM, REFRESH_TOKEN_TYPE)
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public boolean isAuthenticationToken(String token) {
+        String tokenType = parseClaims(token).get(TOKEN_TYPE_CLAIM, String.class);
+        return ACCESS_TOKEN_TYPE.equals(tokenType) || ONBOARDING_TOKEN_TYPE.equals(tokenType);
+    }
+
+    public boolean isRefreshToken(String token) {
+        return REFRESH_TOKEN_TYPE.equals(parseClaims(token).get(TOKEN_TYPE_CLAIM, String.class));
     }
 
     // 토큰에서 인증 정보 가져오기

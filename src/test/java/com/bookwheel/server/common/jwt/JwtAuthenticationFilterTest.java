@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class JwtAuthenticationFilterTest {
 
@@ -34,6 +35,7 @@ class JwtAuthenticationFilterTest {
                 "user-pk", "", List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
         given(tokenProvider.validateToken("token")).willReturn(true);
+        given(tokenProvider.isAuthenticationToken("token")).willReturn(true);
         given(tokenProvider.getAuthentication("token")).willReturn(authentication);
         given(revocationService.isRevoked("user-pk")).willReturn(true);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
@@ -44,6 +46,29 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Refresh Token은 일반 API 인증에 사용하지 않는다")
+    void rejectsRefreshTokenForApiAuthentication() throws Exception {
+        JwtTokenProvider tokenProvider = new JwtTokenProvider(
+                "dGVzdC1qd3Qtc2VjcmV0LWtleS1hdC1sZWFzdC0zMi1ieXRlcy1sb25n"
+        );
+        AccessTokenRevocationService revocationService = mock(AccessTokenRevocationService.class);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(tokenProvider, revocationService);
+        String refreshToken = tokenProvider.createRefreshToken(
+                "user-pk", com.bookwheel.server.common.auth.AuthRole.USER
+        );
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users/me");
+        request.addHeader("Authorization", "Bearer " + refreshToken);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verifyNoInteractions(revocationService);
         verify(chain).doFilter(request, response);
     }
 }
