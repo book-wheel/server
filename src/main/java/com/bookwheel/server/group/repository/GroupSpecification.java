@@ -30,23 +30,14 @@ public class GroupSpecification {
                 builder.lessThan(root.<LocalDate>get("startDate"), currentDate)
         )));
 
-        // 최대 정원 또는 일정 목표 인원에 도달한 모집 모임은 가입 API에서도 거절되므로 탐색에서 제외한다.
+        // 모임 최대 정원에 도달한 모집 모임은 가입 API에서도 거절되므로 탐색에서 제외한다.
         spec = spec.and((root, query, builder) -> builder.not(builder.and(
                 builder.equal(root.get("groupState"), State.RECRUITING),
-                builder.or(
-                        builder.and(
-                                builder.isNotNull(root.get("maxMembers")),
-                                builder.greaterThanOrEqualTo(
-                                        root.<Integer>get("currentMembers"),
-                                        root.<Integer>get("maxMembers")
-                                )
-                        ),
-                        builder.and(
-                                builder.isNotNull(root.get("targetMemberCount")),
-                                builder.greaterThanOrEqualTo(
-                                        root.<Integer>get("currentMembers"),
-                                        root.<Integer>get("targetMemberCount")
-                                )
+                builder.and(
+                        builder.isNotNull(root.get("maxMembers")),
+                        builder.greaterThanOrEqualTo(
+                                root.<Integer>get("currentMembers"),
+                                root.<Integer>get("maxMembers")
                         )
                 )
         )));

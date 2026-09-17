@@ -14,7 +14,7 @@ public record GroupScheduleResponse(
         @Schema(description = "일정 생성 시 전체 라운드에 적용되며, 진행 중 변경 시 새 미래 라운드에 적용되는 독서 기간(일)", example = "5", nullable = true)
         Integer readingPeriod,
 
-        @Schema(description = "일정이 넘을 수 없는 종료 제한일", example = "2026-08-31", nullable = true)
+        @Schema(description = "일정이 넘을 수 없는 종료 제한일", example = "2026-08-31", nullable = true, types = {"string", "null"})
         LocalDate endDate,
 
         @Schema(description = "제외할 개별 날짜 목록")
@@ -30,10 +30,10 @@ public record GroupScheduleResponse(
         )
         GroupScheduleStatus scheduleStatus,
 
-        @Schema(description = "진행 중 멤버 변동 후 리더가 완료해야 하는 일정 재확정 단계")
+        @Schema(description = "진행 중 멤버 변동 후 모임장 또는 부모임장이 완료해야 하는 일정 재확정 단계")
         ScheduleReconfigurationStatus scheduleReconfigurationStatus,
 
-        @Schema(description = "전체 라운드 날짜 틀을 만드는 기준이자 시작 전 모집 가능한 상한 인원", example = "10", nullable = true)
+        @Schema(description = "전체 라운드 날짜 틀을 만드는 기준 인원. 신규 일정은 모임 최대 인원을 사용하며, 일정이 없으면 null", example = "10", nullable = true, types = {"integer", "null"})
         Integer targetMemberCount,
 
         @Schema(description = "현재 ACTIVE 멤버 수", example = "7")
@@ -54,16 +54,16 @@ public record GroupScheduleResponse(
         @Schema(description = "현재 상태에서 실제 실행 대상으로 확정된 라운드 수", example = "2")
         int executableRoundCount,
 
-        @Schema(description = "전체 날짜 틀의 마지막 종료일", example = "2026-10-11", nullable = true)
+        @Schema(description = "전체 날짜 틀의 마지막 종료일", example = "2026-10-11", nullable = true, types = {"string", "null"})
         LocalDate plannedEndDate,
 
-        @Schema(description = "실제 마지막 실행 라운드 종료일", example = "2026-08-14", nullable = true)
+        @Schema(description = "실제 마지막 실행 라운드 종료일", example = "2026-08-14", nullable = true, types = {"string", "null"})
         LocalDate executableEndDate,
 
-        @Schema(description = "이미 시작되어 미래 일정 변경 시 보존해야 하는 라운드 수. 진행 중이 아니면 null", nullable = true)
+        @Schema(description = "이미 시작되어 미래 일정 변경 시 보존해야 하는 라운드 수. 진행 중이 아니면 null", nullable = true, types = {"integer", "null"})
         Integer protectedRoundCount,
 
-        @Schema(description = "미래 일정 변경 시 허용되는 최소 전체 라운드 수. 진행 중이 아니면 null", nullable = true)
+        @Schema(description = "미래 일정 변경 시 허용되는 최소 전체 라운드 수. 진행 중이 아니면 null", nullable = true, types = {"integer", "null"})
         Integer minTotalRoundCount,
 
         @Schema(description = "라운드별 날짜와 내 책바퀴 배정. executable=false인 라운드는 보존된 비활성 날짜 틀입니다.")

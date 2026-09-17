@@ -35,4 +35,16 @@ public class GroupMemberPermissionValidator {
             throw new BusinessException(ErrorCode.GROUP_LEADER_ONLY);
         }
     }
+
+    public void validateManager(String groupId, String userPK) {
+        Member member = memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_MANAGER_ONLY));
+
+        boolean isManager = member.getMemberRole() == MemberRole.LEADER
+                || member.getMemberRole() == MemberRole.SUB_LEADER;
+        boolean isActive = member.getMemberStatus() == MemberStatus.ACTIVE;
+        if (!isManager || !isActive) {
+            throw new BusinessException(ErrorCode.GROUP_MANAGER_ONLY);
+        }
+    }
 }

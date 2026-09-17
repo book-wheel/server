@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -57,6 +58,35 @@ class ScheduleCalendarService {
         }
 
         return new ExcludedCalendar(mergeRanges(ranges));
+    }
+
+    ExcludedCalendar deserializeExcludedCalendar(String serializedDates, String serializedRanges) {
+        return normalizeExcludedCalendar(
+                deserializeExcludedDates(serializedDates),
+                deserializeExcludedDateRanges(serializedRanges)
+        );
+    }
+
+    static List<LocalDate> deserializeExcludedDates(String serializedDates) {
+        if (serializedDates == null || serializedDates.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(serializedDates.split(","))
+                .map(LocalDate::parse)
+                .toList();
+    }
+
+    static List<ExcludedDateRange> deserializeExcludedDateRanges(String serializedRanges) {
+        if (serializedRanges == null || serializedRanges.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(serializedRanges.split(","))
+                .map(range -> range.split(":"))
+                .map(parts -> new ExcludedDateRange(
+                        LocalDate.parse(parts[0]),
+                        LocalDate.parse(parts[1])
+                ))
+                .toList();
     }
 
     long countUsableDaysUntilDeadline(

@@ -17,6 +17,7 @@ import com.bookwheel.server.member.entity.*;
 import com.bookwheel.server.member.enums.*;
 import com.bookwheel.server.member.repository.*;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
+import com.bookwheel.server.schedule.service.RecruitingSchedulePlanSynchronizer;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class GroupService {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final GroupMemberPermissionValidator memberPermissionValidator;
+    private final RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
     private final RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
     private final Clock clock;
 
@@ -189,14 +191,8 @@ public class GroupService {
             if (group.getCurrentMembers() >= group.getMaxMembers()) {
                 throw new BusinessException(ErrorCode.GROUP_FULL);
             }
-            Integer targetMemberCount = group.getTargetMemberCount();
-            long activeMemberCount = memberRepository.countByGroup_GroupIdAndMemberStatus(
-                    groupId,
-                    MemberStatus.ACTIVE
-            );
-            if (targetMemberCount != null && activeMemberCount >= targetMemberCount) {
-                throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
-            }
+            // 과거 일정이나 정원 증가로 날짜 틀이 작아진 경우 승인 전에 모임 정원 기준으로 확장한다.
+            recruitingSchedulePlanSynchronizer.synchronizeToMaxMembers(group);
             targetMember.approve();
             // 라운드는 유지하고 새 멤버 구성을 기준으로 모집 중 PLANNED 배정만 다시 판단한다.
             recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
@@ -244,11 +240,6 @@ public class GroupService {
         if (group.getCurrentMembers() >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
         }
-
-        Integer targetMemberCount = group.getTargetMemberCount();
-        if (targetMemberCount != null && group.getCurrentMembers() >= targetMemberCount) {
-            throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
-        }
     }
 
     private GroupDetailButtonType resolveBottomButtonType(String groupId, String userPK) {
@@ -286,7 +277,7 @@ public class GroupService {
 
     private GroupDetailButtonType resolveBottomButtonType(MemberRole memberRole, MemberStatus memberStatus) {
         if (memberStatus == MemberStatus.ACTIVE) {
-            if (memberRole == MemberRole.LEADER) {
+            if (memberRole == MemberRole.LEADER || memberRole == MemberRole.SUB_LEADER) {
                 return GroupDetailButtonType.LEADER_SETTING;
             }
             return GroupDetailButtonType.JOINED;

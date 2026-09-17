@@ -22,8 +22,11 @@ public record MyStepResponse(
         @Schema(description = "표지 이미지 URL", example = "https://image.aladin.co.kr/...")
         String coverImage,
 
-        @Schema(description = "책을 보낼 사람 닉네임", example = "책벌레")
-        String senderNickname
+        @Schema(description = "직전 회차에서 책을 전달한 멤버 닉네임. 1회차는 원래 책 소유자", example = "직전 전달자", nullable = true, types = {"string", "null"})
+        String senderNickname,
+
+        @Schema(description = "책의 원래 소유자 닉네임", example = "책 주인", nullable = true, types = {"string", "null"})
+        String ownerNickname
 ) {
     public static MyStepResponse of(
             String wheelStateId,
@@ -31,7 +34,8 @@ public record MyStepResponse(
             WheelStatus status,
             String bookTitle,
             String coverImage,
-            String senderNickname
+            String senderNickname,
+            String ownerNickname
     ) {
         return MyStepResponse.builder()
                 .wheelStateId(wheelStateId)
@@ -40,6 +44,7 @@ public record MyStepResponse(
                 .bookTitle(bookTitle)
                 .coverImage(coverImage)
                 .senderNickname(senderNickname)
+                .ownerNickname(ownerNickname)
                 .build();
     }
 }

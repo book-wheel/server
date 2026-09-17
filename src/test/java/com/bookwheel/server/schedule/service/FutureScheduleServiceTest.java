@@ -298,6 +298,7 @@ class FutureScheduleServiceTest {
                 today.plusDays(4) + ":" + today.plusDays(5)
         );
         assertThat(group.getScheduleReconfigurationStatus()).isEqualTo(ScheduleReconfigurationStatus.NONE);
+        then(memberPermissionValidator).should().validateManager(groupId, "leader-user-pk");
         then(wheelReassignmentService).should()
                 .deleteReplaceableFutureAssignments(List.of(existingFutureRound));
         then(roundRepository).should().deleteByRoundIdIn(List.of("round-2"));

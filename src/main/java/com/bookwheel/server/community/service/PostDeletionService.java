@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -34,8 +35,10 @@ public class PostDeletionService {
         postRepository.findByPostIdForUpdate(postId);
 
         // 게시물이 사라진 뒤에는 이미지 키를 다시 읽을 수 없으므로 삭제 전에 수집한다.
+        // 원본과 썸네일은 별개 객체라 둘 다 모아야 한다. 썸네일을 빠뜨리면 게시물을 지울 때마다
+        // *_thumb.jpg 가 MinIO 에 고아로 남는다.
         List<String> imageObjectKeys = post.getImages().stream()
-            .map(PostImage::getObjectKey)
+            .flatMap(image -> Stream.of(image.getObjectKey(), image.getThumbnailKey()))
             .filter(StringUtils::hasText)
             .distinct()
             .toList();
