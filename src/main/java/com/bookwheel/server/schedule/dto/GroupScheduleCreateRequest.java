@@ -1,9 +1,7 @@
 package com.bookwheel.server.schedule.dto;
 
-import com.bookwheel.server.group.entity.Group;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
@@ -31,11 +29,8 @@ public record GroupScheduleCreateRequest(
         @Schema(description = "제외할 날짜 범위 목록. 시작일과 종료일을 포함합니다.", nullable = true)
         List<@Valid ExcludedDateRange> excludedDateRanges,
 
-        // 목표 인원은 시작 필수 인원이 아니라 날짜 틀의 크기와 모집 상한을 정하는 값이다.
-        @Schema(description = "전체 라운드 날짜 틀과 모집 상한에 사용할 목표 인원. 현재 ACTIVE 멤버 수 이상, 모임 최대 인원 이하이며 목표 인원을 다 채우지 않아도 현재 인원 기준으로 시작할 수 있습니다.", example = "10")
-        @NotNull(message = "목표 인원을 입력해주세요.")
-        @Min(value = 2, message = "목표 인원은 최소 2명 이상이어야 합니다.")
-        @Max(value = Group.MAX_MEMBER_COUNT, message = "목표 인원은 12명 이하여야 합니다.")
+        // 기존 클라이언트와의 하위 호환을 위해 필드는 받지만, 일정 목표 인원은 서버가 모임 최대 인원으로 결정한다.
+        @Schema(description = "더 이상 사용하지 않음. 서버가 모임의 maxMembers를 일정 목표 인원으로 사용합니다.", deprecated = true, nullable = true)
         Integer targetMemberCount
 ) {
 }

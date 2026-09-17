@@ -49,7 +49,7 @@ public class GroupController {
     @Operation(
             summary = "그룹 목록 조회",
             description = "조건(상태/유형/지역/키워드)에 맞는 그룹 목록을 조회합니다. "
-                    + "시작일이 지났거나 최대 정원 또는 일정 목표 인원에 도달한 모집 중 모임은 제외합니다."
+                    + "시작일이 지났거나 최대 정원에 도달한 모집 중 모임은 제외합니다."
     )
     @GetMapping
     public ResponseEntity<ApiResponse<Page<GroupSearchResponse>>> getGroups(
@@ -92,7 +92,7 @@ public class GroupController {
 
     @Operation(
             summary = "그룹 가입 신청",
-            description = "그룹에 가입 신청을 보냅니다. 시작일이 지난 모임은 GROUP_056, 일정 목표 인원에 도달한 모임은 GROUP_051로 거절합니다."
+            description = "그룹에 가입 신청을 보냅니다. 시작일이 지난 모임은 GROUP_056, 모임 최대 정원에 도달한 모임은 GROUP_006으로 거절합니다."
     )
     @PostMapping("/{groupId}/join")
     public ResponseEntity<ApiResponse<GroupJoinResponse>> joinGroup(
@@ -104,7 +104,7 @@ public class GroupController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @Operation(summary = "가입 요청 목록 조회", description = "리더가 대기 중인 가입 요청 목록을 조회합니다.")
+    @Operation(summary = "가입 요청 목록 조회", description = "ACTIVE 모임장(LEADER)만 대기 중인 가입 요청 목록을 조회할 수 있습니다.")
     @GetMapping("/{groupId}/members/requests")
     public ResponseEntity<ApiResponse<List<MemberRequestResponse>>> getMemberRequests(
             @PathVariable String groupId,
@@ -116,7 +116,7 @@ public class GroupController {
 
     @Operation(
             summary = "가입 요청 처리",
-            description = "모집 중(RECRUITING)인 모임에서 리더가 가입 요청을 승인 또는 거절합니다. 승인 후에도 목표 인원 기준 라운드는 유지되고 PLANNED 배정만 재검증됩니다. 목표 인원을 초과하는 승인은 GROUP_051로 거절되며, 프론트는 처리 후 GET /schedule을 다시 조회해 CONFIGURED/READY 상태를 갱신합니다."
+            description = "모집 중(RECRUITING)인 모임에서 ACTIVE 모임장(LEADER)만 가입 요청을 승인 또는 거절할 수 있습니다. 승인은 모임 최대 정원까지 가능하며, 승인 후 PLANNED 배정을 재검증합니다. 프론트는 처리 후 GET /schedule을 다시 조회해 CONFIGURED/READY 상태를 갱신합니다."
     )
     @PatchMapping("/{groupId}/members/{memberId}/status")
     public ResponseEntity<ApiResponse<MemberRequestStatusUpdateResponse>> updateMemberRequestStatus(

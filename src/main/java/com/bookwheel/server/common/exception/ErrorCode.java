@@ -89,13 +89,13 @@ public enum ErrorCode {
     GROUP_REGION_NOT_ALLOWED_FOR_ONLINE(HttpStatus.BAD_REQUEST, "GROUP_047", "온라인 모임에는 지역을 설정할 수 없습니다."),
     GROUP_SCHEDULE_START_DATE_NOT_FUTURE(HttpStatus.BAD_REQUEST, "GROUP_048", "일정 시작일은 내일부터 설정할 수 있습니다."),
     GROUP_DELETED(HttpStatus.BAD_REQUEST, "GROUP_049", "삭제된 모임입니다."),
-    GROUP_SCHEDULE_TARGET_MEMBER_INVALID(HttpStatus.BAD_REQUEST, "GROUP_050", "목표 인원은 현재 ACTIVE 멤버 수 이상이며, 2명 이상이고 모임 최대 인원 이하여야 합니다."),
-    GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED(HttpStatus.BAD_REQUEST, "GROUP_051", "일정의 목표 인원을 초과해 가입할 수 없습니다."),
+    GROUP_SCHEDULE_TARGET_MEMBER_INVALID(HttpStatus.BAD_REQUEST, "GROUP_050", "모임 최대 인원은 2명 이상 12명 이하이며, 저장된 일정 목표 인원보다 작을 수 없습니다."),
     GROUP_SCHEDULE_REPLACE_NOT_ALLOWED_ON_START_DATE(HttpStatus.BAD_REQUEST, "GROUP_052", "시작 당일에는 기존 일정을 교체할 수 없습니다."),
     GROUP_SCHEDULE_DURATION_EXCEEDED(HttpStatus.BAD_REQUEST, "GROUP_053", "일정은 계산 시작일로부터 3년 이내로 설정해야 합니다."),
     GROUP_READ_ORDER_RECONFIRMATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "GROUP_054", "읽기 순서를 변경할 수 없는 상태입니다."),
     GROUP_READ_ORDER_RECONFIRMATION_REQUIRED(HttpStatus.BAD_REQUEST, "GROUP_055", "읽기 순서를 먼저 재확인해야 합니다."),
     GROUP_JOIN_PERIOD_EXPIRED(HttpStatus.BAD_REQUEST, "GROUP_056", "시작일이 지난 모임에는 가입을 신청할 수 없습니다."),
+    GROUP_MANAGER_ONLY(HttpStatus.FORBIDDEN, "GROUP_057", "ACTIVE 모임장 또는 부모임장만 수행할 수 있는 작업입니다."),
 
     // 채팅 관련 에러
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

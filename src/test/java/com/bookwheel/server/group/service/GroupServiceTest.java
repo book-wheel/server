@@ -5,18 +5,22 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.group.dto.GroupCreateRequest;
 import com.bookwheel.server.group.dto.GroupCreateResponse;
+import com.bookwheel.server.group.dto.GroupDetailButtonType;
+import com.bookwheel.server.group.dto.GroupDetailResponse;
 import com.bookwheel.server.group.dto.member.GroupJoinRequest;
 import com.bookwheel.server.group.dto.search.GroupSearchCondition;
 import com.bookwheel.server.group.dto.search.GroupSearchResponse;
 import com.bookwheel.server.group.dto.setting.MemberRequestStatus;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.enums.State;
+import com.bookwheel.server.group.event.GroupJoinDecidedEvent;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.entity.Member;
 import com.bookwheel.server.member.enums.MemberRole;
 import com.bookwheel.server.member.enums.MemberStatus;
 import com.bookwheel.server.member.repository.MemberRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
+import com.bookwheel.server.schedule.service.RecruitingSchedulePlanSynchronizer;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +80,9 @@ class GroupServiceTest {
     private GroupMemberPermissionValidator memberPermissionValidator;
 
     @Mock
+    private RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
+
+    @Mock
     private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     private GroupService groupService;
@@ -90,6 +97,7 @@ class GroupServiceTest {
                 passwordEncoder,
                 eventPublisher,
                 memberPermissionValidator,
+                recruitingSchedulePlanSynchronizer,
                 recruitingScheduleAssignmentService,
                 FIXED_CLOCK
         );
@@ -126,8 +134,8 @@ class GroupServiceTest {
     }
 
     @Test
-    @DisplayName("일정 목표 인원을 채운 모임에는 가입 신청을 만들지 않는다")
-    void joinGroup_RejectsWhenTargetMemberCountReached() {
+    @DisplayName("일정 목표 인원을 채워도 모임 최대 정원 이하면 가입을 신청할 수 있다")
+    void joinGroup_AllowsWhenScheduleTargetMemberCountReached() {
         String groupId = "group-1";
         Group group = Group.builder()
                 .groupId(groupId)
@@ -140,17 +148,15 @@ class GroupServiceTest {
                 .build();
         given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
         given(userRepository.findById("member-user-pk")).willReturn(Optional.of(activeUser()));
+        given(memberRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> groupService.joinGroup(
+        groupService.joinGroup(
                 groupId,
                 new GroupJoinRequest(null, "가입하고 싶습니다"),
                 "member-user-pk"
-        ))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_EXCEEDED);
+        );
 
-        then(memberRepository).shouldHaveNoInteractions();
+        then(memberRepository).should().save(any());
     }
 
     @Test
@@ -246,6 +252,44 @@ class GroupServiceTest {
     }
 
     @Test
+    @DisplayName("현재 2명인 상태에서 일정을 생성해도 모임 최대 인원까지 추가 가입을 승인할 수 있다")
+    void updateMemberRequestStatus_AllowsApprovalUpToGroupMaxMembers() {
+        String groupId = "group-1";
+        String memberId = "pending-member";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("추가 모집 모임")
+                .groupPublic(true)
+                .maxMembers(10)
+                .targetMemberCount(2)
+                .currentMembers(2)
+                .startDate(LocalDate.now(FIXED_CLOCK).plusDays(7))
+                .groupState(State.RECRUITING)
+                .build();
+        Member pendingMember = Member.builder()
+                .memberId(memberId)
+                .group(group)
+                .user(activeUser())
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.PENDING)
+                .build();
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByMemberIdAndGroup_GroupId(memberId, groupId))
+                .willReturn(Optional.of(pendingMember));
+        groupService.updateMemberRequestStatus(
+                groupId,
+                memberId,
+                "leader-user-pk",
+                MemberRequestStatus.APPROVED
+        );
+
+        assertThat(pendingMember.getMemberStatus()).isEqualTo(MemberStatus.ACTIVE);
+        then(recruitingSchedulePlanSynchronizer).should().synchronizeToMaxMembers(group);
+        then(recruitingScheduleAssignmentService).should().refreshPlannedAssignments(group);
+        then(eventPublisher).should().publishEvent(any(GroupJoinDecidedEvent.class));
+    }
+
+    @Test
     @DisplayName("그룹 목록 D-day는 UTC 날짜가 아닌 KST 날짜를 기준으로 계산한다")
     void getGroups_CalculatesDdayWithKstClock() {
         Clock kstBoundaryClock = Clock.fixed(
@@ -260,6 +304,7 @@ class GroupServiceTest {
                 passwordEncoder,
                 eventPublisher,
                 memberPermissionValidator,
+                recruitingSchedulePlanSynchronizer,
                 recruitingScheduleAssignmentService,
                 kstBoundaryClock
         );
@@ -309,6 +354,51 @@ class GroupServiceTest {
             assertThat(expiredGroup.groupStateLabel()).isEqualTo("일정 재설정 필요");
             assertThat(expiredGroup.dday()).isNull();
         });
+    }
+
+    @Test
+    @DisplayName("부모임장은 모임 설정 버튼 상태를 반환한다")
+    void getGroup_ReturnsSettingButtonForSubLeader() {
+        String groupId = "group-1";
+        String userPK = "sub-leader-user-pk";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("독서 모임")
+                .maxMembers(5)
+                .groupState(State.RECRUITING)
+                .build();
+        Member subLeader = Member.builder()
+                .group(group)
+                .user(activeUser())
+                .memberRole(MemberRole.SUB_LEADER)
+                .memberStatus(MemberStatus.ACTIVE)
+                .build();
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, userPK))
+                .willReturn(Optional.of(subLeader));
+
+        GroupDetailResponse response = groupService.getGroup(groupId, userPK);
+
+        assertThat(response.bottomButtonType()).isEqualTo(GroupDetailButtonType.LEADER_SETTING);
+    }
+
+    @Test
+    @DisplayName("가입 요청 목록은 부모임장이 아닌 모임장 전용 권한을 검증한다")
+    void getMemberRequests_UsesLeaderOnlyPermission() {
+        String groupId = "group-1";
+        String userPK = "leader-user-pk";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("독서 모임")
+                .build();
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.PENDING))
+                .willReturn(List.of());
+
+        groupService.getMemberRequests(groupId, userPK);
+
+        then(memberPermissionValidator).should().validateLeader(groupId, userPK);
+        then(memberPermissionValidator).should(never()).validateManager(groupId, userPK);
     }
 
     private GroupCreateRequest groupCreateRequest(LocalDate startDate) {

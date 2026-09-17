@@ -288,6 +288,7 @@ public class GroupReadingCardService {
                 wheelState.getWheelState(),
                 book.getTitle(),
                 book.getCoverImage(),
+                wheelState.getOwnBook().getOwner().getNickname(),
                 wheelState.getOwnBook().getOwner().getNickname()
         );
     }
@@ -320,7 +321,8 @@ public class GroupReadingCardService {
                 wheelState.getWheelState(),
                 book.getTitle(),
                 book.getCoverImage(),
-                senderNickname
+                senderNickname,
+                wheelState.getOwnBook().getOwner().getNickname()
         );
     }
 

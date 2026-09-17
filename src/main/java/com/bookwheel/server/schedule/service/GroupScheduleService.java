@@ -64,7 +64,7 @@ public class GroupScheduleService {
     ) {
         Group group = findGroupByIdForUpdate(groupId);
         findActiveUserById(userPK);
-        memberPermissionValidator.validateLeader(groupId, userPK);
+        memberPermissionValidator.validateManager(groupId, userPK);
         LocalDate today = LocalDate.now(clock);
         validateRecruitingScheduleChange(group, today);
 
@@ -79,7 +79,7 @@ public class GroupScheduleService {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
         }
 
-        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+        int targetMemberCount = resolveScheduleTargetMemberCount(group);
 
         LocalDate requestedEndDate = request.endDate();
         if (requestedEndDate != null && requestedEndDate.isBefore(startDate)) {
@@ -148,11 +148,11 @@ public class GroupScheduleService {
     ) {
         Group group = findGroupById(groupId);
         findActiveUserById(userPK);
-        memberPermissionValidator.validateLeader(groupId, userPK);
+        memberPermissionValidator.validateManager(groupId, userPK);
         LocalDate today = LocalDate.now(clock);
         validateRecruitingScheduleChange(group, today);
 
-        int targetMemberCount = validateTargetMemberCount(group, request.targetMemberCount());
+        int targetMemberCount = resolveScheduleTargetMemberCount(group);
         Integer readingPeriod = request.readingPeriod();
         if (readingPeriod == null || readingPeriod < 1) {
             throw new BusinessException(ErrorCode.GROUP_READING_PERIOD_INVALID);
@@ -301,8 +301,8 @@ public class GroupScheduleService {
                 group.getStartDate(),
                 group.getReadingPeriod(),
                 group.getScheduleEndDate(),
-                deserializeExcludedDates(group.getScheduleExcludedDates()),
-                deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
+                ScheduleCalendarService.deserializeExcludedDates(group.getScheduleExcludedDates()),
+                ScheduleCalendarService.deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
                 scheduleStatus,
                 group.getScheduleReconfigurationStatus(),
                 resolvedTargetMemberCount,
@@ -423,18 +423,13 @@ public class GroupScheduleService {
         return readiness.ready() ? GroupScheduleStatus.READY : GroupScheduleStatus.CONFIGURED;
     }
 
-    private int validateTargetMemberCount(Group group, Integer targetMemberCount) {
-        long currentMemberCount = memberRepository.countByGroup_GroupIdAndMemberStatus(
-                group.getGroupId(),
-                MemberStatus.ACTIVE
-        );
-        // 목표 인원은 일정 틀의 상한이므로 현재 인원보다 작거나 모임 최대 인원보다 클 수 없다.
+    private int resolveScheduleTargetMemberCount(Group group) {
+        Integer targetMemberCount = group.getMaxMembers();
+        // 일정 생성 시점의 멤버 수가 아니라 모임 정원을 목표 인원으로 사용해
+        // 일정을 먼저 저장한 뒤에도 정원 내 추가 가입을 승인할 수 있게 한다.
         if (targetMemberCount == null
                 || targetMemberCount < 2
-                || targetMemberCount > Group.MAX_MEMBER_COUNT
-                || group.getMaxMembers() == null
-                || targetMemberCount > group.getMaxMembers()
-                || targetMemberCount < currentMemberCount) {
+                || targetMemberCount > Group.MAX_MEMBER_COUNT) {
             throw new BusinessException(ErrorCode.GROUP_SCHEDULE_TARGET_MEMBER_INVALID);
         }
         return targetMemberCount;
@@ -511,7 +506,7 @@ public class GroupScheduleService {
     }
 
     // 오늘이 예정 시작일인 그룹만 진행 중으로 변경한다.
-    // 당일에 조건을 충족하지 못한 그룹은 리더가 새 시작일을 설정할 때까지 RECRUITING을 유지한다.
+    // 당일에 조건을 충족하지 못한 그룹은 모임장 또는 부모임장이 새 시작일을 설정할 때까지 RECRUITING을 유지한다.
     @Transactional
     public int updateStartedGroupsToInProgress() {
         LocalDate localDate = LocalDate.now(clock);
@@ -531,9 +526,11 @@ public class GroupScheduleService {
 
             Group group = lockedGroup.get();
             boolean startsToday = localDate.equals(group.getStartDate());
-            if (group.getGroupState() == State.RECRUITING
-                    && startsToday
-                    && prepareStartableSchedule(group, localDate)) {
+            if (group.getGroupState() != State.RECRUITING || !startsToday) {
+                continue;
+            }
+
+            if (prepareStartableSchedule(group, localDate)) {
                 startableGroups.add(group);
             }
         }
@@ -632,15 +629,6 @@ public class GroupScheduleService {
                 .collect(Collectors.joining(","));
     }
 
-    private List<LocalDate> deserializeExcludedDates(String serializedDates) {
-        if (serializedDates == null || serializedDates.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(serializedDates.split(","))
-                .map(LocalDate::parse)
-                .toList();
-    }
-
     private String serializeExcludedDateRanges(List<ExcludedDateRange> excludedDateRanges) {
         if (excludedDateRanges == null || excludedDateRanges.isEmpty()) {
             return null;
@@ -648,16 +636,6 @@ public class GroupScheduleService {
         return excludedDateRanges.stream()
                 .map(range -> range.startDate() + ":" + range.endDate())
                 .collect(Collectors.joining(","));
-    }
-
-    private List<ExcludedDateRange> deserializeExcludedDateRanges(String serializedRanges) {
-        if (serializedRanges == null || serializedRanges.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(serializedRanges.split(","))
-                .map(serializedRange -> serializedRange.split(":"))
-                .map(parts -> new ExcludedDateRange(LocalDate.parse(parts[0]), LocalDate.parse(parts[1])))
-                .toList();
     }
 
     // 끝난 라운드를 종료시키는 로직
