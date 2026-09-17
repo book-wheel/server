@@ -113,7 +113,6 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 .socialId(userInfo.getSocialId())
                 .mail(userInfo.getEmail())
                 .nickname(tempNickname)
-                .profileImageKey(userInfo.getProfileImage())
                 .build();
 
         return userRepository.save(user);
