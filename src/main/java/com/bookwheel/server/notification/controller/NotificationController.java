@@ -78,7 +78,8 @@ public class NotificationController {
 
     @Operation(
             summary = "내 알림 설정 조회",
-            description = "카테고리별 수신 여부, 푸시 수신 여부와 현재 계정에 귀속된 Expo Push Token을 조회합니다. "
+            description = "사용자 계정 전체에 적용되는 카테고리별 수신 여부(채팅 포함), "
+                    + "푸시 수신 여부와 현재 계정에 귀속된 Expo Push Token을 조회합니다. "
                     + "로그아웃·명시적 해제·만료 토큰 처리 후에는 expoPushToken이 null입니다."
     )
     @GetMapping("/preferences")
@@ -88,7 +89,8 @@ public class NotificationController {
 
     @Operation(
             summary = "내 알림 설정 변경",
-            description = "카테고리·푸시 on/off와 Expo Push Token 등록·해제를 처리합니다. "
+            description = "사용자 계정 전체에 적용되는 카테고리·채팅·푸시 on/off와 "
+                    + "Expo Push Token 등록·해제를 처리합니다. "
                     + "expoPushToken은 ExpoPushToken[...] / ExponentPushToken[...] / UUID 형식을 지원합니다. "
                     + "유효한 토큰을 전달하면 등록·갱신하고, 같은 토큰의 이전 사용자 귀속은 자동 해제합니다. "
                     + "빈 문자열이면 해제하며, "

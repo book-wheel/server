@@ -14,6 +14,9 @@ public record NotificationPreferenceResponse(
         @Schema(description = "게시물·리뷰 커뮤니티 알림 수신 여부", example = "true", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean communityEnabled,
 
+        @Schema(description = "계정 전체 채팅 알림 수신 여부", example = "true", requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean chatEnabled,
+
         @Schema(description = "푸시 알림 수신 여부", example = "true", requiredMode = Schema.RequiredMode.REQUIRED)
         boolean pushEnabled,
 
@@ -30,6 +33,7 @@ public record NotificationPreferenceResponse(
                 Boolean.TRUE.equals(preference.getGroupEnabled()),
                 Boolean.TRUE.equals(preference.getRoundEnabled()),
                 Boolean.TRUE.equals(preference.getCommunityEnabled()),
+                Boolean.TRUE.equals(preference.getChatEnabled()),
                 Boolean.TRUE.equals(preference.getPushEnabled()),
                 preference.getExpoPushToken()
         );
