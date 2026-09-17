@@ -54,7 +54,9 @@ public class AuthController {
     @Operation(
             summary = "일반 회원가입 (Stage 1)",
             description = "이메일 인증 후 필수 동의와 현재 약관 버전을 함께 제출합니다. "
-                    + "마케팅 동의는 선택이며, 응답으로 프로필 설정 전용 온보딩 토큰을 반환합니다."
+                    + "마케팅 동의는 선택이며, 응답으로 프로필 설정 전용 온보딩 토큰을 반환합니다. "
+                    + "7일 안에 프로필을 완료하지 않으면 계정 정보는 삭제되지만, "
+                    + "이메일을 HMAC 처리한 식별자와 동의 증빙은 계정 삭제 시점부터 3년간 별도 보관됩니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -119,7 +121,8 @@ public class AuthController {
     @Operation(
             summary = "소셜 로그인 코드 교환",
             description = "일회용 코드와 PKCE verifier를 검증합니다. 최초 가입자는 "
-                    + "isFirstLogin=true와 온보딩 토큰을 받고, 현재 약관 동의 후 setup-profile을 호출해야 합니다."
+                    + "isFirstLogin=true와 온보딩 토큰을 받고, 현재 약관 동의 후 setup-profile을 호출해야 합니다. "
+                    + "미완료 계정은 7일 후 삭제되며 최초 동의 증빙은 삭제 시점부터 3년간 별도 보관됩니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -140,7 +143,8 @@ public class AuthController {
                 .body(ApiResponse.success(tokenResponse));
     }
 
-    @Operation(summary = "토큰 재발급", description = "만료된 Access Token 대신 Refresh Token을 이용해 새로운 토큰을 발급받습니다.")
+    @Operation(summary = "토큰 재발급", description = "만료된 Access Token 대신 Refresh Token을 요청 본문에 담아 "
+            + "새 Access Token을 발급받습니다. Refresh Token을 일반 API의 Bearer 토큰으로 사용할 수 없습니다.")
     @PostMapping("/reissue")
     public ApiResponse<TokenResponse> reissue(@Valid @RequestBody TokenReissueRequest request) {
         return ApiResponse.success(userService.reissue(request));
