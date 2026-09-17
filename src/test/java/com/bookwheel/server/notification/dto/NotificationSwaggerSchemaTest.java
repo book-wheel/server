@@ -63,10 +63,17 @@ class NotificationSwaggerSchemaTest {
                 .read(NotificationPreferenceResponse.class);
 
         assertThat(requestSchemas.get("NotificationPreferenceUpdateRequest").getProperties())
-                .containsKeys("groupEnabled", "roundEnabled", "communityEnabled", "pushEnabled", "expoPushToken")
+                .containsKeys(
+                        "groupEnabled",
+                        "roundEnabled",
+                        "communityEnabled",
+                        "chatEnabled",
+                        "pushEnabled",
+                        "expoPushToken"
+                )
                 .doesNotContainKey("fcmToken");
         assertThat(responseSchemas.get("NotificationPreferenceResponse").getProperties())
-                .containsKey("expoPushToken")
+                .containsKeys("chatEnabled", "expoPushToken")
                 .doesNotContainKey("fcmToken");
 
         Schema requestTokenSchema = (Schema) requestSchemas.get("NotificationPreferenceUpdateRequest")

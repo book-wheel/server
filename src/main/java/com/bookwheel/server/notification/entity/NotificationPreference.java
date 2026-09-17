@@ -39,6 +39,10 @@ public class NotificationPreference {
     private Boolean communityEnabled = true;
 
     @Builder.Default
+    @Column(name = "chat_enabled", nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean chatEnabled = true;
+
+    @Builder.Default
     @Column(name = "push_enabled", nullable = false)
     private Boolean pushEnabled = true;
 
@@ -76,11 +80,13 @@ public class NotificationPreference {
             Boolean groupEnabled,
             Boolean roundEnabled,
             Boolean communityEnabled,
+            Boolean chatEnabled,
             Boolean pushEnabled
     ) {
         if (groupEnabled != null) this.groupEnabled = groupEnabled;
         if (roundEnabled != null) this.roundEnabled = roundEnabled;
         if (communityEnabled != null) this.communityEnabled = communityEnabled;
+        if (chatEnabled != null) this.chatEnabled = chatEnabled;
         if (pushEnabled != null) this.pushEnabled = pushEnabled;
     }
 
