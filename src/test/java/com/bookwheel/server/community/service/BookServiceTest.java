@@ -412,6 +412,59 @@ class BookServiceTest {
     }
 
     @Test
+    @DisplayName("갤러리 대표 이미지에 썸네일 키가 있으면 원본이 아닌 썸네일로 Presigned URL을 만든다.")
+    void getGallery_UsesThumbnailKeyWhenPresent() {
+        String objectKey = "posts/1/abc_image.png";
+        String thumbnailKey = "posts/1/abc_image_thumb.jpg";
+        String presignedUrl = "https://bucket.s3.amazonaws.com/posts/1/abc_image_thumb.jpg?X-Amz-Signature=abc";
+
+        PostImage image = mock(PostImage.class);
+        given(image.getThumbnailKey()).willReturn(thumbnailKey);
+
+        stubSingleGalleryPost(image);
+        given(s3Service.getPresignedGetUrl(thumbnailKey)).willReturn(presignedUrl);
+
+        CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(null, null);
+
+        assertThat(response.content().get(0).thumbnailUrl()).isEqualTo(presignedUrl);
+        then(s3Service).should(never()).getPresignedGetUrl(objectKey);
+    }
+
+    @Test
+    @DisplayName("썸네일 키가 없는 과거 이미지는 원본 objectKey로 폴백한다.")
+    void getGallery_FallsBackToOriginalWhenThumbnailKeyIsMissing() {
+        String objectKey = "posts/1/abc_image.png";
+        String presignedUrl = "https://bucket.s3.amazonaws.com/posts/1/abc_image.png?X-Amz-Signature=abc";
+
+        PostImage image = mock(PostImage.class);
+        given(image.getThumbnailKey()).willReturn(null);
+        given(image.getObjectKey()).willReturn(objectKey);
+
+        stubSingleGalleryPost(image);
+        given(s3Service.getPresignedGetUrl(objectKey)).willReturn(presignedUrl);
+
+        CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(null, null);
+
+        assertThat(response.content().get(0).thumbnailUrl()).isEqualTo(presignedUrl);
+    }
+
+    // 갤러리 첫 페이지에 이미지 1장짜리 게시물 하나만 있는 상황을 만든다.
+    private void stubSingleGalleryPost(PostImage image) {
+        BookInfo bookInfo = mock(BookInfo.class);
+        given(bookInfo.getIsbn()).willReturn("9788934972464");
+
+        Post post = mock(Post.class);
+        given(post.getImages()).willReturn(List.of(image));
+        given(post.getBookInfo()).willReturn(bookInfo);
+        given(post.getPostId()).willReturn(10L);
+        given(post.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 14, 0, 0));
+
+        given(cursorUtils.decode(null, GalleryCursor.class)).willReturn(null);
+        given(postRepository.findGalleryPage(null, 19)).willReturn(List.of(post));
+        given(postRepository.countGalleryPosts()).willReturn(1L);
+    }
+
+    @Test
     @DisplayName("관심 도서가 없으면 빈 목록과 다음 페이지 없음을 반환한다.")
     void getInterestBooks_ReturnsEmptyPageWhenNoInterestBooks() {
         String userPK = UUID.randomUUID().toString();

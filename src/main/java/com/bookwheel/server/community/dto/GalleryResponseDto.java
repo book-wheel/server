@@ -3,6 +3,7 @@ package com.bookwheel.server.community.dto;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostImage;
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +45,12 @@ public record GalleryResponseDto(
             return null;
         }
 
-        return images.get(0).getObjectKey();
+        PostImage representative = images.get(0);
+
+        // 썸네일 도입 이전에 올라온 이미지는 축소본이 없다. 이때만 원본을 그대로 내려준다.
+        // 원본은 1.8MB 수준이라 18장 기준 한 화면이 33MB 가 되므로, 백필이 끝나면 이 경로는 비어야 한다.
+        return StringUtils.hasText(representative.getThumbnailKey())
+            ? representative.getThumbnailKey()
+            : representative.getObjectKey();
     }
 }

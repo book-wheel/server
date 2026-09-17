@@ -18,6 +18,8 @@ import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostComment;
+import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.image.PostThumbnailService;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
@@ -34,6 +36,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -54,6 +57,7 @@ class PostServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private S3Service s3Service;
     @Mock private CursorUtils cursorUtils;
+    @Mock private PostThumbnailService postThumbnailService;
 
     @InjectMocks
     private PostService postService;
@@ -165,6 +169,53 @@ class PostServiceTest {
 
         assertThat(response.isbn()).isEqualTo(pathIsbn);
         then(bookInfoRepository).should().findOrCreateByIsbn(pathIsbn);
+    }
+
+    @Test
+    @DisplayName("이미지를 저장한 뒤 썸네일 생성을 커밋 이후로 예약한다")
+    void create_SchedulesThumbnailGenerationAfterCommit() {
+        stubCreate(BookInfo.builder().isbn(ISBN).build());
+        String objectKey = "posts/" + ISBN + "/abc_image.png";
+        PostCreateRequest request =
+            new PostCreateRequest("Clean Code", "post content", List.of(objectKey), null);
+
+        postService.create(ISBN, request, UUID.randomUUID().toString());
+
+        ArgumentCaptor<Post> savedPost = ArgumentCaptor.forClass(Post.class);
+        then(postRepository).should().save(savedPost.capture());
+        List<PostImage> savedImages = savedPost.getValue().getImages();
+        assertThat(savedImages).hasSize(1);
+        assertThat(savedImages.get(0).getObjectKey()).isEqualTo(objectKey);
+
+        // 썸네일 키는 커밋 이후에 채워진다. 저장 시점에는 비어 있어야 한다.
+        assertThat(savedImages.get(0).getThumbnailKey()).isNull();
+        then(postThumbnailService).should().registerPostCommitThumbnailGeneration(savedImages);
+    }
+
+    @Test
+    @DisplayName("썸네일 생성은 게시물 저장 트랜잭션 안에서 MinIO를 호출하지 않는다")
+    void create_DoesNotCallThumbnailGenerationInline() {
+        stubCreate(BookInfo.builder().isbn(ISBN).build());
+        String objectKey = "posts/" + ISBN + "/abc_image.png";
+        PostCreateRequest request =
+            new PostCreateRequest("Clean Code", "post content", List.of(objectKey), null);
+
+        postService.create(ISBN, request, UUID.randomUUID().toString());
+
+        // 트랜잭션 안에서 돌면 모임 행 잠금과 DB 커넥션을 MinIO 왕복 내내 붙잡게 된다.
+        then(postThumbnailService).should(never()).createThumbnail(anyString());
+    }
+
+    @Test
+    @DisplayName("이미지가 없으면 썸네일 생성을 예약하지 않는다")
+    void create_SkipsThumbnailSchedulingWithoutImages() {
+        stubCreate(BookInfo.builder().isbn(ISBN).build());
+        PostCreateRequest request =
+            new PostCreateRequest("Clean Code", "post content", List.of(), null);
+
+        postService.create(ISBN, request, UUID.randomUUID().toString());
+
+        then(postThumbnailService).should().registerPostCommitThumbnailGeneration(List.of());
     }
 
     @Test

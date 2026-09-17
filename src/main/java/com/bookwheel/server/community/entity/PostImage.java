@@ -24,7 +24,17 @@ public class PostImage {
     @Column(name = "fileExtensions", nullable = false, length = 500)
     private String objectKey;
 
+    // 갤러리 목록에 쓰는 축소본의 objectKey.
+    // 썸네일 도입 이전에 올라온 이미지는 null 이며, 이때는 원본(objectKey)으로 폴백한다.
+    @Column(name = "thumbnail_key", length = 500)
+    private String thumbnailKey;
+
     public void setPost(Post post) {
         this.post = post;
+    }
+
+    // 썸네일 도입 이전에 올라온 이미지를 나중에 채워 넣기 위한 경로다.
+    public void applyThumbnailKey(String thumbnailKey) {
+        this.thumbnailKey = thumbnailKey;
     }
 }
