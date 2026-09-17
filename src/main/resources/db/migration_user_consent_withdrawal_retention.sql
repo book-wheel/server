@@ -107,6 +107,17 @@ CREATE TABLE IF NOT EXISTS user_consent_history (
     INDEX idx_consent_history_retention_until (retention_until)
 );
 
+-- 탈퇴자가 직접 삭제하지 않은 공개 콘텐츠는 남기고 회원과의 연결만 해제한다.
+-- MySQL의 UNIQUE 인덱스는 NULL을 여러 건 허용하므로 익명 리뷰 간 (book_info_id, user_id) 충돌이 없다.
+ALTER TABLE post
+    MODIFY COLUMN user_id VARCHAR(50) NULL;
+
+ALTER TABLE post_comment
+    MODIFY COLUMN user_id VARCHAR(50) NULL;
+
+ALTER TABLE book_review
+    MODIFY COLUMN user_id VARCHAR(50) NULL;
+
 -- 탈퇴자가 소유했던 도서와 다른 회원의 독서 기록을 보존하기 위한 익명 소유자다.
 INSERT IGNORE INTO users (
     id, login_id, password, nickname, mail, social_type, is_active, is_profile_set, created_at

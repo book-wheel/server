@@ -22,6 +22,7 @@ import com.bookwheel.server.community.repository.BookReviewRepository;
 import com.bookwheel.server.community.repository.BookVoteRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import com.bookwheel.server.notification.service.NotificationService;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
@@ -40,6 +41,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -127,12 +129,12 @@ public class BookService {
                 // 하트를 누르지 않은 상태면 -> 좋아요 추가
                 reviewLikeRepository.save(ReviewLike.create(review, user));
                 review.increaseLikeCount();
-                String reviewerUserPK = review.getReviewer().getId();
-                if (!reviewerUserPK.equals(userPK)) {
+                User reviewer = review.getReviewer();
+                if (!CommunityAuthorDisplay.isAnonymous(reviewer) && !reviewer.getId().equals(userPK)) {
                     eventPublisher.publishEvent(new ReviewLikedEvent(
                             review.getReviewId(),
                             review.getBookInfo().getIsbn(),
-                            reviewerUserPK,
+                            reviewer.getId(),
                             userPK,
                             user.getNickname()
                     ));
@@ -151,7 +153,8 @@ public class BookService {
         BookReview review = bookReviewRepository.findByReviewIdForUpdate(reviewId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
-        if (!review.getReviewer().getId().equals(userPK)) {
+        User reviewer = review.getReviewer();
+        if (CommunityAuthorDisplay.isAnonymous(reviewer) || !reviewer.getId().equals(userPK)) {
             throw new BusinessException(ErrorCode.REVIEW_DELETE_FORBIDDEN);
         }
 
@@ -258,7 +261,13 @@ public class BookService {
             : Set.copyOf(reviewLikeRepository.findLikedReviewIds(user, reviewIds));
 
         // 현재 페이지 리뷰 작성자들의 추천/비추천 투표를 한 번의 쿼리로 조회 (리뷰별 조회 N+1 방지)
-        List<String> reviewerPKs = reviews.stream().map(review -> review.getReviewer().getId()).distinct().toList();
+        List<String> reviewerPKs = reviews.stream()
+            .map(BookReview::getReviewer)
+            .filter(Objects::nonNull)
+            .filter(reviewer -> Boolean.TRUE.equals(reviewer.getIsActive()))
+            .map(User::getId)
+            .distinct()
+            .toList();
         Map<String, Boolean> voteByReviewerId = reviewerPKs.isEmpty()
             ? Map.of()
             : bookVoteRepository.findByBookInfoAndUserPKs(bookInfo, reviewerPKs).stream()
@@ -266,8 +275,11 @@ public class BookService {
 
         return reviews.map(review -> {
             boolean isLikedByMe = likedReviewIds.contains(review.getReviewId());
-            String profileImageUrl = getProfileImageUrl(review.getReviewer().getProfileImageKey());
-            Boolean isRecommended = voteByReviewerId.get(review.getReviewer().getId());
+            User reviewer = review.getReviewer();
+            String profileImageUrl = getProfileImageUrl(CommunityAuthorDisplay.profileImageKey(reviewer));
+            Boolean isRecommended = CommunityAuthorDisplay.isAnonymous(reviewer)
+                ? null
+                : voteByReviewerId.get(reviewer.getId());
 
             return ReviewDetailResponse.of(review, profileImageUrl, isLikedByMe, isRecommended);
         });

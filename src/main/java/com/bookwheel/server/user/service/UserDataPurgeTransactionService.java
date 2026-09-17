@@ -92,60 +92,27 @@ public class UserDataPurgeTransactionService {
                 .setParameter("userPK", userPK)
                 .executeUpdate();
 
-        // 작성 게시물의 종속 데이터와 사용자가 다른 게시물에 남긴 행동 기록을 함께 제거한다.
-        entityManager.createQuery("""
-                        delete from PostComment comment
-                        where comment.user.id = :userPK
-                           or comment.post.postId in (
-                               select post.postId from Post post where post.uploader.id = :userPK
-                           )
-                        """)
+        // 공개 게시글·댓글·리뷰와 첨부 이미지는 보존하고 작성자 연결만 해제한다.
+        // 탈퇴자가 다른 콘텐츠에 남긴 좋아요·신고 기록은 개인 행동 기록이므로 삭제한다.
+        adjustPostLikeCounts(userPK);
+        entityManager.createQuery("delete from PostLike postLike where postLike.user.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        adjustSurvivingPostLikeCounts(userPK);
-        entityManager.createQuery("""
-                        delete from PostLike postLike
-                        where postLike.user.id = :userPK
-                           or postLike.post.postId in (
-                               select post.postId from Post post where post.uploader.id = :userPK
-                           )
-                        """)
+        entityManager.createQuery("delete from PostReport report where report.reporter.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        entityManager.createQuery("""
-                        delete from PostReport report
-                        where report.reporter.id = :userPK
-                           or report.post.postId in (
-                               select post.postId from Post post where post.uploader.id = :userPK
-                           )
-                        """)
+        entityManager.createQuery("update PostComment comment set comment.user = null where comment.user.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        entityManager.createQuery("""
-                        delete from PostImage image
-                        where image.post.postId in (
-                            select post.postId from Post post where post.uploader.id = :userPK
-                        )
-                        """)
-                .setParameter("userPK", userPK)
-                .executeUpdate();
-        entityManager.createQuery("delete from Post post where post.uploader.id = :userPK")
+        entityManager.createQuery("update Post post set post.uploader = null where post.uploader.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
 
-        adjustSurvivingReviewLikeCounts(userPK);
-        entityManager.createQuery("""
-                        delete from ReviewLike reviewLike
-                        where reviewLike.user.id = :userPK
-                           or reviewLike.review.reviewId in (
-                               select review.reviewId
-                               from BookReview review
-                               where review.reviewer.id = :userPK
-                           )
-                        """)
+        adjustReviewLikeCounts(userPK);
+        entityManager.createQuery("delete from ReviewLike reviewLike where reviewLike.user.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        entityManager.createQuery("delete from BookReview review where review.reviewer.id = :userPK")
+        entityManager.createQuery("update BookReview review set review.reviewer = null where review.reviewer.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
         entityManager.createQuery("delete from BookVote vote where vote.user.id = :userPK")
@@ -211,13 +178,6 @@ public class UserDataPurgeTransactionService {
                 .getResultList());
         objectKeys.addAll(entityManager.createQuery("""
                         select image.objectKey
-                        from PostImage image
-                        where image.post.uploader.id = :userPK
-                        """, String.class)
-                .setParameter("userPK", userPK)
-                .getResultList());
-        objectKeys.addAll(entityManager.createQuery("""
-                        select image.objectKey
                         from WheelStateImage image
                         where image.wheelState.member.user.id = :userPK
                         """, String.class)
@@ -227,7 +187,7 @@ public class UserDataPurgeTransactionService {
         return objectKeys;
     }
 
-    private void adjustSurvivingPostLikeCounts(String userPK) {
+    private void adjustPostLikeCounts(String userPK) {
         entityManager.createNativeQuery("""
                         update post target_post
                         join (
@@ -240,13 +200,12 @@ public class UserDataPurgeTransactionService {
                             target_post.like_count - removed.removed_count,
                             0
                         )
-                        where target_post.user_id <> :userPK
                         """)
                 .setParameter("userPK", userPK)
                 .executeUpdate();
     }
 
-    private void adjustSurvivingReviewLikeCounts(String userPK) {
+    private void adjustReviewLikeCounts(String userPK) {
         entityManager.createNativeQuery("""
                         update book_review target_review
                         join (
@@ -259,7 +218,6 @@ public class UserDataPurgeTransactionService {
                             target_review.like_count - removed.removed_count,
                             0
                         )
-                        where target_review.user_id <> :userPK
                         """)
                 .setParameter("userPK", userPK)
                 .executeUpdate();

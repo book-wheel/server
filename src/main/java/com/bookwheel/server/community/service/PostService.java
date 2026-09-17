@@ -16,6 +16,7 @@ import com.bookwheel.server.community.entity.*;
 import com.bookwheel.server.community.event.PostCommentedEvent;
 import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.repository.*;
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import com.bookwheel.server.group.entity.Group;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.member.enums.MemberStatus;
@@ -73,11 +74,14 @@ public class PostService {
         List<PostComment> pageComments = hasNext ? comments.subList(0, pageSize) : comments;
 
         List<PostCommentResponse> content = pageComments.stream()
-            .map(comment -> PostCommentResponse.of(
-                comment,
-                getProfileImageUrl(comment.getUser().getProfileImageKey()),
-                comment.getUser().getId().equals(userPK)
-            ))
+            .map(comment -> {
+                User author = comment.getUser();
+                return PostCommentResponse.of(
+                    comment,
+                    getProfileImageUrl(CommunityAuthorDisplay.profileImageKey(author)),
+                    !CommunityAuthorDisplay.isAnonymous(author) && author.getId().equals(userPK)
+                );
+            })
             .toList();
 
         String nextCursor = hasNext ? createNextCommentCursor(pageComments) : null;
@@ -120,7 +124,8 @@ public class PostService {
         BookInfo bookInfo = post.getBookInfo();
         String isbn = bookInfo.getIsbn();
 
-        String profileImageUrl = getProfileImageUrl(post.getUploader().getProfileImageKey());
+        User uploader = post.getUploader();
+        String profileImageUrl = getProfileImageUrl(CommunityAuthorDisplay.profileImageKey(uploader));
 
         List<String> imageUrls = post.getImages().stream()
             .map(image -> s3Service.getPresignedGetUrl(image.getObjectKey()))
@@ -128,14 +133,14 @@ public class PostService {
 
         long commentCount = postCommentRepository.countByPost(post);
         boolean isLikedByMe = postLikeRepository.existsByPostAndUser(post, user);
-        boolean isMine = userPK.equals(post.getUploader().getId());
+        boolean isMine = !CommunityAuthorDisplay.isAnonymous(uploader) && userPK.equals(uploader.getId());
         // 모임에서 작성한 게시물이면 모임 이름, 개인 작성이면 null
         String groupName = post.getGroup() != null ? post.getGroup().getGroupName() : null;
 
         return new PostDetailResponse(
             post.getPostId(),
             isbn,
-            post.getUploader().getNickname(),
+            CommunityAuthorDisplay.displayName(uploader),
             profileImageUrl,
             groupName,
             post.getBookTitle(),
@@ -240,11 +245,11 @@ public class PostService {
                 () -> {
                     postLikeRepository.save(PostLike.create(post, user));
                     post.increaseLikeCount();
-                    String ownerUserPK = post.getUploader().getId();
-                    if (!ownerUserPK.equals(userPK)) {
+                    User uploader = post.getUploader();
+                    if (!CommunityAuthorDisplay.isAnonymous(uploader) && !uploader.getId().equals(userPK)) {
                         eventPublisher.publishEvent(new PostLikedEvent(
                                 post.getPostId(),
-                                ownerUserPK,
+                                uploader.getId(),
                                 userPK,
                                 user.getNickname()
                         ));
@@ -266,11 +271,11 @@ public class PostService {
 
         postCommentRepository.save(comment);
 
-        String ownerUserPK = post.getUploader().getId();
-        if (!ownerUserPK.equals(userPK)) {
+        User uploader = post.getUploader();
+        if (!CommunityAuthorDisplay.isAnonymous(uploader) && !uploader.getId().equals(userPK)) {
             eventPublisher.publishEvent(new PostCommentedEvent(
                     post.getPostId(),
-                    ownerUserPK,
+                    uploader.getId(),
                     userPK,
                     user.getNickname(),
                     comment.getContent()
@@ -283,7 +288,8 @@ public class PostService {
         PostComment comment = postCommentRepository.findByPostCommentIdAndPost_PostId(commentId, postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_COMMENT_NOT_FOUND));
 
-        if (!comment.getUser().getId().equals(userPK)) {
+        User author = comment.getUser();
+        if (CommunityAuthorDisplay.isAnonymous(author) || !author.getId().equals(userPK)) {
             throw new BusinessException(ErrorCode.POST_COMMENT_DELETE_FORBIDDEN);
         }
 
@@ -295,7 +301,8 @@ public class PostService {
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
-        if (!post.getUploader().getId().equals(userPK)) {
+        User uploader = post.getUploader();
+        if (CommunityAuthorDisplay.isAnonymous(uploader) || !uploader.getId().equals(userPK)) {
             throw new BusinessException(ErrorCode.POST_DELETE_FORBIDDEN);
         }
 
@@ -311,7 +318,8 @@ public class PostService {
         User user = userRepository.findById(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if (post.getUploader().getId().equals(user.getId())) {
+        User uploader = post.getUploader();
+        if (!CommunityAuthorDisplay.isAnonymous(uploader) && uploader.getId().equals(user.getId())) {
             throw new BusinessException(ErrorCode.CANNOT_REPORT_OWN_POST);
         }
 

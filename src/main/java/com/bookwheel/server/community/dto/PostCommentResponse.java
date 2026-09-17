@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.dto;
 
 import com.bookwheel.server.community.entity.PostComment;
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ public record PostCommentResponse(
     @Schema(description = "게시물 ID", example = "10")
     Long postId,
 
-    @Schema(description = "작성자 닉네임", example = "문소희")
+    @Schema(description = "작성자 닉네임 (탈퇴 후 '탈퇴한 사용자')", example = "문소희")
     String author,
 
     @Schema(description = "작성자 프로필 이미지 URL (없으면 null)", nullable = true)
@@ -32,7 +33,7 @@ public record PostCommentResponse(
         return new PostCommentResponse(
             comment.getPostCommentId(),
             comment.getPost().getPostId(),
-            comment.getUser().getNickname(),
+            CommunityAuthorDisplay.displayName(comment.getUser()),
             profileImageUrl,
             comment.getContent(),
             isMine,

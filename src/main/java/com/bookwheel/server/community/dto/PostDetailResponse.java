@@ -13,7 +13,7 @@ public record PostDetailResponse(
     @Schema(description = "도서 ISBN", example = "9791161571188")
     String isbn,
 
-    @Schema(description = "작성자 닉네임", example = "문소희")
+    @Schema(description = "작성자 닉네임 (탈퇴 후 '탈퇴한 사용자')", example = "문소희")
     String author,
 
     @Schema(description = "작성자 프로필 이미지 URL (없으면 null)", nullable = true)

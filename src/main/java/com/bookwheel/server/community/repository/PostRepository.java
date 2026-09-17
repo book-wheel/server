@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface PostRepository extends JpaRepository<Post, Long>, PostRepositoryCustom {
 
     @Query("SELECT p FROM Post p " +
-        "JOIN FETCH p.uploader " +
+        "LEFT JOIN FETCH p.uploader " +
         "JOIN FETCH p.bookInfo")
     List<Post> findAllWithDetails();
 

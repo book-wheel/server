@@ -37,6 +37,7 @@ import com.bookwheel.server.community.event.ReviewLikedEvent;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.BookLikeRepository;
 import com.bookwheel.server.community.repository.BookReviewRepository;
+import com.bookwheel.server.community.repository.BookVoteRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.community.entity.BookReview;
 import com.bookwheel.server.community.repository.ReviewLikeRepository;
@@ -61,6 +62,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 
 @ExtendWith(MockitoExtension.class)
 class BookServiceTest {
@@ -68,6 +70,7 @@ class BookServiceTest {
     @Mock private BookInfoRepository bookInfoRepository;
     @Mock private UserRepository userRepository;
     @Mock private BookReviewRepository bookReviewRepository;
+    @Mock private BookVoteRepository bookVoteRepository;
     @Mock private ReviewLikeRepository reviewLikeRepository;
     @Mock private NotificationService notificationService;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -560,6 +563,57 @@ class BookServiceTest {
         assertThat(captor.getValue().reviewerUserPK()).isEqualTo(reviewer.getId());
     }
 
+    @Test
+    @DisplayName("탈퇴자의 리뷰에 공감해도 알림 이벤트를 발행하지 않는다")
+    void toggleReviewLike_SkipsNotificationForAnonymousReviewer() {
+        String userPK = UUID.randomUUID().toString();
+        User user = mock(User.class);
+        BookReview review = BookReview.builder()
+                .reviewId(9L)
+                .bookInfo(BookInfo.builder().isbn("9788954681179").build())
+                .content("보존된 리뷰")
+                .isHidden(false)
+                .build();
+
+        given(bookReviewRepository.findById(9L)).willReturn(Optional.of(review));
+        given(userRepository.findById(userPK)).willReturn(Optional.of(user));
+        given(reviewLikeRepository.findByReviewAndUser(review, user)).willReturn(Optional.empty());
+
+        bookService.toggleReviewLike(9L, userPK);
+
+        assertThat(review.getLikeCount()).isEqualTo(1);
+        then(eventPublisher).should(never()).publishEvent(any(ReviewLikedEvent.class));
+    }
+
+    @Test
+    @DisplayName("익명 리뷰도 목록에서 탈퇴한 사용자로 노출된다")
+    void getReviewList_IncludesAnonymousReview() {
+        String isbn = "9788954681179";
+        String userPK = UUID.randomUUID().toString();
+        User viewer = mock(User.class);
+        BookInfo bookInfo = BookInfo.builder().isbn(isbn).build();
+        BookReview review = BookReview.builder()
+                .reviewId(9L)
+                .bookInfo(bookInfo)
+                .content("보존된 리뷰")
+                .isHidden(false)
+                .build();
+
+        given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
+        given(bookInfoRepository.findByIsbn(isbn)).willReturn(Optional.of(bookInfo));
+        given(bookReviewRepository.findAllByBookInfo(eq(bookInfo), any()))
+                .willReturn(new PageImpl<>(List.of(review)));
+        given(reviewLikeRepository.findLikedReviewIds(viewer, List.of(9L))).willReturn(List.of());
+
+        var response = bookService.getReviewList(isbn, "latest", 0, 10, userPK);
+
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().get(0).reviewerName()).isEqualTo("탈퇴한 사용자");
+        assertThat(response.getContent().get(0).profileImageUrl()).isNull();
+        assertThat(response.getContent().get(0).isRecommended()).isNull();
+        then(bookVoteRepository).should(never()).findByBookInfoAndUserPKs(any(), anyList());
+    }
+
     private InterestBookResponseDto interestBook(Long bookInfoId, String isbn, LocalDateTime interestedAt) {
         return new InterestBookResponseDto(
                 bookInfoId,
@@ -665,6 +719,7 @@ class BookServiceTest {
         given(bookReviewRepository.findByReviewIdForUpdate(reviewId)).willReturn(Optional.of(review));
         given(review.getReviewer()).willReturn(reviewer);
         given(reviewer.getId()).willReturn(userPK);
+        given(reviewer.getIsActive()).willReturn(true);
 
         bookService.deleteReview(reviewId, userPK);
 
@@ -685,6 +740,27 @@ class BookServiceTest {
         given(bookReviewRepository.findByReviewIdForUpdate(reviewId)).willReturn(Optional.of(review));
         given(review.getReviewer()).willReturn(reviewer);
         given(reviewer.getId()).willReturn(UUID.randomUUID().toString());
+        given(reviewer.getIsActive()).willReturn(true);
+
+        assertThatThrownBy(() -> bookService.deleteReview(reviewId, userPK))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.REVIEW_DELETE_FORBIDDEN));
+
+        then(notificationService).shouldHaveNoInteractions();
+        then(reviewLikeRepository).shouldHaveNoInteractions();
+        then(bookReviewRepository).should(never()).delete(any(BookReview.class));
+    }
+
+    @Test
+    @DisplayName("작성자 연결이 해제된 리뷰는 일반 회원이 삭제할 수 없다")
+    void deleteReview_RejectsAnonymousReview() {
+        Long reviewId = 5L;
+        String userPK = UUID.randomUUID().toString();
+        BookReview review = mock(BookReview.class);
+
+        given(bookReviewRepository.findByReviewIdForUpdate(reviewId)).willReturn(Optional.of(review));
+        given(review.getReviewer()).willReturn(null);
 
         assertThatThrownBy(() -> bookService.deleteReview(reviewId, userPK))
                 .isInstanceOf(BusinessException.class)
