@@ -147,6 +147,18 @@ class UserConsentServiceTest {
     }
 
     @Test
+    @DisplayName("미완료 계정 삭제 시에도 동의 증빙을 삭제 시점부터 3년 보관한다")
+    void scheduleRetentionFromAccountDeletionUsesServerTime() {
+        service.scheduleRetentionFromAccountDeletion("user-pk");
+
+        then(repository).should().scheduleRetentionByUserPK(
+                "user-pk",
+                NOW,
+                NOW.plusYears(3)
+        );
+    }
+
+    @Test
     @DisplayName("분쟁 당사자 이메일을 HMAC으로 변환해 동의 증빙을 조회한다")
     void findEvidenceBySubjectEmailUsesProtectedIdentifier() {
         given(repository.findAllBySubjectIdentifierHashInOrderByAgreedAtAsc(

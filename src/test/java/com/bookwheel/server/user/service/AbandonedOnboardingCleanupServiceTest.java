@@ -2,7 +2,6 @@ package com.bookwheel.server.user.service;
 
 import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.entity.User;
-import com.bookwheel.server.user.repository.UserConsentHistoryRepository;
 import com.bookwheel.server.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,13 +18,13 @@ import static org.mockito.Mockito.mock;
 class AbandonedOnboardingCleanupServiceTest {
 
     @Test
-    @DisplayName("7일 넘게 프로필을 완료하지 않은 계정과 동의 이력을 함께 삭제한다")
-    void deletesAbandonedAccountAndConsentEvidence() {
+    @DisplayName("7일 넘게 프로필을 완료하지 않은 계정은 삭제하고 동의 증빙은 3년 보관을 예약한다")
+    void deletesAbandonedAccountAndRetainsConsentEvidence() {
         UserRepository userRepository = mock(UserRepository.class);
-        UserConsentHistoryRepository consentRepository = mock(UserConsentHistoryRepository.class);
+        UserConsentService userConsentService = mock(UserConsentService.class);
         S3DeletionQueueService queueService = mock(S3DeletionQueueService.class);
         AbandonedOnboardingCleanupService service = new AbandonedOnboardingCleanupService(
-                userRepository, consentRepository, queueService
+                userRepository, userConsentService, queueService
         );
         User user = User.builder()
                 .loginId("incomplete")
@@ -43,7 +42,7 @@ class AbandonedOnboardingCleanupServiceTest {
                 user.getId(), LocalDateTime.of(2026, 9, 10, 0, 0)
         )).isTrue();
 
-        then(consentRepository).should().deleteByUserPK(user.getId());
+        then(userConsentService).should().scheduleRetentionFromAccountDeletion(user.getId());
         then(userRepository).should().delete(user);
         then(userRepository).should().flush();
     }

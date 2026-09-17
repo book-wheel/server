@@ -87,8 +87,8 @@ public class UserConsentHistory {
     @Column(name = "consent_source", length = 30, nullable = false, updatable = false)
     private ConsentSource consentSource;
 
-    @Column(name = "withdrawal_requested_at")
-    private LocalDateTime withdrawalRequestedAt;
+    @Column(name = "retention_started_at")
+    private LocalDateTime retentionStartedAt;
 
     @Column(name = "retention_until")
     private LocalDateTime retentionUntil;

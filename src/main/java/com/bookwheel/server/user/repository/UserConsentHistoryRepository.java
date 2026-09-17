@@ -19,17 +19,15 @@ public interface UserConsentHistoryRepository extends JpaRepository<UserConsentH
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update UserConsentHistory history
-               set history.withdrawalRequestedAt = :withdrawalRequestedAt,
+               set history.retentionStartedAt = :retentionStartedAt,
                    history.retentionUntil = :retentionUntil
              where history.userPK = :userPK
             """)
     int scheduleRetentionByUserPK(
             @Param("userPK") String userPK,
-            @Param("withdrawalRequestedAt") LocalDateTime withdrawalRequestedAt,
+            @Param("retentionStartedAt") LocalDateTime retentionStartedAt,
             @Param("retentionUntil") LocalDateTime retentionUntil
     );
 
     long deleteByRetentionUntilLessThanEqual(LocalDateTime now);
-
-    long deleteByUserPK(String userPK);
 }

@@ -99,13 +99,44 @@ CREATE TABLE IF NOT EXISTS user_consent_history (
     marketing_document_hash CHAR(64) NULL,
     agreed_at DATETIME(6) NOT NULL,
     consent_source VARCHAR(30) NOT NULL,
-    withdrawal_requested_at DATETIME(6) NULL,
+    retention_started_at DATETIME(6) NULL,
     retention_until DATETIME(6) NULL,
     PRIMARY KEY (consent_record_pk),
     INDEX idx_consent_history_user_pk (user_pk),
     INDEX idx_consent_history_subject_hash (subject_identifier_hash),
     INDEX idx_consent_history_retention_until (retention_until)
 );
+
+-- 이전 마이그레이션 초안을 실행한 DB의 컬럼명도 일반화한다.
+SET @consent_retention_started_at_count = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'user_consent_history'
+      AND COLUMN_NAME = 'retention_started_at'
+);
+SET @consent_withdrawal_requested_at_count = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'user_consent_history'
+      AND COLUMN_NAME = 'withdrawal_requested_at'
+);
+SET @consent_retention_started_at_ddl = IF(
+    @consent_retention_started_at_count = 0 AND @consent_withdrawal_requested_at_count > 0,
+    'ALTER TABLE user_consent_history CHANGE COLUMN withdrawal_requested_at retention_started_at DATETIME(6) NULL',
+    IF(
+        @consent_retention_started_at_count = 0,
+        'ALTER TABLE user_consent_history ADD COLUMN retention_started_at DATETIME(6) NULL',
+        'DO 0'
+    )
+);
+PREPARE consent_retention_started_at_statement FROM @consent_retention_started_at_ddl;
+EXECUTE consent_retention_started_at_statement;
+DEALLOCATE PREPARE consent_retention_started_at_statement;
+
+-- 프로필 미완료 계정을 7일 후 삭제해도 동의 증빙은 삭제하지 않는다.
+-- 앱이 보관 시작·만료 시각을 설정하고, 만료된 증빙만 보유 정리 스케줄러가 삭제한다.
 
 -- 탈퇴자가 직접 삭제하지 않은 공개 콘텐츠는 남기고 회원과의 연결만 해제한다.
 -- MySQL의 UNIQUE 인덱스는 NULL을 여러 건 허용하므로 익명 리뷰 간 (book_info_id, user_id) 충돌이 없다.

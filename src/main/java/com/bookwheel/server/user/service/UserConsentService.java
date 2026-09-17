@@ -76,12 +76,17 @@ public class UserConsentService {
     }
 
     @Transactional
-    public void scheduleRetention(String userPK, LocalDateTime withdrawalRequestedAt) {
+    public void scheduleRetention(String userPK, LocalDateTime retentionStartedAt) {
         consentHistoryRepository.scheduleRetentionByUserPK(
                 userPK,
-                withdrawalRequestedAt,
-                withdrawalRequestedAt.plusYears(CONSENT_RETENTION_YEARS)
+                retentionStartedAt,
+                retentionStartedAt.plusYears(CONSENT_RETENTION_YEARS)
         );
+    }
+
+    @Transactional
+    public void scheduleRetentionFromAccountDeletion(String userPK) {
+        scheduleRetention(userPK, LocalDateTime.now(clock));
     }
 
     @Transactional
