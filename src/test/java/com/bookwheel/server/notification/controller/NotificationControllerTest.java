@@ -47,7 +47,7 @@ class NotificationControllerTest {
     @DisplayName("알림 설정 API에서 빈 문자열로 Expo Push Token을 해제한다")
     void updatePreferencesAcceptsTokenRemoval() throws Exception {
         given(preferenceService.update(eq("userPK"), any(NotificationPreferenceUpdateRequest.class)))
-                .willReturn(new NotificationPreferenceResponse(true, true, true, true, null));
+                .willReturn(new NotificationPreferenceResponse(true, true, true, true, true, null));
 
         mockMvc.perform(put("/api/v1/notifications/preferences")
                         .with(csrf())
@@ -58,7 +58,27 @@ class NotificationControllerTest {
 
         verify(preferenceService).update(
                 "userPK",
-                new NotificationPreferenceUpdateRequest(null, null, null, null, "")
+                new NotificationPreferenceUpdateRequest(null, null, null, null, null, "")
+        );
+    }
+
+    @Test
+    @WithMockUser(username = "userPK")
+    @DisplayName("알림 설정 API에서 계정 전체 채팅 알림 설정을 변경한다")
+    void updatePreferencesAcceptsChatEnabled() throws Exception {
+        given(preferenceService.update(eq("userPK"), any(NotificationPreferenceUpdateRequest.class)))
+                .willReturn(new NotificationPreferenceResponse(true, true, true, false, true, null));
+
+        mockMvc.perform(put("/api/v1/notifications/preferences")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"chatEnabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chatEnabled").value(false));
+
+        verify(preferenceService).update(
+                "userPK",
+                new NotificationPreferenceUpdateRequest(null, null, null, false, null, null)
         );
     }
 

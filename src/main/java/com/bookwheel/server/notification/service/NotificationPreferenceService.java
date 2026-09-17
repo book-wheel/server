@@ -94,6 +94,7 @@ public class NotificationPreferenceService {
                 request.groupEnabled(),
                 request.roundEnabled(),
                 request.communityEnabled(),
+                request.chatEnabled(),
                 request.pushEnabled()
         );
         if (requestedToken != null) {
