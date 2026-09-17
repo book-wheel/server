@@ -10,6 +10,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ public class PostThumbnailService {
 
     // 게시물 저장 트랜잭션이 커밋된 뒤에 썸네일을 만들어 반영한다.
     //
-    // 생성 한 건은 MinIO 왕복 2회(원본 다운로드 + 썸네일 업로드)라 이미지 5장이면 수 초가 걸린다.
+    // 생성 한 건은 MinIO 왕복 2회(원본 다운로드 + 썸네일 업로드)가 필요하다.
     // 이 작업을 게시물 작성 트랜잭션 안에서 돌리면 그동안 모임 행 잠금(findByGroupIdForUpdate)과
     // DB 커넥션을 붙잡아, 같은 모임에 동시에 글을 쓰는 사람이 잠금 대기로 막힌다.
     // 커밋 이후로 미루면 롤백된 게시물의 썸네일이 MinIO 에 남는 문제도 함께 사라진다.
@@ -36,10 +37,19 @@ public class PostThumbnailService {
             throw new IllegalStateException("썸네일 생성은 트랜잭션 커밋 이후에만 실행할 수 있습니다.");
         }
 
+        // 조회 및 백필과 동일하게 최소 이미지 ID를 대표로 사용한다.
+        PostImage representative = images.stream()
+                .filter(image -> image.getPostImageId() != null)
+                .min(Comparator.comparing(PostImage::getPostImageId))
+                .orElse(null);
+        if (representative == null) {
+            return;
+        }
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                generateAndStore(images);
+                generateAndStore(List.of(representative));
             }
         });
     }

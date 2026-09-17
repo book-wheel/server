@@ -117,7 +117,7 @@ class PostThumbnailServiceTest {
         given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(800, 600));
 
         postThumbnailService.registerPostCommitThumbnailGeneration(
-                List.of(postImage(1L, ORIGINAL_KEY)));
+                List.of(postImage(2L, "posts/other.png"), postImage(1L, ORIGINAL_KEY)));
 
         // 아직 커밋 전이다.
         then(s3Service).should(never()).getObjectBytes(anyString(), anyLong());
@@ -127,21 +127,22 @@ class PostThumbnailServiceTest {
 
         then(s3Service).should().putObject(eq(THUMBNAIL_KEY), any(), anyString());
         then(postThumbnailStore).should().applyThumbnailKeys(Map.of(1L, THUMBNAIL_KEY));
+        then(s3Service).should(never()).getObjectBytes(eq("posts/other.png"), anyLong());
     }
 
     @Test
-    @DisplayName("썸네일 생성이 실패한 이미지는 반영 대상에서 빠진다")
+    @DisplayName("대표 이미지 생성에 실패해도 두 번째 이미지로 교체하지 않는다")
     void registerPostCommitThumbnailGeneration_SkipsFailedImage() {
         TransactionSynchronizationManager.initSynchronization();
         String brokenKey = "posts/9791161571188/broken_image.png";
         given(s3Service.getObjectBytes(brokenKey, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn("not an image".getBytes());
-        given(s3Service.getObjectBytes(ORIGINAL_KEY, PostThumbnailGenerator.MAX_SOURCE_BYTES)).willReturn(createImage(800, 600));
 
         postThumbnailService.registerPostCommitThumbnailGeneration(
                 List.of(postImage(1L, brokenKey), postImage(2L, ORIGINAL_KEY)));
         triggerAfterCommit();
 
-        then(postThumbnailStore).should().applyThumbnailKeys(Map.of(2L, THUMBNAIL_KEY));
+        then(postThumbnailStore).should().applyThumbnailKeys(Map.of());
+        then(s3Service).should(never()).getObjectBytes(eq(ORIGINAL_KEY), anyLong());
     }
 
     @Test

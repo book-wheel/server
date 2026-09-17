@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// 썸네일 도입 이전에 올라온 이미지의 축소본을 한 번에 만들어 둔다.
+// 썸네일 도입 이전에 올라온 게시물의 대표 이미지 축소본을 한 번에 만들어 둔다.
 //
 // 기본값은 꺼짐이다. 랩 서버에서 한 번만 돌리고 다시 끈다.
 //   docker compose 환경변수에 POST_THUMBNAIL_BACKFILL_ENABLED=true 를 넣고 backend 를 재기동한 뒤,
@@ -43,7 +43,7 @@ public class PostThumbnailBackfillRunner implements ApplicationRunner {
         try {
             while (true) {
                 List<PostImage> batch = postImageRepository
-                        .findByThumbnailKeyIsNullAndPostImageIdGreaterThan(lastPostImageId, batchRequest);
+                        .findRepresentativesMissingThumbnailAfter(lastPostImageId, batchRequest);
                 if (batch.isEmpty()) {
                     break;
                 }

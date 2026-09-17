@@ -67,24 +67,24 @@ class PostThumbnailBackfillRunnerTest {
     void run_AdvancesCursorPastProcessedRows() {
         PostImage first = postImage(7L, "posts/1/a_image.png");
         PostImage second = postImage(9L, "posts/1/b_image.png");
-        given(postImageRepository.findByThumbnailKeyIsNullAndPostImageIdGreaterThan(eq(0L), any(Pageable.class)))
+        given(postImageRepository.findRepresentativesMissingThumbnailAfter(eq(0L), any(Pageable.class)))
                 .willReturn(List.of(first));
-        given(postImageRepository.findByThumbnailKeyIsNullAndPostImageIdGreaterThan(eq(7L), any(Pageable.class)))
+        given(postImageRepository.findRepresentativesMissingThumbnailAfter(eq(7L), any(Pageable.class)))
                 .willReturn(List.of(second));
-        given(postImageRepository.findByThumbnailKeyIsNullAndPostImageIdGreaterThan(eq(9L), any(Pageable.class)))
+        given(postImageRepository.findRepresentativesMissingThumbnailAfter(eq(9L), any(Pageable.class)))
                 .willReturn(List.of());
         given(postThumbnailService.createThumbnail(anyString())).willReturn("posts/1/any_thumb.jpg");
 
         runner.run(null);
 
         then(postImageRepository).should()
-                .findByThumbnailKeyIsNullAndPostImageIdGreaterThan(eq(9L), any(Pageable.class));
+                .findRepresentativesMissingThumbnailAfter(eq(9L), any(Pageable.class));
     }
 
     @Test
     @DisplayName("대상이 없으면 아무 것도 저장하지 않는다")
     void run_DoesNothingWhenNoTargets() {
-        given(postImageRepository.findByThumbnailKeyIsNullAndPostImageIdGreaterThan(eq(0L), any(Pageable.class)))
+        given(postImageRepository.findRepresentativesMissingThumbnailAfter(eq(0L), any(Pageable.class)))
                 .willReturn(List.of());
 
         runner.run(null);
@@ -96,9 +96,9 @@ class PostThumbnailBackfillRunnerTest {
     // 첫 조회에서 batch 를 돌려주고, 그 다음 조회부터는 비운다.
     private void givenBatches(List<PostImage> batch) {
         long lastPostImageId = batch.get(batch.size() - 1).getPostImageId();
-        given(postImageRepository.findByThumbnailKeyIsNullAndPostImageIdGreaterThan(eq(0L), any(Pageable.class)))
+        given(postImageRepository.findRepresentativesMissingThumbnailAfter(eq(0L), any(Pageable.class)))
                 .willReturn(batch);
-        given(postImageRepository.findByThumbnailKeyIsNullAndPostImageIdGreaterThan(
+        given(postImageRepository.findRepresentativesMissingThumbnailAfter(
                 eq(lastPostImageId), any(Pageable.class)))
                 .willReturn(List.of());
     }
