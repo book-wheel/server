@@ -16,7 +16,7 @@ public record PostDetailResponse(
     @Schema(description = "작성자 닉네임 (탈퇴 후 '탈퇴한 사용자')", example = "문소희")
     String author,
 
-    @Schema(description = "작성자 프로필 이미지 URL (없으면 null)", nullable = true)
+    @Schema(description = "작성자 프로필 이미지 URL. 작성자 탈퇴 시 null", nullable = true)
     String profileImageUrl,
 
     @Schema(description = "모임 이름 (모임에서 작성한 글이면 모임명, 개인 작성이면 null)", nullable = true)
@@ -40,7 +40,7 @@ public record PostDetailResponse(
     @Schema(description = "로그인 사용자의 좋아요 여부", example = "true")
     boolean isLikedByMe,
 
-    @Schema(description = "로그인 사용자의 게시글 작성자 여부", example = "true")
+    @Schema(description = "로그인 사용자의 게시글 작성자 여부. 작성자 탈퇴 시 false", example = "true")
     boolean isMine,
 
     @Schema(description = "작성 일시")

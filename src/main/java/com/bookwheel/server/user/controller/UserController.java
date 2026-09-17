@@ -6,6 +6,7 @@ import com.bookwheel.server.common.response.ApiResponse;
 import com.bookwheel.server.user.dto.*;
 import com.bookwheel.server.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,17 @@ public class UserController {
                     + "함께 전달해야 하며, 기존 프로필 수정에서는 동의 필드를 생략할 수 있습니다. "
                     + "최초 설정 완료 시 일반 Access Token과 Refresh Token을 발급합니다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+                    description = "프로필 설정 완료. 일반 Access Token과 Refresh Token 발급"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "필수 동의/약관 버전 누락 또는 프로필 입력값 오류 "
+                            + "(AUTH_025, AUTH_026, AUTH_027 등)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
+                    description = "온보딩 토큰이 유효하지 않거나 이미 사용됨 (AUTH_011)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409",
+                    description = "제출한 약관 버전이 현재 버전과 다름. 약관 재조회 후 재동의 필요 (AUTH_028)")
+    })
     @PatchMapping("/setup-profile")
     public ApiResponse<LoginResponse> setupProfile(
             @AuthenticationPrincipal Object principal,
@@ -83,9 +95,19 @@ public class UserController {
 
     @Operation(
             summary = "회원 탈퇴",
-            description = "비밀번호 확인 후 계정을 즉시 비활성화하고 30일 후 영구 삭제 대상으로 예약합니다. "
-                    + "동의 증빙은 별도로 3년간 보관합니다."
+            description = "일반 회원은 비밀번호 확인 후, 소셜 회원은 요청 본문 없이 탈퇴할 수 있습니다. "
+                    + "가입한 모임이 있으면 GROUP_023으로 거절됩니다. 성공 즉시 기존 토큰은 사용할 수 없습니다. "
+                    + "탈퇴 전에 삭제하지 않은 공개 게시글·댓글·리뷰·첨부 이미지는 작성자가 익명화된 상태로 유지될 수 있습니다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+                    description = "탈퇴 접수 성공. 토큰 즉시 폐기 및 30일 후 영구 삭제 예약"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "비밀번호 불일치 (AUTH_005), 이미 탈퇴한 회원 (AUTH_010), "
+                            + "가입 모임이 남아 있음 (GROUP_023)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
+                    description = "인증 토큰 없음/유효하지 않음 (AUTH_015 등)")
+    })
     @DeleteMapping("/me")
     public ApiResponse<Void> withdraw(
             @AuthenticationPrincipal Object principal,
