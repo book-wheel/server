@@ -82,6 +82,7 @@ public class GroupSettingService {
         memberPermissionValidator.validateManager(groupId, requesterUserPK);
         // 일정 진행 여부와 관계없이 일정 필드를 제외한 모임 정보는 모임장과 부모임장이 수정할 수 있다.
         validateGroupUpdate(group, request);
+        Integer previousMaxMembers = group.getMaxMembers();
 
         group.updateGroupInfo(
                 request.groupName(),
@@ -94,8 +95,9 @@ public class GroupSettingService {
                 request.maxMembers()
         );
 
-        // 모집 중 정원을 늘리면 저장된 목표 인원과 날짜 틀도 함께 확장해 READY 판정을 유지한다.
+        // 모집 중 정원이 실제로 늘어난 경우에만 목표 인원과 날짜 틀을 함께 확장한다.
         if (group.getGroupState() == State.RECRUITING
+                && (previousMaxMembers == null || request.maxMembers() > previousMaxMembers)
                 && recruitingSchedulePlanSynchronizer.synchronizeToMaxMembers(group)) {
             recruitingScheduleAssignmentService.refreshPlannedAssignments(group);
         }

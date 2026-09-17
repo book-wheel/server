@@ -158,6 +158,8 @@ class GroupSettingServiceTest {
         assertThat(group.getGroupRegion()).isEqualTo(Region.SEOUL);
         then(memberPermissionValidator).should().validateManager(groupId, leaderUserPK);
         then(passwordEncoder).should().encode(request.groupPassword());
+        then(recruitingSchedulePlanSynchronizer).should(never()).synchronizeToMaxMembers(group);
+        then(recruitingScheduleAssignmentService).shouldHaveNoInteractions();
     }
 
     @Test

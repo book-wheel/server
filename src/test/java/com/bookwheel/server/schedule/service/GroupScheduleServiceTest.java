@@ -77,9 +77,6 @@ class GroupScheduleServiceTest {
     private FutureScheduleService futureScheduleService;
 
     @Mock
-    private RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
-
-    @Mock
     private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     @Mock
@@ -98,7 +95,6 @@ class GroupScheduleServiceTest {
                 eventPublisher,
                 memberPermissionValidator,
                 futureScheduleService,
-                recruitingSchedulePlanSynchronizer,
                 recruitingScheduleAssignmentService,
                 scheduleCalendarService,
                 FIXED_CLOCK
@@ -771,73 +767,6 @@ class GroupScheduleServiceTest {
         assertThat(group.getGroupRoundCount()).isEqualTo(1);
         then(roundRepository).should(never()).saveAll(anyList());
         then(roundRepository).should(never()).deleteByGroup_GroupId(groupId);
-    }
-
-    @Test
-    @DisplayName("자정 자동 시작 전에 기존 일정의 목표 인원과 라운드를 정원 기준으로 동기화한다")
-    void updateStartedGroups_SynchronizesLegacyScheduleBeforeAutomaticStart() {
-        String groupId = "legacy-group";
-        LocalDate today = LocalDate.now(FIXED_CLOCK);
-        Group group = Group.builder()
-                .groupId(groupId)
-                .groupName("기존 일정 모임")
-                .groupState(State.RECRUITING)
-                .startDate(today)
-                .readingPeriod(7)
-                .maxMembers(4)
-                .targetMemberCount(2)
-                .groupRoundCount(1)
-                .build();
-        List<Member> members = List.of(mock(Member.class), mock(Member.class));
-        List<Round> synchronizedRounds = List.of(
-                Round.builder()
-                        .roundId("round-1")
-                        .group(group)
-                        .roundNumber(1)
-                        .startDate(today)
-                        .endDate(today.plusDays(6))
-                        .build(),
-                Round.builder()
-                        .roundId("round-2")
-                        .group(group)
-                        .roundNumber(2)
-                        .startDate(today.plusDays(7))
-                        .endDate(today.plusDays(13))
-                        .build(),
-                Round.builder()
-                        .roundId("round-3")
-                        .group(group)
-                        .roundNumber(3)
-                        .startDate(today.plusDays(14))
-                        .endDate(today.plusDays(20))
-                        .build()
-        );
-        given(groupRepository.findByGroupStateAndStartDate(State.RECRUITING, today))
-                .willReturn(List.of(group));
-        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
-        given(recruitingSchedulePlanSynchronizer.synchronizeToMaxMembers(group)).willAnswer(invocation -> {
-            group.updateSchedulePlan(today, 3, 4);
-            return true;
-        });
-        given(memberRepository.findByGroupIdAndMemberStatusForUpdate(
-                groupId,
-                com.bookwheel.server.member.enums.MemberStatus.ACTIVE
-        )).willReturn(members);
-        given(roundRepository.findByGroup_GroupIdOrderByRoundNumberAsc(groupId))
-                .willReturn(synchronizedRounds);
-        given(recruitingScheduleAssignmentService.isReady(group)).willReturn(true);
-        given(groupRepository.updateGroupStateToInProcessByGroupIds(
-                State.IN_PROGRESS,
-                State.RECRUITING,
-                List.of(groupId)
-        )).willReturn(1);
-
-        int updated = groupScheduleService.updateStartedGroupsToInProgress();
-
-        assertThat(updated).isEqualTo(1);
-        assertThat(group.getTargetMemberCount()).isEqualTo(4);
-        assertThat(group.getGroupRoundCount()).isEqualTo(1);
-        then(recruitingScheduleAssignmentService).should().refreshPlannedAssignments(group);
     }
 
     @Test
