@@ -302,8 +302,8 @@ public class GroupScheduleService {
                 group.getStartDate(),
                 group.getReadingPeriod(),
                 group.getScheduleEndDate(),
-                deserializeExcludedDates(group.getScheduleExcludedDates()),
-                deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
+                ScheduleCalendarService.deserializeExcludedDates(group.getScheduleExcludedDates()),
+                ScheduleCalendarService.deserializeExcludedDateRanges(group.getScheduleExcludedDateRanges()),
                 scheduleStatus,
                 group.getScheduleReconfigurationStatus(),
                 resolvedTargetMemberCount,
@@ -642,15 +642,6 @@ public class GroupScheduleService {
                 .collect(Collectors.joining(","));
     }
 
-    private List<LocalDate> deserializeExcludedDates(String serializedDates) {
-        if (serializedDates == null || serializedDates.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(serializedDates.split(","))
-                .map(LocalDate::parse)
-                .toList();
-    }
-
     private String serializeExcludedDateRanges(List<ExcludedDateRange> excludedDateRanges) {
         if (excludedDateRanges == null || excludedDateRanges.isEmpty()) {
             return null;
@@ -658,16 +649,6 @@ public class GroupScheduleService {
         return excludedDateRanges.stream()
                 .map(range -> range.startDate() + ":" + range.endDate())
                 .collect(Collectors.joining(","));
-    }
-
-    private List<ExcludedDateRange> deserializeExcludedDateRanges(String serializedRanges) {
-        if (serializedRanges == null || serializedRanges.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(serializedRanges.split(","))
-                .map(serializedRange -> serializedRange.split(":"))
-                .map(parts -> new ExcludedDateRange(LocalDate.parse(parts[0]), LocalDate.parse(parts[1])))
-                .toList();
     }
 
     // 끝난 라운드를 종료시키는 로직
