@@ -90,6 +90,9 @@ class NotificationPreferenceServiceTest {
 
         then(receiptRepository).should().deleteByExpoPushToken("ExpoPushToken[old_token]");
         then(preferenceRepository).should().clearExpoPushTokenByUserPK("userPK");
+    }
+
+    @Test
     @DisplayName("신규 사용자의 채팅 알림 설정은 기본으로 활성화된다")
     void chatNotificationsAreEnabledByDefault() {
         NotificationPreference preference = NotificationPreference.defaultsFor("userPK");
