@@ -84,9 +84,13 @@ public class WheelAssignmentService {
 
         // 읽기 순서 기준으로 멤버 정렬
         List<Member> sortedMembers = sortMembers(members);
+        Set<String> activeUserPKs = sortedMembers.stream()
+                .map(member -> member.getUser().getId())
+                .collect(Collectors.toSet());
 
         // 책 주인 PK 기준으로 책을 빠르게 찾기 위한 Map 생성
         Map<String, OwnBook> bookMap = books.stream()
+                .filter(book -> activeUserPKs.contains(book.getOwner().getId()))
                 .collect(Collectors.toMap(book -> book.getOwner().getId(), book -> book));
 
         // 멤버 순서와 같은 순서로 책 목록 재정렬

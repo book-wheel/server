@@ -33,9 +33,9 @@ public class BookReview {
     @JoinColumn(name = "book_info_id", nullable = false)
     private BookInfo bookInfo;
 
-    // 누가 작성한 리뷰인지 (User 참조)
+    // 탈퇴 후에는 작성자 연결만 해제하고 리뷰 내용은 보존한다.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User reviewer;
 
     // 리뷰 내용

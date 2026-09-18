@@ -56,9 +56,27 @@ class OAuth2LoginCodeServiceTest {
     }
 
     @Test
-    @DisplayName("유효한 코드와 verifier를 교환하면 JWT를 발급하고 Refresh Token을 저장한다")
+    @DisplayName("소셜 최초 로그인 코드는 온보딩 토큰만 발급한다")
     void exchangesOneTimeCodeForTokens() {
         IssuedCode issuedCode = issueLoginCode();
+        given(valueOperations.getAndDelete(issuedCode.redisKey())).willReturn(issuedCode.storedValue());
+        given(jwtTokenProvider.createOnboardingToken("user-pk")).willReturn("onboarding-token");
+
+        OAuth2TokenResponse response = loginCodeService.exchange(
+                new OAuth2LoginCodeExchangeRequest(issuedCode.code(), CODE_VERIFIER)
+        );
+
+        assertThat(response.accessToken()).isEqualTo("onboarding-token");
+        assertThat(response.refreshToken()).isNull();
+        assertThat(response.isFirstLogin()).isTrue();
+        verify(valueOperations).getAndDelete(issuedCode.redisKey());
+        verify(refreshTokenRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("프로필 설정이 완료된 소셜 로그인은 일반 토큰과 Refresh Token을 발급한다")
+    void exchangesReturningLoginCodeForRegularTokens() {
+        IssuedCode issuedCode = issueLoginCode(false);
         given(valueOperations.getAndDelete(issuedCode.redisKey())).willReturn(issuedCode.storedValue());
         given(jwtTokenProvider.createAccessToken("user-pk", AuthRole.USER)).willReturn("access-token");
         given(jwtTokenProvider.createRefreshToken("user-pk", AuthRole.USER)).willReturn("refresh-token");
@@ -69,13 +87,10 @@ class OAuth2LoginCodeServiceTest {
 
         assertThat(response.accessToken()).isEqualTo("access-token");
         assertThat(response.refreshToken()).isEqualTo("refresh-token");
-        assertThat(response.isFirstLogin()).isTrue();
-        verify(valueOperations).getAndDelete(issuedCode.redisKey());
-
+        assertThat(response.isFirstLogin()).isFalse();
         ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(captor.capture());
         assertThat(captor.getValue().getUserPK()).isEqualTo("user-pk");
-        assertThat(captor.getValue().getRefreshToken()).isEqualTo("refresh-token");
     }
 
     @Test
@@ -84,8 +99,7 @@ class OAuth2LoginCodeServiceTest {
         IssuedCode issuedCode = issueLoginCode();
         given(valueOperations.getAndDelete(issuedCode.redisKey()))
                 .willReturn(issuedCode.storedValue(), (String) null);
-        given(jwtTokenProvider.createAccessToken("user-pk", AuthRole.USER)).willReturn("access-token");
-        given(jwtTokenProvider.createRefreshToken("user-pk", AuthRole.USER)).willReturn("refresh-token");
+        given(jwtTokenProvider.createOnboardingToken("user-pk")).willReturn("onboarding-token");
         OAuth2LoginCodeExchangeRequest request = new OAuth2LoginCodeExchangeRequest(
                 issuedCode.code(),
                 CODE_VERIFIER
@@ -118,10 +132,14 @@ class OAuth2LoginCodeServiceTest {
     }
 
     private IssuedCode issueLoginCode() {
+        return issueLoginCode(true);
+    }
+
+    private IssuedCode issueLoginCode(boolean isFirstLogin) {
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
 
-        String code = loginCodeService.issue("user-pk", AuthRole.USER, true, CODE_CHALLENGE);
+        String code = loginCodeService.issue("user-pk", AuthRole.USER, isFirstLogin, CODE_CHALLENGE);
 
         verify(valueOperations).set(keyCaptor.capture(), valueCaptor.capture(), eq(Duration.ofMinutes(1)));
         return new IssuedCode(code, keyCaptor.getValue(), valueCaptor.getValue());

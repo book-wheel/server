@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserServ
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +59,8 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 userNameAttributeName,
                 user.getId(),
                 AuthRole.USER,
-                user.getNickname()
+                user.getNickname(),
+                Boolean.TRUE.equals(user.getIsProfileSet())
         );
     }
 
@@ -83,17 +85,12 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         }
 
         // 탈퇴했었던 유저 처리
-        if (!findUser.getIsActive()) {
-            log.info("탈퇴했던 소셜 유저의 재접속: 기존 데이터를 삭제하고 신규 가입 처리합니다. loginId={}", findUser.getLoginId());
-
-            // 기존 데이터 삭제 (Hard Delete)
-            userRepository.delete(findUser);
-
-            // 즉시 DB에 반영하여 중복 제약 조건 충돌 방지
-            userRepository.flush();
-
-            // 새로운 유저 엔티티 생성 및 저장
-            return saveUser(userInfo, socialType);
+        if (!Boolean.TRUE.equals(findUser.getIsActive())) {
+            log.info("탈퇴 보존 기간 중인 소셜 유저의 재접속을 차단합니다. loginId={}", findUser.getLoginId());
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("inactive_user"),
+                    "탈퇴 처리 중인 사용자입니다."
+            );
         }
 
         // 정상 활동 중인 유저라면 그대로 반환

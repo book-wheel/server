@@ -3,6 +3,7 @@ package com.bookwheel.server.admin.controller;
 import com.bookwheel.server.admin.service.AdminService;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
 import com.bookwheel.server.common.oauth2.CustomOAuth2UserService;
 import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import com.bookwheel.server.config.SecurityConfig;
@@ -30,6 +31,9 @@ class AdminAccessControllerTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private AccessTokenRevocationService accessTokenRevocationService;
 
     @MockitoBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;

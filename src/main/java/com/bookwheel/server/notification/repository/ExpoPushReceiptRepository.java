@@ -11,4 +11,6 @@ public interface ExpoPushReceiptRepository extends JpaRepository<ExpoPushReceipt
     List<ExpoPushReceipt> findTop1000ByCreatedAtBeforeOrderByCreatedAtAsc(Instant createdAt);
 
     long deleteByCreatedAtBefore(Instant createdAt);
+
+    long deleteByExpoPushToken(String expoPushToken);
 }

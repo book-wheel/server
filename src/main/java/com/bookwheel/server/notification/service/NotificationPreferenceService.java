@@ -3,6 +3,7 @@ package com.bookwheel.server.notification.service;
 import com.bookwheel.server.notification.dto.NotificationPreferenceResponse;
 import com.bookwheel.server.notification.dto.NotificationPreferenceUpdateRequest;
 import com.bookwheel.server.notification.entity.NotificationPreference;
+import com.bookwheel.server.notification.repository.ExpoPushReceiptRepository;
 import com.bookwheel.server.notification.repository.NotificationPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class NotificationPreferenceService {
 
     private final NotificationPreferenceRepository preferenceRepository;
+    private final ExpoPushReceiptRepository receiptRepository;
 
     /**
      * 알림 발송 경로에서 호출된다. 발송 트랜잭션이 이미 write 라서 여기서도 동일 트랜잭션에 합류해
@@ -106,6 +108,10 @@ public class NotificationPreferenceService {
 
     @Transactional
     public void clearExpoPushTokenForUser(String userPK) {
+        preferenceRepository.findByUserPK(userPK)
+                .map(NotificationPreference::getExpoPushToken)
+                .filter(token -> !token.isBlank())
+                .ifPresent(receiptRepository::deleteByExpoPushToken);
         preferenceRepository.clearExpoPushTokenByUserPK(userPK);
     }
 

@@ -21,15 +21,15 @@ public interface BookReviewRepository extends JpaRepository<BookReview, Long> {
     // 리뷰 삭제와 그 리뷰를 가리키는 비동기 알림 저장을 같은 리뷰 단위로 직렬화한다.
     Optional<BookReview> findByReviewIdForUpdate(@Param("reviewId") Long reviewId);
 
-    // 작성자(reviewer)를 fetch join으로 함께 로딩해 목록 매핑 시 리뷰어 조회 N+1을 방지한다.
-    @Query(value = "select r from BookReview r join fetch r.reviewer where r.bookInfo = :bookInfo",
+    // 탈퇴자의 익명 리뷰도 누락되지 않도록 작성자는 left join으로 조회한다.
+    @Query(value = "select r from BookReview r left join fetch r.reviewer where r.bookInfo = :bookInfo",
         countQuery = "select count(r) from BookReview r where r.bookInfo = :bookInfo")
     Page<BookReview> findAllByBookInfo(@Param("bookInfo") BookInfo bookInfo, Pageable pageable);
 
     @Query("""
             select r
             from BookReview r
-            join fetch r.reviewer
+            left join fetch r.reviewer
             where r.bookInfo.isbn = :isbn
             and r.isHidden = false
             order by r.likeCount desc, r.createdAt desc

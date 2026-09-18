@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum AuthRole {
+    ONBOARDING("ROLE_ONBOARDING"),
     USER("ROLE_USER"),
     ADMIN("ROLE_ADMIN");
 

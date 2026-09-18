@@ -28,7 +28,7 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     // 최신순 첫 페이지 (작성일 내림차순, 동일 시 댓글 ID 내림차순)
     @Query("""
         select c from PostComment c
-        join fetch c.user
+        left join fetch c.user
         where c.post = :post
         order by c.createdAt desc, c.postCommentId desc
         """)
@@ -37,7 +37,7 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     // 커서 이후(더 오래된) 댓글 페이지
     @Query("""
         select c from PostComment c
-        join fetch c.user
+        left join fetch c.user
         where c.post = :post
         and (
             c.createdAt < :cursorCreatedAt

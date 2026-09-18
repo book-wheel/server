@@ -6,12 +6,18 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(
         name = "users",
-        indexes = @Index(name = "idx_users_profile_image_key", columnList = "profile_image_key")
+        indexes = {
+                @Index(name = "idx_users_profile_image_key", columnList = "profile_image_key"),
+                @Index(name = "idx_users_purge_at", columnList = "purge_at"),
+                @Index(name = "idx_users_onboarding_cleanup", columnList = "is_active,is_profile_set,created_at")
+        }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -55,6 +61,16 @@ public class User {
     @Column(name = "is_profile_set")
     private Boolean isProfileSet = false;
 
+    @Column(name = "withdrawal_requested_at")
+    private LocalDateTime withdrawalRequestedAt;
+
+    @Column(name = "purge_at")
+    private LocalDateTime purgeAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
     @Builder
     public User(String loginId, String password, String nickname, String mail,
                 SocialType socialType, String socialId, String comment, String profileImageKey,
@@ -85,8 +101,15 @@ public class User {
         this.profileImageKey = profileImageKey;
     }
 
-    public void deactivate() {
+    public void deactivate(LocalDateTime withdrawalRequestedAt, LocalDateTime purgeAt) {
+        Objects.requireNonNull(withdrawalRequestedAt, "탈퇴 요청 시각은 필수입니다.");
+        Objects.requireNonNull(purgeAt, "영구 삭제 예정 시각은 필수입니다.");
+        if (!purgeAt.isAfter(withdrawalRequestedAt)) {
+            throw new IllegalArgumentException("영구 삭제 예정 시각은 탈퇴 요청 시각 이후여야 합니다.");
+        }
         this.isActive = false;
+        this.withdrawalRequestedAt = withdrawalRequestedAt;
+        this.purgeAt = purgeAt;
         this.nickname = "탈퇴한 사용자_" + java.util.UUID.randomUUID().toString().substring(0, 8);    // 닉네임 중복 방지
         this.comment = null;
         this.profileImageKey = null;

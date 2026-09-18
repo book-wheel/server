@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.dto;
 
 import com.bookwheel.server.community.entity.BookReview;
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ public record BookExchangeRecommendationReview(
     @Schema(description = "후기 ID", example = "1")
     Long reviewId,
 
-    @Schema(description = "후기 작성자 닉네임", example = "문희연")
+    @Schema(description = "후기 작성자 닉네임 (탈퇴 후 '탈퇴한 사용자')", example = "문희연")
     String reviewerName,
 
     @Schema(description = "공개 후기 내용")
@@ -25,7 +26,7 @@ public record BookExchangeRecommendationReview(
     public static BookExchangeRecommendationReview from(BookReview review) {
         return new BookExchangeRecommendationReview(
             review.getReviewId(),
-            review.getReviewer().getNickname(),
+            CommunityAuthorDisplay.displayName(review.getReviewer()),
             review.getContent(),
             review.getLikeCount(),
             review.getCreatedAt()
