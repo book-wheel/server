@@ -44,6 +44,25 @@ class GroupScheduleApiContractTest {
     }
 
     @Test
+    @DisplayName("일정 생성 요청은 targetMemberCount 없이도 역직렬화한다")
+    void createRequest_AllowsMissingTargetMemberCount() throws Exception {
+        GroupScheduleCreateRequest request = objectMapper.readValue(
+                """
+                        {
+                          "startDate": "2026-08-01",
+                          "readingPeriod": 7,
+                          "endDate": "2026-10-31",
+                          "excludedDates": [],
+                          "excludedDateRanges": []
+                        }
+                        """,
+                GroupScheduleCreateRequest.class
+        );
+
+        assertThat(request.targetMemberCount()).isNull();
+    }
+
+    @Test
     @DisplayName("미래 일정 변경 요청도 기존 endDate 필드로 종료 제한일을 받는다")
     void futureRequest_UsesEndDateField() throws Exception {
         GroupScheduleFutureRequest request = objectMapper.readValue(

@@ -1,5 +1,7 @@
 package com.bookwheel.server.dashboard.service;
 
+import com.bookwheel.server.book.entity.Book;
+import com.bookwheel.server.book.entity.OwnBook;
 import com.bookwheel.server.book.repository.OwnBookRepository;
 import com.bookwheel.server.dashboard.dto.DashboardResponse;
 import com.bookwheel.server.group.entity.Group;
@@ -13,6 +15,8 @@ import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
+import com.bookwheel.server.wheel.entity.WheelState;
+import com.bookwheel.server.wheel.enums.WheelStatus;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -116,5 +120,105 @@ class GroupDashboardServiceTest {
         assertThat(response.startDate()).isEqualTo(group.getStartDate());
         assertThat(response.endDate()).isEqualTo(group.getStartDate());
         assertThat(response.myStep()).isNull();
+    }
+
+    @Test
+    @DisplayName("대시보드 myStep은 직전 전달자와 원래 책 소유자를 구분해 반환한다")
+    void getDashboard_ReturnsSenderAndOwnerNicknamesSeparately() {
+        String groupId = "group-1";
+        LocalDate today = LocalDate.now(FIXED_CLOCK);
+        User me = activeUser("현재 독자");
+        User previousSender = activeUser("직전 전달자");
+        User owner = activeUser("원래 책 주인");
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("독서 모임")
+                .groupState(State.IN_PROGRESS)
+                .groupRoundCount(2)
+                .build();
+        Member currentMember = Member.builder()
+                .memberId("member-current")
+                .group(group)
+                .user(me)
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.ACTIVE)
+                .build();
+        Member previousMember = Member.builder()
+                .memberId("member-previous")
+                .group(group)
+                .user(previousSender)
+                .memberRole(MemberRole.MEMBER)
+                .memberStatus(MemberStatus.ACTIVE)
+                .build();
+        Round previousRound = Round.builder()
+                .roundId("round-1")
+                .group(group)
+                .roundNumber(1)
+                .startDate(today.minusDays(7))
+                .endDate(today.minusDays(1))
+                .build();
+        Round currentRound = Round.builder()
+                .roundId("round-2")
+                .group(group)
+                .roundNumber(2)
+                .startDate(today)
+                .endDate(today.plusDays(6))
+                .build();
+        OwnBook ownBook = OwnBook.builder()
+                .ownBookId("own-book-1")
+                .group(group)
+                .owner(owner)
+                .book(Book.builder()
+                        .bookId("book-1")
+                        .title("소년이 온다")
+                        .coverImage("https://example.com/book.jpg")
+                        .build())
+                .build();
+        WheelState previousState = WheelState.builder()
+                .wheelStateId("wheel-1")
+                .roundId(previousRound.getRoundId())
+                .member(previousMember)
+                .ownBook(ownBook)
+                .wheelState(WheelStatus.COMPLETED)
+                .build();
+        WheelState currentState = WheelState.builder()
+                .wheelStateId("wheel-2")
+                .roundId(currentRound.getRoundId())
+                .member(currentMember)
+                .ownBook(ownBook)
+                .wheelState(WheelStatus.READY)
+                .build();
+
+        given(userRepository.findById(me.getId())).willReturn(Optional.of(me));
+        given(groupRepository.findById(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.findByGroup_GroupIdAndUser_Id(groupId, me.getId()))
+                .willReturn(Optional.of(currentMember));
+        given(roundRepository.findByGroup_GroupIdAndStartDateIsNotNullAndEndDateIsNotNullOrderByRoundNumberAsc(groupId))
+                .willReturn(List.of(previousRound, currentRound));
+        given(wheelStateRepository.findFirstByRoundIdAndMember_MemberId("round-2", "member-current"))
+                .willReturn(Optional.of(currentState));
+        given(roundRepository.findByGroup_GroupIdAndRoundNumber(groupId, 1))
+                .willReturn(Optional.of(previousRound));
+        given(wheelStateRepository.findFirstByRoundIdAndOwnBook_OwnBookId("round-1", "own-book-1"))
+                .willReturn(Optional.of(previousState));
+        given(ownBookRepository.findByGroup_GroupIdAndOwner_Id(groupId, me.getId()))
+                .willReturn(Optional.empty());
+
+        DashboardResponse response = service.getDashboard(groupId, me.getId());
+
+        assertThat(response.myStep()).satisfies(myStep -> {
+            assertThat(myStep.senderNickname()).isEqualTo("직전 전달자");
+            assertThat(myStep.ownerNickname()).isEqualTo("원래 책 주인");
+        });
+    }
+
+    private User activeUser(String nickname) {
+        return User.builder()
+                .loginId(nickname + "-login")
+                .password("password")
+                .nickname(nickname)
+                .mail(nickname + "@example.com")
+                .isActive(true)
+                .build();
     }
 }

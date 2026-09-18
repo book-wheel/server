@@ -46,6 +46,7 @@ public class Post {
 
     @Builder.Default
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("postImageId ASC")
     private List<PostImage> images = new ArrayList<>();
 
     @Builder.Default

@@ -108,7 +108,8 @@ public class GroupDashboardService {
                     ws.getWheelState(),
                     book.getTitle(),
                     book.getCoverImage(),
-                    previousSenderName
+                    previousSenderName,
+                    ws.getOwnBook().getOwner().getNickname()
             );
         }
 
@@ -161,6 +162,7 @@ public class GroupDashboardService {
                             wheelState.getWheelState(),
                             book.getTitle(),
                             book.getCoverImage(),
+                            wheelState.getOwnBook().getOwner().getNickname(),
                             wheelState.getOwnBook().getOwner().getNickname()
                     );
                 })

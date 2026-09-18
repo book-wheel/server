@@ -68,6 +68,30 @@ class PostDeletionServiceTest {
     }
 
     @Test
+    @DisplayName("게시물 삭제는 원본과 썸네일 객체를 모두 정리한다")
+    void delete_RemovesThumbnailObjectsAsWell() {
+        Post post = mock(Post.class);
+        PostImage image = mock(PostImage.class);
+
+        given(post.getPostId()).willReturn(10L);
+        given(post.getImages()).willReturn(List.of(image));
+        given(image.getObjectKey()).willReturn("posts/10/abc_image.jpg");
+        given(image.getThumbnailKey()).willReturn("posts/10/abc_image_thumb.jpg");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            postDeletionService.delete(post);
+            TransactionSynchronizationManager.getSynchronizations().forEach(synchronization -> synchronization.afterCommit());
+
+            // 썸네일을 빠뜨리면 게시물을 지울 때마다 *_thumb.jpg 가 MinIO 에 고아로 남는다.
+            then(s3Service).should().deleteObject("posts/10/abc_image.jpg");
+            then(s3Service).should().deleteObject("posts/10/abc_image_thumb.jpg");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
     @DisplayName("게시물 삭제는 중복되거나 빈 이미지 키를 S3 삭제 대상에서 제외한다")
     void delete_FiltersImageObjectKeys() {
         Post post = mock(Post.class);

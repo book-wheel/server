@@ -19,6 +19,9 @@ public record NotificationPreferenceUpdateRequest(
         @Schema(description = "게시물·리뷰 커뮤니티 알림 수신 여부", example = "true", nullable = true)
         Boolean communityEnabled,
 
+        @Schema(description = "계정 전체 채팅 알림 수신 여부", example = "true", nullable = true)
+        Boolean chatEnabled,
+
         @Schema(
                 description = "푸시 알림 수신 여부. false여도 인앱 알림은 유지되며 계정·제재 푸시는 강제 발송됩니다.",
                 example = "true",

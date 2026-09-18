@@ -15,12 +15,6 @@ public class KakaoOAuth2UserInfo implements OAuth2UserInfo {
     @Override
     public String getEmail() { return (String) getKakaoAccount().get("email"); }
 
-    @Override
-    public String getProfileImage() {
-        Map<String, Object> profile = (Map<String, Object>) getKakaoAccount().get("profile");
-        return profile == null ? null : (String) profile.get("thumbnail_image_url");
-    }
-
     private Map<String, Object> getKakaoAccount() {
         return (Map<String, Object>) attributes.get("kakao_account");
     }

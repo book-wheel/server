@@ -75,6 +75,35 @@ class NotificationPreferenceServiceTest {
     }
 
     @Test
+    @DisplayName("신규 사용자의 채팅 알림 설정은 기본으로 활성화된다")
+    void chatNotificationsAreEnabledByDefault() {
+        NotificationPreference preference = NotificationPreference.defaultsFor("userPK");
+
+        NotificationPreferenceResponse response = NotificationPreferenceResponse.from(preference);
+
+        assertThat(response.chatEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("채팅 알림 설정을 변경하고 null이면 기존 값을 유지한다")
+    void updateChatNotificationPreference() {
+        NotificationPreference preference = NotificationPreference.defaultsFor("userPK");
+        given(preferenceRepository.findByUserPK("userPK")).willReturn(Optional.of(preference));
+
+        NotificationPreferenceResponse disabled = preferenceService.update(
+                "userPK",
+                new NotificationPreferenceUpdateRequest(null, null, null, false, null, null)
+        );
+        NotificationPreferenceResponse unchanged = preferenceService.update(
+                "userPK",
+                new NotificationPreferenceUpdateRequest(null, null, null, null, null, null)
+        );
+
+        assertThat(disabled.chatEnabled()).isFalse();
+        assertThat(unchanged.chatEnabled()).isFalse();
+    }
+
+    @Test
     @DisplayName("Expo 토큰 두 형식과 해제용 빈 문자열만 검증을 통과한다")
     void requestValidatesExpoPushTokenContract() {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
@@ -90,6 +119,6 @@ class NotificationPreferenceServiceTest {
     }
 
     private NotificationPreferenceUpdateRequest request(String expoPushToken) {
-        return new NotificationPreferenceUpdateRequest(null, null, null, null, expoPushToken);
+        return new NotificationPreferenceUpdateRequest(null, null, null, null, null, expoPushToken);
     }
 }

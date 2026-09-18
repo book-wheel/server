@@ -29,6 +29,7 @@ import com.bookwheel.server.notification.service.NotificationService;
 import com.bookwheel.server.schedule.entity.Round;
 import com.bookwheel.server.schedule.repository.RoundRepository;
 import com.bookwheel.server.schedule.service.RecruitingScheduleAssignmentService;
+import com.bookwheel.server.schedule.service.RecruitingSchedulePlanSynchronizer;
 import com.bookwheel.server.wheel.repository.WheelStateRepository;
 import com.bookwheel.server.wheel.service.WheelReassignmentService;
 import com.bookwheel.server.user.entity.User;
@@ -106,6 +107,9 @@ class GroupSettingServiceTest {
     private WheelReassignmentService wheelReassignmentService;
 
     @Mock
+    private RecruitingSchedulePlanSynchronizer recruitingSchedulePlanSynchronizer;
+
+    @Mock
     private RecruitingScheduleAssignmentService recruitingScheduleAssignmentService;
 
     @Mock
@@ -124,7 +128,7 @@ class GroupSettingServiceTest {
     private GroupSettingService groupSettingService;
 
     @Test
-    @DisplayName("리더가 모집 중인 모임 정보를 수정하면 변경된 상세 정보를 반환한다")
+    @DisplayName("모임장 또는 부모임장이 모집 중인 모임 정보를 수정하면 변경된 상세 정보를 반환한다")
     void updateGroup_UpdatesRecruitingGroup() {
         String groupId = "group-1";
         String leaderUserPK = "leader-user-pk";
@@ -152,8 +156,50 @@ class GroupSettingServiceTest {
         assertThat(response.bottomButtonType()).isEqualTo(GroupDetailButtonType.LEADER_SETTING);
         assertThat(group.getGroupPassword()).isEqualTo("encoded-password");
         assertThat(group.getGroupRegion()).isEqualTo(Region.SEOUL);
-        then(memberPermissionValidator).should().validateLeader(groupId, leaderUserPK);
+        then(memberPermissionValidator).should().validateManager(groupId, leaderUserPK);
         then(passwordEncoder).should().encode(request.groupPassword());
+        then(recruitingSchedulePlanSynchronizer).should(never()).synchronizeToMaxMembers(group);
+        then(recruitingScheduleAssignmentService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("모집 중 모임의 정원을 늘리면 일정 틀과 PLANNED 배정을 함께 갱신한다")
+    void updateGroup_SynchronizesScheduleWhenMaxMembersIncreases() {
+        String groupId = "group-1";
+        Group group = Group.builder()
+                .groupId(groupId)
+                .groupName("기존 모임")
+                .groupComment("기존 한줄소개")
+                .groupRule("기존 규칙")
+                .groupPublic(true)
+                .groupOffline(false)
+                .readingPeriod(7)
+                .startDate(LocalDate.of(2026, 7, 20))
+                .maxMembers(3)
+                .targetMemberCount(3)
+                .groupRoundCount(2)
+                .groupState(State.RECRUITING)
+                .build();
+        GroupUpdateRequest request = new GroupUpdateRequest(
+                group.getGroupName(),
+                group.getGroupComment(),
+                group.getGroupRule(),
+                true,
+                null,
+                false,
+                null,
+                5
+        );
+        given(groupRepository.findByGroupIdForUpdate(groupId)).willReturn(Optional.of(group));
+        given(memberRepository.countByGroup_GroupIdAndMemberStatus(groupId, MemberStatus.ACTIVE))
+                .willReturn(2L);
+        given(recruitingSchedulePlanSynchronizer.synchronizeToMaxMembers(group)).willReturn(true);
+
+        groupSettingService.updateGroup(groupId, "manager-user-pk", request);
+
+        assertThat(group.getMaxMembers()).isEqualTo(5);
+        then(recruitingSchedulePlanSynchronizer).should().synchronizeToMaxMembers(group);
+        then(recruitingScheduleAssignmentService).should().refreshPlannedAssignments(group);
     }
 
     @Test

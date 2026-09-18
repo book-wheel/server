@@ -90,6 +90,17 @@ class UserServiceProfileSetupTest {
     private UserService userService;
 
     @Test
+    @DisplayName("프로필 이미지 key가 없으면 S3 URL을 생성하지 않고 null을 응답한다")
+    void getMyInfo_MissingProfileImageKey_DoesNotPresign() {
+        givenActiveUser();
+
+        var response = userService.getMyInfo(USER_PK);
+
+        assertThat(response.profileImageKey()).isNull();
+        then(s3Service).shouldHaveNoInteractions();
+    }
+
+    @Test
     @DisplayName("프로필 전용 Presigned URL은 userPK 귀속 임시 key와 용량·MIME 조건을 사용한다")
     void createProfileImagePresignedUrl_ReturnsOwnedTemporaryKey() {
         givenActiveUser();
