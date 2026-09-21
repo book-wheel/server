@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.dto;
 
 import com.bookwheel.server.community.entity.BookReview;
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -13,13 +14,14 @@ public record ReviewDetailResponse(
     @Schema(description = "도서 ISBN", example = "9791161571188")
     String isbn,
 
-    @Schema(description = "리뷰어 닉네임", example = "문소희")
+    @Schema(description = "리뷰어 닉네임 (탈퇴 후 '탈퇴한 사용자')", example = "문소희")
     String reviewerName,
 
-    @Schema(description = "리뷰어 프로필 이미지 URL (없으면 null)", nullable = true)
+    @Schema(description = "리뷰어 프로필 이미지 URL. 리뷰어 탈퇴 시 null", nullable = true)
     String profileImageUrl,
 
-    @Schema(description = "리뷰어의 추천 여부 (true: 추천, false: 비추천, null: 미투표)", example = "true", nullable = true)
+    @Schema(description = "리뷰어의 추천 여부 (true: 추천, false: 비추천, null: 미투표 또는 리뷰어 탈퇴)",
+            example = "true", nullable = true)
     Boolean isRecommended,
 
     @Schema(description = "리뷰 내용", example = "리뷰 내용")
@@ -41,7 +43,7 @@ public record ReviewDetailResponse(
         return new ReviewDetailResponse(
             review.getReviewId(),
             review.getBookInfo().getIsbn(),
-            review.getReviewer().getNickname(),
+            CommunityAuthorDisplay.displayName(review.getReviewer()),
             profileImageUrl,
             isRecommended,
             review.getContent(),

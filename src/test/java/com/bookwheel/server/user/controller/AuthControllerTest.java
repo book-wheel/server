@@ -41,7 +41,8 @@ class AuthControllerTest {
         AuthController authController = new AuthController(
                 mock(UserService.class),
                 mock(EmailService.class),
-                loginCodeService
+                loginCodeService,
+                mock(com.bookwheel.server.user.service.UserConsentService.class)
         );
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler())

@@ -3,6 +3,7 @@ package com.bookwheel.server.config;
 import com.bookwheel.server.common.jwt.JwtAuthenticationFilter;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
 import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ import com.bookwheel.server.common.oauth2.CustomOAuth2UserService;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final AccessTokenRevocationService accessTokenRevocationService;
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -69,14 +71,24 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
-                        .anyRequest().authenticated()
+                        .requestMatchers(
+                                "/api/v1/users/setup-profile",
+                                "/api/v1/users/profile-image/presigned-url",
+                                "/api/v1/users/check-nickname",
+                                "/api/v1/users/logout"
+                        ).hasAnyRole("ONBOARDING", "USER")
+
+                        .anyRequest().hasRole("USER")
                 )
 
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
                 )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        new JwtAuthenticationFilter(jwtTokenProvider, accessTokenRevocationService),
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
         return http.build();
     }

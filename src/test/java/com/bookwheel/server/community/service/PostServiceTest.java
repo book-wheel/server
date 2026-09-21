@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -14,11 +15,13 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.common.util.CursorUtils;
 import com.bookwheel.server.community.dto.PostCreateRequest;
+import com.bookwheel.server.community.dto.PostCommentResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.entity.BookInfo;
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostComment;
 import com.bookwheel.server.community.entity.PostImage;
+import com.bookwheel.server.community.event.PostLikedEvent;
 import com.bookwheel.server.community.image.PostThumbnailService;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
@@ -73,6 +76,7 @@ class PostServiceTest {
 
         User uploader = mock(User.class);
         given(uploader.getId()).willReturn(userPK);
+        given(uploader.getIsActive()).willReturn(true);
         given(uploader.getNickname()).willReturn("writer");
         given(uploader.getProfileImageKey()).willReturn(null);
 
@@ -106,6 +110,47 @@ class PostServiceTest {
         assertThat(response.title()).isEqualTo("Clean Code");
         assertThat(response.isbn()).isEqualTo(ISBN);
         assertThat(response.isMine()).isTrue();
+    }
+
+    @Test
+    @DisplayName("탈퇴자의 게시글은 익명 작성자로 조회된다")
+    void getPostDetail_ShowsAnonymousAuthorWhenUploaderIsDetached() {
+        String userPK = UUID.randomUUID().toString();
+        User viewer = mock(User.class);
+        Post post = mock(Post.class);
+        BookInfo bookInfo = mock(BookInfo.class);
+
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
+        given(post.getBookInfo()).willReturn(bookInfo);
+        given(bookInfo.getIsbn()).willReturn(ISBN);
+        given(post.getUploader()).willReturn(null);
+        given(post.getImages()).willReturn(List.of());
+        given(post.getContent()).willReturn("보존된 게시글");
+        given(postCommentRepository.countByPost(post)).willReturn(0L);
+
+        PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
+
+        assertThat(response.author()).isEqualTo("탈퇴한 사용자");
+        assertThat(response.profileImageUrl()).isNull();
+        assertThat(response.isMine()).isFalse();
+    }
+
+    @Test
+    @DisplayName("탈퇴자의 게시글에 좋아요를 눌러도 알림 이벤트를 발행하지 않는다")
+    void togglePostLike_SkipsNotificationForAnonymousAuthor() {
+        String userPK = UUID.randomUUID().toString();
+        User user = mock(User.class);
+        Post post = Post.builder().postId(POST_ID).build();
+
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(userRepository.findById(userPK)).willReturn(Optional.of(user));
+        given(postLikeRepository.findByPostAndUser(post, user)).willReturn(Optional.empty());
+
+        postService.togglePostLike(POST_ID, userPK);
+
+        assertThat(post.getLikeCount()).isEqualTo(1);
+        then(eventPublisher).should(never()).publishEvent(any(PostLikedEvent.class));
     }
 
     // 게시글 작성 요청을 stubbing하고, 작성에 사용된 BookInfo를 돌려준다.
@@ -233,6 +278,31 @@ class PostServiceTest {
     }
 
     @Test
+    @DisplayName("탈퇴자의 댓글은 익명 작성자로 조회된다")
+    void getPostComments_ShowsAnonymousAuthor() {
+        Long postId = 7L;
+        String userPK = UUID.randomUUID().toString();
+        Post post = mock(Post.class);
+        PostComment comment = PostComment.builder()
+                .postCommentId(3L)
+                .post(post)
+                .content("보존된 댓글")
+                .build();
+
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(userRepository.existsById(userPK)).willReturn(true);
+        given(postCommentRepository.findFirstCommentPage(eq(post), any())).willReturn(List.of(comment));
+        given(postCommentRepository.countByPost(post)).willReturn(1L);
+
+        var response = postService.getPostComments(postId, null, 20, userPK);
+        PostCommentResponse result = response.content().get(0);
+
+        assertThat(result.author()).isEqualTo("탈퇴한 사용자");
+        assertThat(result.profileImageUrl()).isNull();
+        assertThat(result.isMine()).isFalse();
+    }
+
+    @Test
     @DisplayName("게시물 댓글 삭제는 작성자 본인이면 댓글을 삭제한다")
     void deletePostComment_DeletesWhenOwner() {
         Long postId = 7L;
@@ -245,6 +315,7 @@ class PostServiceTest {
                 .willReturn(Optional.of(comment));
         given(comment.getUser()).willReturn(user);
         given(user.getId()).willReturn(userPK);
+        given(user.getIsActive()).willReturn(true);
 
         postService.deletePostComment(postId, commentId, userPK);
 
@@ -264,6 +335,27 @@ class PostServiceTest {
                 .willReturn(Optional.of(comment));
         given(comment.getUser()).willReturn(user);
         given(user.getId()).willReturn(UUID.randomUUID().toString());
+        given(user.getIsActive()).willReturn(true);
+
+        assertThatThrownBy(() -> postService.deletePostComment(postId, commentId, userPK))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.POST_COMMENT_DELETE_FORBIDDEN));
+
+        then(postCommentRepository).should(never()).delete(any(PostComment.class));
+    }
+
+    @Test
+    @DisplayName("작성자 연결이 해제된 댓글은 일반 회원이 삭제할 수 없다")
+    void deletePostComment_RejectsAnonymousComment() {
+        Long postId = 7L;
+        Long commentId = 3L;
+        String userPK = UUID.randomUUID().toString();
+        PostComment comment = mock(PostComment.class);
+
+        given(postCommentRepository.findByPostCommentIdAndPost_PostId(commentId, postId))
+                .willReturn(Optional.of(comment));
+        given(comment.getUser()).willReturn(null);
 
         assertThatThrownBy(() -> postService.deletePostComment(postId, commentId, userPK))
                 .isInstanceOf(BusinessException.class)
@@ -283,6 +375,7 @@ class PostServiceTest {
         given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
         given(post.getUploader()).willReturn(uploader);
         given(uploader.getId()).willReturn(userPK);
+        given(uploader.getIsActive()).willReturn(true);
 
         postService.deletePost(POST_ID, userPK);
 
@@ -299,6 +392,7 @@ class PostServiceTest {
         given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
         given(post.getUploader()).willReturn(uploader);
         given(uploader.getId()).willReturn(UUID.randomUUID().toString());
+        given(uploader.getIsActive()).willReturn(true);
 
         assertThatThrownBy(() -> postService.deletePost(POST_ID, userPK))
                 .isInstanceOf(BusinessException.class)

@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ProfileSetupTransactionServiceTest {
@@ -42,6 +43,8 @@ class ProfileSetupTransactionServiceTest {
     private JwtTokenProvider jwtTokenProvider;
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+    @Mock
+    private UserConsentService userConsentService;
 
     // 정지 상태 판정 시각이 실행 환경 시간대에 흔들리지 않도록 KST로 고정한다.
     @Spy
@@ -65,7 +68,7 @@ class ProfileSetupTransactionServiceTest {
                 .isActive(true)
                 .build();
         userPK = user.getId();
-        given(userRepository.findByUserPKForUpdate(userPK)).willReturn(Optional.of(user));
+        lenient().when(userRepository.findByUserPKForUpdate(userPK)).thenReturn(Optional.of(user));
     }
 
     @Test
@@ -164,6 +167,74 @@ class ProfileSetupTransactionServiceTest {
         assertThat(user.getProfileImageKey()).isEqualTo(CURRENT_OBJECT_KEY);
         then(jwtTokenProvider).should(never()).createAccessToken(userPK, AuthRole.USER);
         then(refreshTokenRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("소셜 최초 프로필 설정에서 필수 동의 이력을 저장한다")
+    void persist_FirstSocialProfileSetup_RecordsConsent() {
+        User socialUser = User.builder()
+                .loginId("KAKAO_social")
+                .password("random-password")
+                .nickname("USER_temp")
+                .mail("social@example.com")
+                .socialType(SocialType.KAKAO)
+                .socialId("social-subject")
+                .isActive(true)
+                .build();
+        String socialUserPK = socialUser.getId();
+        given(userRepository.findByUserPKForUpdate(socialUserPK)).willReturn(Optional.of(socialUser));
+        given(jwtTokenProvider.createAccessToken(socialUserPK, AuthRole.USER)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(socialUserPK, AuthRole.USER)).willReturn("refresh-token");
+
+        ProfileSetupRequest request = new ProfileSetupRequest(
+                null,
+                "comment",
+                "nickname",
+                true,
+                true,
+                false,
+                "terms-2026-09",
+                "privacy-2026-09",
+                null
+        );
+
+        transactionService.persist(
+                socialUserPK,
+                request,
+                ProfileSetupTransactionService.ProfileImageUpdate.retain()
+        );
+
+        then(userConsentService).should().recordRequiredConsents(
+                socialUserPK,
+                "social@example.com",
+                true,
+                "terms-2026-09",
+                true,
+                "privacy-2026-09",
+                false,
+                null,
+                com.bookwheel.server.user.entity.ConsentSource.SOCIAL_PROFILE_SETUP
+        );
+        assertThat(socialUser.getIsProfileSet()).isTrue();
+    }
+
+    @Test
+    @DisplayName("이미 프로필을 완료한 계정은 기존 온보딩 토큰을 다시 사용할 수 없다")
+    void persist_CompletedProfile_RejectsReusedOnboardingToken() {
+        user.completeProfile();
+        ProfileSetupRequest request = new ProfileSetupRequest(null, "comment", "nickname");
+
+        assertThatThrownBy(() -> transactionService.persist(
+                userPK,
+                request,
+                ProfileSetupTransactionService.ProfileImageUpdate.retain(),
+                true
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_TOKEN);
+
+        then(jwtTokenProvider).should(never()).createAccessToken(userPK, AuthRole.USER);
     }
 
     private void givenSuccessfulTokenIssue() {

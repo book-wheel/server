@@ -33,7 +33,7 @@ public class Post {
     private String bookTitle;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User uploader;
 
     // 모임에서 작성한 게시물이면 해당 모임, 개인적으로 작성했으면 null

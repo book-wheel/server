@@ -52,8 +52,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         }
         session.removeAttribute(OAuth2Pkce.SESSION_ATTRIBUTE);
 
-        // 소셜 신규 유저인지 판단
-        boolean isFirstLogin = oAuth2User.getNickname().startsWith("USER_");
+        // 임시 닉네임 규칙이 아니라 저장된 프로필 완료 상태로 소셜 신규 유저를 판단한다.
+        boolean isFirstLogin = !oAuth2User.isProfileSet();
         String code = loginCodeService.issue(userPK, role, isFirstLogin, codeChallenge);
 
         // 토큰 대신 PKCE로 보호된 일회용 코드만 프론트엔드로 전달한다.
