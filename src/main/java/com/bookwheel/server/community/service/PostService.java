@@ -12,6 +12,7 @@ import com.bookwheel.server.community.dto.PostCreateRequest;
 import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostReportRequest;
+import com.bookwheel.server.community.dto.PostCommentReportRequest;
 import com.bookwheel.server.community.entity.*;
 import com.bookwheel.server.community.event.PostCommentedEvent;
 import com.bookwheel.server.community.image.PostThumbnailService;
@@ -45,6 +46,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
     private final PostReportRepository postReportRepository;
+    private final PostCommentReportRepository postCommentReportRepository;
     private final PostDeletionService postDeletionService;
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
@@ -318,11 +320,9 @@ public class PostService {
     @Transactional
     public void reportPost(Long postId, PostReportRequest request, String userPK) {
 
-        Post post = postRepository.findById(postId)
+        User user = findActiveReporter(userPK);
+        Post post = postRepository.findByPostIdForUpdate(postId)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
-
-        User user = userRepository.findById(userPK)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         User uploader = post.getUploader();
         if (!CommunityAuthorDisplay.isAnonymous(uploader) && uploader.getId().equals(user.getId())) {
@@ -337,6 +337,33 @@ public class PostService {
         // 신고 내역 저장
         PostReport postReport = new PostReport(post, user, request.reason());
         postReportRepository.save(postReport);
+    }
+
+    @Transactional
+    public void reportPostComment(Long postId, Long commentId, PostCommentReportRequest request, String userPK) {
+        User reporter = findActiveReporter(userPK);
+        postRepository.findByPostIdForUpdate(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+        PostComment comment = postCommentRepository.findForReport(commentId, postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_COMMENT_NOT_FOUND));
+
+        User author = comment.getUser();
+        if (author != null && author.getId().equals(reporter.getId())) {
+            throw new BusinessException(ErrorCode.CANNOT_REPORT_OWN_COMMENT);
+        }
+        if (postCommentReportRepository.existsByCommentAndReporter(comment, reporter)) {
+            throw new BusinessException(ErrorCode.COMMENT_ALREADY_REPORTED);
+        }
+        postCommentReportRepository.save(new PostCommentReport(comment, reporter, request.reason()));
+    }
+
+    private User findActiveReporter(String userPK) {
+        User reporter = userRepository.findByUserPKForUpdate(userPK)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!Boolean.TRUE.equals(reporter.getIsActive())) {
+            throw new BusinessException(ErrorCode.INACTIVE_USER);
+        }
+        return reporter;
     }
 
 

@@ -2,6 +2,8 @@ package com.bookwheel.server.community.repository;
 
 import com.bookwheel.server.community.entity.Post;
 import com.bookwheel.server.community.entity.PostComment;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,6 +15,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PostCommentRepository extends JpaRepository<PostComment, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from PostComment c where c.postCommentId = :commentId and c.post.postId = :postId")
+    Optional<PostComment> findForReport(@Param("commentId") Long commentId, @Param("postId") Long postId);
 
     List<PostComment> findAllByPost(Post post);
 
