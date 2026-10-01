@@ -99,7 +99,9 @@ class PostControllerTest {
     @ValueSource(strings = {"/api/v1/posts/1/reports", "/api/v1/posts/1/comments/2/reports"})
     @WithMockUser
     void reports_RejectInvalidReason(String path) throws Exception {
-        for (String body : List.of("{}", "{\"reason\":null}", "{\"reason\":\"INVALID\"}")) {
+        for (String body : List.of("{}", "{\"reason\":null}", "{\"reason\":\"INVALID\"}",
+                "{\"reason\":0}", "{\"reason\":1}", "{\"reason\":\"1\"}",
+                "{\"reason\":true}", "{\"reason\":[]}", "{\"reason\":{}}")) {
             mockMvc.perform(post(path).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest());
         }
