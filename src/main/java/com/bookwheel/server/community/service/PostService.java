@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.admin.service.ReportRecordingService;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.cursor.CommentCursor;
 import com.bookwheel.server.common.response.CursorPageResponse;
@@ -38,6 +39,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PostService {
+    private final ReportRecordingService reportRecordingService;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final BookInfoRepository bookInfoRepository;
@@ -337,6 +339,7 @@ public class PostService {
         // 신고 내역 저장
         PostReport postReport = new PostReport(post, user, request.reason());
         postReportRepository.save(postReport);
+        reportRecordingService.record(postReport);
     }
 
     @Transactional
@@ -354,7 +357,9 @@ public class PostService {
         if (postCommentReportRepository.existsByCommentAndReporter(comment, reporter)) {
             throw new BusinessException(ErrorCode.COMMENT_ALREADY_REPORTED);
         }
-        postCommentReportRepository.save(new PostCommentReport(comment, reporter, request.reason()));
+        PostCommentReport report = new PostCommentReport(comment, reporter, request.reason());
+        postCommentReportRepository.save(report);
+        reportRecordingService.record(report);
     }
 
     private User findActiveReporter(String userPK) {
