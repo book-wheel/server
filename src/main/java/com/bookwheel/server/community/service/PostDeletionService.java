@@ -6,6 +6,7 @@ import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
 import com.bookwheel.server.community.repository.PostRepository;
+import com.bookwheel.server.community.repository.PostReportRepository;
 import com.bookwheel.server.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class PostDeletionService {
     private final PostCommentRepository postCommentRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostRepository postRepository;
+    private final PostReportRepository postReportRepository;
     private final NotificationService notificationService;
     private final S3Service s3Service;
 
@@ -45,9 +47,9 @@ public class PostDeletionService {
 
         // 게시물을 가리키는 알림은 게시물이 사라지면 열 수 없는 링크가 되므로 함께 정리한다.
         notificationService.deleteByPostId(postId);
-        // 댓글·좋아요는 Post의 cascade 대상이 아니므로 게시물보다 먼저 지운다. (이미지·신고는 cascade로 정리된다)
         postCommentRepository.deleteAllByPost(post);
         postLikeRepository.deleteAllByPost(post);
+        postReportRepository.deleteAllByPostId(postId);
         postRepository.delete(post);
         registerPostCommitImageCleanup(imageObjectKeys);
     }
