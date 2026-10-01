@@ -19,19 +19,6 @@ public class AdminController {
 
     private final AdminService adminService;
 
-    @Operation(summary = "신고 목록 조회")
-    @GetMapping("/reports")
-    public ApiResponse<String> getReports() {
-        return ApiResponse.success("신고목록 조회 api 연결 성공");
-    }
-
-    @Operation(summary = "신고처리")
-    @PatchMapping("/reports/{reportId}/process")
-    public ApiResponse<String> processReport(@PathVariable("reportId") Long reportId) {
-        return ApiResponse.success(reportId +"신고처리 api 연결 성공");
-    }
-
-
     @Operation(summary = "회원 강제 탈퇴/정지 시키기")
     @PostMapping("/users/{userPK}/ban")
     public ApiResponse<AdminBanResponse> banUser(

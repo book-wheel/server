@@ -78,16 +78,4 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$.data.banType").value("SUSPEND"));
     }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("신고 처리 API 호출 성공")
-    void processReport_Success() throws Exception {
-        Long reportId = 1L;
-
-        mockMvc.perform(patch("/api/v1/admin/reports/{reportId}/process", reportId)
-                        .with(csrf()))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("1신고처리 api 연결 성공"));
-    }
 }
