@@ -1,6 +1,7 @@
 package com.bookwheel.server.common.oauth2;
 
 import com.bookwheel.server.common.auth.AuthRole;
+import com.bookwheel.server.common.oauth2.userinfo.AppleOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.GoogleOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.KakaoOAuth2UserInfo;
 import com.bookwheel.server.common.oauth2.userinfo.OAuth2UserInfo;
@@ -14,10 +15,15 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.Map;
@@ -64,17 +70,60 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         );
     }
 
+    public OidcUser loadOidcUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
+        log.info("CustomOAuth2UserService.loadOidcUser() 실행 - OIDC 소셜 로그인 시도");
+
+        OidcUser oidcUser = new OidcUserService().loadUser(userRequest);
+        String registrationId = userRequest.getClientRegistration().getRegistrationId();
+        SocialType socialType = getSocialType(registrationId);
+        Map<String, Object> attributes = oidcUser.getAttributes();
+        OAuth2UserInfo userInfo = getOAuth2UserInfo(socialType, attributes);
+        User user = getUser(userInfo, socialType);
+
+        return new CustomOidcUser(
+                Collections.singleton(new SimpleGrantedAuthority(AuthRole.USER.getKey())),
+                oidcUser.getIdToken(),
+                oidcUser.getUserInfo(),
+                IdTokenClaimNames.SUB,
+                user.getId(),
+                AuthRole.USER,
+                user.getNickname(),
+                Boolean.TRUE.equals(user.getIsProfileSet())
+        );
+    }
+
     private SocialType getSocialType(String registrationId) {
-        if ("kakao".equals(registrationId)) return SocialType.KAKAO;
-        return SocialType.GOOGLE;
+        return switch (registrationId) {
+            case "kakao" -> SocialType.KAKAO;
+            case "google" -> SocialType.GOOGLE;
+            case "apple" -> SocialType.APPLE;
+            default -> throw new OAuth2AuthenticationException(
+                    new OAuth2Error("unsupported_provider"),
+                    "지원하지 않는 소셜 로그인 provider입니다."
+            );
+        };
     }
 
     private OAuth2UserInfo getOAuth2UserInfo(SocialType socialType, Map<String, Object> attributes) {
-        if (socialType == SocialType.KAKAO) return new KakaoOAuth2UserInfo(attributes);
-        return new GoogleOAuth2UserInfo(attributes);
+        return switch (socialType) {
+            case KAKAO -> new KakaoOAuth2UserInfo(attributes);
+            case GOOGLE -> new GoogleOAuth2UserInfo(attributes);
+            case APPLE -> new AppleOAuth2UserInfo(attributes);
+            case NONE -> throw new OAuth2AuthenticationException(
+                    new OAuth2Error("unsupported_provider"),
+                    "일반 회원은 소셜 로그인으로 처리할 수 없습니다."
+            );
+        };
     }
 
     private User getUser(OAuth2UserInfo userInfo, SocialType socialType) {
+        if (!StringUtils.hasText(userInfo.getSocialId())) {
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("missing_social_identifier"),
+                    "소셜 계정 식별자를 확인할 수 없습니다."
+            );
+        }
+
         // 소셜 타입과 소셜 고유 ID로 이미 가입된 유저인지 확인
         User findUser = userRepository.findBySocialTypeAndSocialId(socialType, userInfo.getSocialId())
                 .orElse(null);
@@ -98,6 +147,13 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     }
 
     private User saveUser(OAuth2UserInfo userInfo, SocialType socialType) {
+        if (!StringUtils.hasText(userInfo.getEmail())) {
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("missing_email"),
+                    "최초 가입에 필요한 이메일을 확인할 수 없습니다."
+            );
+        }
+
         // 소셜 타입 + 소셜 고유 ID로 loginId 생성
         String tempNickname = "USER_" + UUID.randomUUID().toString().substring(0, 8);
 

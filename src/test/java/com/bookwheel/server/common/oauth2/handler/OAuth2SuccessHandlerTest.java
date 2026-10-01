@@ -2,6 +2,7 @@ package com.bookwheel.server.common.oauth2.handler;
 
 import com.bookwheel.server.common.auth.AuthRole;
 import com.bookwheel.server.common.oauth2.CustomOAuth2User;
+import com.bookwheel.server.common.oauth2.CustomOidcUser;
 import com.bookwheel.server.common.oauth2.OAuth2LoginCodeService;
 import com.bookwheel.server.common.oauth2.OAuth2Pkce;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +13,9 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +77,43 @@ class OAuth2SuccessHandlerTest {
         successHandler.onAuthenticationSuccess(request, new MockHttpServletResponse(), authentication);
 
         verify(loginCodeService).issue("user-pk", AuthRole.USER, false, CODE_CHALLENGE);
+    }
+
+    @Test
+    @DisplayName("Apple OIDC 로그인도 동일한 PKCE 일회용 코드 흐름을 사용한다")
+    void supportsAppleOidcPrincipal() throws Exception {
+        Instant now = Instant.now();
+        CustomOidcUser oidcUser = new CustomOidcUser(
+                List.of(new SimpleGrantedAuthority(AuthRole.USER.getKey())),
+                new OidcIdToken(
+                        "apple-id-token",
+                        now,
+                        now.plusSeconds(300),
+                        Map.of("sub", "apple-subject", "email", "relay@privaterelay.appleid.com")
+                ),
+                null,
+                "sub",
+                "user-pk",
+                AuthRole.USER,
+                "USER_temporary",
+                false
+        );
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                oidcUser,
+                null,
+                oidcUser.getAuthorities()
+        );
+        given(loginCodeService.issue("user-pk", AuthRole.USER, true, CODE_CHALLENGE))
+                .willReturn("apple-one-time-code");
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession().setAttribute(OAuth2Pkce.SESSION_ATTRIBUTE, CODE_CHALLENGE);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        successHandler.onAuthenticationSuccess(request, response, authentication);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("bookwheel://auth/callback?code=apple-one-time-code");
+        verify(loginCodeService).issue("user-pk", AuthRole.USER, true, CODE_CHALLENGE);
     }
 
     @Test

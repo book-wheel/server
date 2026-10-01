@@ -9,12 +9,12 @@ import java.util.Collection;
 import java.util.Map;
 
 @Getter
-public class CustomOAuth2User extends DefaultOAuth2User {
+public class CustomOAuth2User extends DefaultOAuth2User implements SocialLoginPrincipal {
 
-    private String userPK;
-    private AuthRole role;
-    private String nickname;
-    private boolean profileSet;
+    private final String userPK;
+    private final AuthRole role;
+    private final String nickname;
+    private final boolean profileSet;
 
     public CustomOAuth2User(Collection<? extends GrantedAuthority> authorities,
                             Map<String, Object> attributes, String nameAttributeKey,
