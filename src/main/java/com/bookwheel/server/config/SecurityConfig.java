@@ -5,7 +5,9 @@ import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
 import com.bookwheel.server.common.oauth2.apple.AppleClientSecretGenerator;
+import com.bookwheel.server.common.oauth2.apple.AppleOAuth2AuthorizedClientRepository;
 import com.bookwheel.server.common.oauth2.apple.AppleOAuth2AuthorizationRequestResolver;
+import com.bookwheel.server.common.oauth2.apple.AppleOAuthCredentialService;
 import com.bookwheel.server.common.oauth2.apple.AppleOAuth2TokenRequestParametersConverter;
 import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +61,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             AppleClientSecretGenerator appleClientSecretGenerator,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider,
+            ObjectProvider<AppleOAuthCredentialService> appleOAuthCredentialServiceProvider
     ) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -121,6 +124,14 @@ public class SecurityConfig {
                                 .authorizationRequestResolver(
                                         new AppleOAuth2AuthorizationRequestResolver(registrations)
                                 )
+                        );
+                    }
+
+                    AppleOAuthCredentialService credentialService =
+                            appleOAuthCredentialServiceProvider.getIfAvailable();
+                    if (credentialService != null) {
+                        oauth2.authorizedClientRepository(
+                                new AppleOAuth2AuthorizedClientRepository(credentialService)
                         );
                     }
                 })

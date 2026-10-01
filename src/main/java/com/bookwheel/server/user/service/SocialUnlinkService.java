@@ -1,5 +1,6 @@
 package com.bookwheel.server.user.service;
 
+import com.bookwheel.server.common.oauth2.apple.AppleOAuthCredentialService;
 import com.bookwheel.server.user.entity.SocialType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,14 +18,12 @@ public class SocialUnlinkService {
     private String kakaoAdminKey;
 
     private final RestClient restClient = RestClient.create();
+    private final AppleOAuthCredentialService appleOAuthCredentialService;
 
-    public void unlink(SocialType socialType, String socialId) {
+    public void unlink(String userPK, SocialType socialType, String socialId) {
         switch (socialType) {
             case KAKAO -> unlinkKakao(socialId);
-            case APPLE -> log.warn(
-                    "Apple provider token을 보관하지 않아 연동 해제를 건너뜁니다. "
-                            + "회원 탈퇴 처리는 계속합니다."
-            );
+            case APPLE -> appleOAuthCredentialService.requestRevocation(userPK);
             case GOOGLE -> {
                 // Google 연동 해제는 사용자가 Google 계정의 연결 관리에서 직접 처리한다.
             }

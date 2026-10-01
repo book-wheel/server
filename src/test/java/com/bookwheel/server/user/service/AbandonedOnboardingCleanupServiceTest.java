@@ -23,8 +23,9 @@ class AbandonedOnboardingCleanupServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         UserConsentService userConsentService = mock(UserConsentService.class);
         S3DeletionQueueService queueService = mock(S3DeletionQueueService.class);
+        SocialUnlinkService socialUnlinkService = mock(SocialUnlinkService.class);
         AbandonedOnboardingCleanupService service = new AbandonedOnboardingCleanupService(
-                userRepository, userConsentService, queueService
+                userRepository, userConsentService, queueService, socialUnlinkService
         );
         User user = User.builder()
                 .loginId("incomplete")
@@ -45,5 +46,36 @@ class AbandonedOnboardingCleanupServiceTest {
         then(userConsentService).should().scheduleRetentionFromAccountDeletion(user.getId());
         then(userRepository).should().delete(user);
         then(userRepository).should().flush();
+    }
+
+    @Test
+    @DisplayName("미완료 Apple 온보딩 계정 삭제 전 token 폐기를 예약한다")
+    void requestsAppleRevocationBeforeDeletingAbandonedAccount() {
+        UserRepository userRepository = mock(UserRepository.class);
+        UserConsentService userConsentService = mock(UserConsentService.class);
+        S3DeletionQueueService queueService = mock(S3DeletionQueueService.class);
+        SocialUnlinkService socialUnlinkService = mock(SocialUnlinkService.class);
+        AbandonedOnboardingCleanupService service = new AbandonedOnboardingCleanupService(
+                userRepository, userConsentService, queueService, socialUnlinkService
+        );
+        User user = User.builder()
+                .loginId("apple-incomplete")
+                .password("social-login")
+                .nickname("USER_temp")
+                .mail("apple@example.com")
+                .socialType(SocialType.APPLE)
+                .socialId("apple-subject")
+                .isActive(true)
+                .build();
+        ReflectionTestUtils.setField(user, "createdAt", LocalDateTime.of(2026, 9, 1, 0, 0));
+        given(userRepository.findByUserPKForUpdate(user.getId())).willReturn(Optional.of(user));
+
+        assertThat(service.deleteIfStillAbandoned(
+                user.getId(), LocalDateTime.of(2026, 9, 10, 0, 0)
+        )).isTrue();
+
+        then(socialUnlinkService).should().unlink(
+                user.getId(), SocialType.APPLE, "apple-subject"
+        );
     }
 }

@@ -385,9 +385,9 @@ public class UserService {
         refreshTokenRepository.deleteById(userPK);
         notificationPreferenceService.clearExpoPushTokenForUser(userPK);
 
-        // 소셜 연동 해제 (카카오만 서버에서 처리, 구글은 사용자가 직접 처리)
+        // 소셜 연동 해제 (Apple은 트랜잭션에 폐기 작업을 남긴 뒤 비동기로 재시도한다.)
         if (user.getSocialType() != SocialType.NONE) {
-            socialUnlinkService.unlink(user.getSocialType(), user.getSocialId());
+            socialUnlinkService.unlink(userPK, user.getSocialType(), user.getSocialId());
         }
 
         // 이미 발급된 Access Token도 즉시 인증에서 거부한다.
