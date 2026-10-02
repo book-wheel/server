@@ -73,11 +73,12 @@ public class AppleOAuthCredential {
         this.encryptedRefreshToken = encryptedRefreshToken;
         this.encryptionKeyVersion = encryptionKeyVersion;
         this.updatedAt = updatedAt;
-        this.revocationRequested = false;
-        this.attemptCount = 0;
-        this.lastAttemptAt = null;
-        this.nextAttemptAt = null;
-        this.lastError = null;
+        if (!this.revocationRequested) {
+            this.attemptCount = 0;
+            this.lastAttemptAt = null;
+            this.nextAttemptAt = null;
+            this.lastError = null;
+        }
     }
 
     public void requestRevocation(LocalDateTime requestedAt) {

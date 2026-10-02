@@ -45,7 +45,7 @@ class AppleOAuthCredentialServiceTest {
     void storesOnlyEncryptedRefreshToken() {
         given(tokenCipher.encrypt("user-pk", "plain-refresh-token"))
                 .willReturn(new AppleRefreshTokenCipher.EncryptionResult("v1", "encrypted-token"));
-        given(credentialRepository.findById("user-pk")).willReturn(Optional.empty());
+        given(credentialRepository.findByUserPKForUpdate("user-pk")).willReturn(Optional.empty());
 
         service.store("user-pk", "plain-refresh-token");
 
@@ -54,6 +54,25 @@ class AppleOAuthCredentialServiceTest {
         assertThat(captor.getValue().getUserPK()).isEqualTo("user-pk");
         assertThat(captor.getValue().getEncryptedRefreshToken()).isEqualTo("encrypted-token");
         assertThat(captor.getValue().getEncryptionKeyVersion()).isEqualTo("v1");
+    }
+
+    @Test
+    @DisplayName("Token storage does not cancel an existing Apple revocation request")
+    void preservesRevocationRequestWhenTokenIsStoredAgain() {
+        AppleOAuthCredential credential = requestedCredential();
+        given(tokenCipher.encrypt("user-pk", "new-refresh-token"))
+                .willReturn(new AppleRefreshTokenCipher.EncryptionResult("v2", "new-encrypted-token"));
+        given(credentialRepository.findByUserPKForUpdate("user-pk"))
+                .willReturn(Optional.of(credential));
+
+        service.store("user-pk", "new-refresh-token");
+
+        assertThat(credential.getEncryptedRefreshToken()).isEqualTo("new-encrypted-token");
+        assertThat(credential.getEncryptionKeyVersion()).isEqualTo("v2");
+        assertThat(credential.isRevocationRequested()).isTrue();
+        assertThat(credential.getNextAttemptAt())
+                .isEqualTo(LocalDateTime.of(2026, 9, 17, 9, 59));
+        then(credentialRepository).should().save(credential);
     }
 
     @Test

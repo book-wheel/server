@@ -32,7 +32,8 @@ public class AppleOAuthCredentialService {
     public void store(String userPK, String refreshToken) {
         AppleRefreshTokenCipher.EncryptionResult encrypted = tokenCipher.encrypt(userPK, refreshToken);
         LocalDateTime now = LocalDateTime.now(clock);
-        AppleOAuthCredential credential = credentialRepository.findById(userPK).orElse(null);
+        // Serialize token storage with withdrawal's revocation request on the same row.
+        AppleOAuthCredential credential = credentialRepository.findByUserPKForUpdate(userPK).orElse(null);
         if (credential == null) {
             credential = new AppleOAuthCredential(
                     userPK,
