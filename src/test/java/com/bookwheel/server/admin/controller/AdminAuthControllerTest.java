@@ -1,5 +1,6 @@
 package com.bookwheel.server.admin.controller;
 
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.admin.dto.AdminLoginRequest;
 import com.bookwheel.server.admin.dto.AdminLoginResponse;
 import com.bookwheel.server.admin.dto.AdminTokenReissueRequest;
@@ -37,6 +38,8 @@ class AdminAuthControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockitoBean private UserAuthenticationStatusService userAuthenticationStatusService;
 
     @MockitoBean
     private AdminAuthService adminAuthService;

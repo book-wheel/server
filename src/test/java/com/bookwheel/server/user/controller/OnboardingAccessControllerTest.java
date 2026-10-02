@@ -1,5 +1,6 @@
 package com.bookwheel.server.user.controller;
 
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
@@ -26,6 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OnboardingAccessControllerTest {
 
     @Autowired private MockMvc mockMvc;
+    @MockitoBean private UserAuthenticationStatusService userAuthenticationStatusService;
+
     @MockitoBean private UserService userService;
     @MockitoBean private JwtTokenProvider jwtTokenProvider;
     @MockitoBean private AccessTokenRevocationService accessTokenRevocationService;

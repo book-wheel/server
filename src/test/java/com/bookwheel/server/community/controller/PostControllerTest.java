@@ -1,5 +1,6 @@
 package com.bookwheel.server.community.controller;
 
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.common.response.CursorPageResponse;
 import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
@@ -57,6 +58,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(PostController.class)
 @Import({SecurityConfig.class, JwtAuthenticationEntryPoint.class})
 class PostControllerTest {
+
+    @MockitoBean private UserAuthenticationStatusService userAuthenticationStatusService;
 
     @MockitoBean private JwtTokenProvider jwtTokenProvider;
     @MockitoBean private AccessTokenRevocationService accessTokenRevocationService;

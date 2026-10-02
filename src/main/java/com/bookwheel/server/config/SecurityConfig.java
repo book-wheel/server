@@ -4,6 +4,7 @@ import com.bookwheel.server.common.jwt.JwtAuthenticationFilter;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,7 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final AccessTokenRevocationService accessTokenRevocationService;
+    private final UserAuthenticationStatusService userAuthenticationStatusService;
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -86,7 +88,8 @@ public class SecurityConfig {
                         .successHandler(oAuth2SuccessHandler)
                 )
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtTokenProvider, accessTokenRevocationService),
+                        new JwtAuthenticationFilter(jwtTokenProvider, accessTokenRevocationService,
+                                userAuthenticationStatusService),
                         UsernamePasswordAuthenticationFilter.class
                 );
 

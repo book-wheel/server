@@ -19,6 +19,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final AccessTokenRevocationService accessTokenRevocationService;
+    private final UserAuthenticationStatusService userAuthenticationStatusService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -42,7 +43,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 && jwtTokenProvider.validateToken(token)
                 && jwtTokenProvider.isAuthenticationToken(token)) {
             Authentication authentication = jwtTokenProvider.getAuthentication(token);
-            if (!accessTokenRevocationService.isRevoked(authentication.getName())) {
+            boolean admin = authentication.getAuthorities().stream()
+                    .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+            // 관리자 계정은 별도 테이블을 사용하며, 회원 제재는 Redis 기록과 무관하게 DB로 확인한다.
+            if ((admin || userAuthenticationStatusService.canAuthenticate(authentication.getName()))
+                    && !accessTokenRevocationService.isRevoked(authentication.getName())) {
                 // 스프링 시큐리티 저장소(ContextHolder)에 인증됨 저장
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }

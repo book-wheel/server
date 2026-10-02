@@ -1,5 +1,6 @@
 package com.bookwheel.server.admin.controller;
 
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.admin.dto.*;
 import com.bookwheel.server.admin.entity.*;
 import com.bookwheel.server.admin.service.AdminReportService;
@@ -28,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtAuthenticationEntryPoint.class})
 class AdminReportControllerTest {
     @Autowired MockMvc mvc;
+    @MockitoBean private UserAuthenticationStatusService userAuthenticationStatusService;
+
     @MockitoBean AdminReportService service;
     @MockitoBean JwtTokenProvider jwtTokenProvider;
     @MockitoBean AccessTokenRevocationService accessTokenRevocationService;

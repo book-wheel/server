@@ -1,5 +1,6 @@
 package com.bookwheel.server.admin.controller;
 
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.admin.service.AdminService;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
@@ -25,6 +26,8 @@ class AdminAccessControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean private UserAuthenticationStatusService userAuthenticationStatusService;
 
     @MockitoBean
     private AdminService adminService;
