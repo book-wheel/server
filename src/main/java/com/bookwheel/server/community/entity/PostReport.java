@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "post_report", uniqueConstraints = @UniqueConstraint(
-    name = "uk_post_report_reporter", columnNames = {"post_post_id", "reporter_id"}))
+    name = "uk_post_report_reporter", columnNames = {"post_post_id", "reporter_user_pk"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PostReport {
@@ -22,7 +22,7 @@ public class PostReport {
     private Post post; // 신고 대상 사진
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
+    @JoinColumn(name = "reporter_user_pk", nullable = false)
     private User reporter; // 신고자
 
     @Enumerated(EnumType.STRING)
