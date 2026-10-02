@@ -55,7 +55,6 @@ public class AppleOAuth2AuthorizedClientRepository implements OAuth2AuthorizedCl
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        // Provider token은 세션에 저장하지 않으며 Apple token은 별도 암호화 저장소에서 관리한다.
     }
 
     private OAuth2AuthenticationException authenticationException(String code) {

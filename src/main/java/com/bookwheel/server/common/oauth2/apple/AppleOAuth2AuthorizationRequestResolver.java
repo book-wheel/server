@@ -41,7 +41,6 @@ public class AppleOAuth2AuthorizationRequestResolver implements OAuth2Authorizat
         Map<String, Object> additionalParameters = new LinkedHashMap<>(
                 authorizationRequest.getAdditionalParameters()
         );
-        // Apple requires form_post when user information scopes such as email are requested.
         additionalParameters.put("response_mode", "form_post");
 
         return OAuth2AuthorizationRequest.from(authorizationRequest)
