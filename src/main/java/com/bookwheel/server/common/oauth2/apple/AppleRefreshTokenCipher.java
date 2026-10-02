@@ -1,5 +1,6 @@
 package com.bookwheel.server.common.oauth2.apple;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -26,6 +27,7 @@ public class AppleRefreshTokenCipher {
     private final Map<String, byte[]> keys;
     private final SecureRandom secureRandom;
 
+    @Autowired
     public AppleRefreshTokenCipher(AppleTokenEncryptionProperties properties) {
         this(properties, new SecureRandom());
     }
