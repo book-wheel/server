@@ -1,6 +1,16 @@
 package com.bookwheel.server.community.controller;
 
 import com.bookwheel.server.common.response.CursorPageResponse;
+import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.common.exception.ErrorCode;
+import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
+import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
+import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.common.oauth2.CustomOAuth2UserService;
+import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
+import com.bookwheel.server.config.SecurityConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import com.bookwheel.server.common.service.S3Service;
 import com.bookwheel.server.community.dto.PostCommentCreateRequest;
 import com.bookwheel.server.community.dto.PostCommentResponse;
@@ -9,10 +19,15 @@ import com.bookwheel.server.community.dto.PostCreateResponse;
 import com.bookwheel.server.community.dto.PostDetailResponse;
 import com.bookwheel.server.community.dto.PostImagePresignedRequest;
 import com.bookwheel.server.community.dto.PostImagePresignedResponse;
+import com.bookwheel.server.community.dto.PostCommentReportRequest;
+import com.bookwheel.server.community.dto.PostReportRequest;
+import com.bookwheel.server.community.dto.PostReportReason;
 import com.bookwheel.server.community.service.PostService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestWatcher;
@@ -30,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -39,7 +55,79 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PostController.class)
+@Import({SecurityConfig.class, JwtAuthenticationEntryPoint.class})
 class PostControllerTest {
+
+    @MockitoBean private JwtTokenProvider jwtTokenProvider;
+    @MockitoBean private AccessTokenRevocationService accessTokenRevocationService;
+    @MockitoBean private CustomOAuth2UserService customOAuth2UserService;
+    @MockitoBean private OAuth2SuccessHandler oAuth2SuccessHandler;
+    @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
+
+    @Test
+    @WithMockUser(roles = "ONBOARDING")
+    void reports_RejectOnboardingRole() throws Exception {
+        for (String path : List.of("/api/v1/posts/1/reports", "/api/v1/posts/1/comments/2/reports")) {
+            mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"ABUSE\"}"))
+                .andExpect(status().isForbidden());
+        }
+        then(postService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @WithMockUser(username = "reporter-pk")
+    void reportComment_Success() throws Exception {
+        mockMvc.perform(post("/api/v1/posts/1/comments/2/reports").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"ABUSE\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true));
+        then(postService).should().reportPostComment(1L, 2L,
+            new PostCommentReportRequest(PostReportReason.ABUSE), "reporter-pk");
+    }
+
+    @Test
+    @WithMockUser(username = "reporter-pk")
+    void reportPost_Success() throws Exception {
+        mockMvc.perform(post("/api/v1/posts/1/reports").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"SPAM\"}"))
+            .andExpect(status().isOk());
+        then(postService).should().reportPost(1L,
+            new PostReportRequest(PostReportReason.SPAM), "reporter-pk");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/posts/1/reports", "/api/v1/posts/1/comments/2/reports"})
+    @WithMockUser
+    void reports_RejectInvalidReason(String path) throws Exception {
+        for (String body : List.of("{}", "{\"reason\":null}", "{\"reason\":\"INVALID\"}",
+                "{\"reason\":0}", "{\"reason\":1}", "{\"reason\":\"1\"}",
+                "{\"reason\":true}", "{\"reason\":[]}", "{\"reason\":{}}")) {
+            mockMvc.perform(post(path).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest());
+        }
+        then(postService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @WithMockUser(username = "reporter-pk")
+    void reportComment_ReturnsBusinessError() throws Exception {
+        doThrow(new BusinessException(ErrorCode.COMMENT_ALREADY_REPORTED))
+            .when(postService).reportPostComment(eq(1L), eq(2L), any(), eq("reporter-pk"));
+        mockMvc.perform(post("/api/v1/posts/1/comments/2/reports").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"ABUSE\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("COMMENT_REPORT_002"));
+    }
+
+    @Test
+    void reports_RequireAuthentication() throws Exception {
+        for (String path : List.of("/api/v1/posts/1/reports", "/api/v1/posts/1/comments/2/reports")) {
+            mockMvc.perform(post(path).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"reason\":\"ABUSE\"}"))
+                .andExpect(status().isUnauthorized());
+        }
+        then(postService).shouldHaveNoInteractions();
+    }
 
     @Autowired
     private MockMvc mockMvc;

@@ -106,10 +106,10 @@ public class UserDataPurgeTransactionService {
         entityManager.createQuery("delete from PostReport report where report.reporter.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        entityManager.createQuery("update PostComment comment set comment.user = null where comment.user.id = :userPK")
+        entityManager.createQuery("update Post post set post.uploader = null where post.uploader.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        entityManager.createQuery("update Post post set post.uploader = null where post.uploader.id = :userPK")
+        entityManager.createQuery("update PostComment comment set comment.user = null where comment.user.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
 
