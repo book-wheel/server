@@ -11,7 +11,6 @@ import com.bookwheel.server.common.exception.BusinessException;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
-import com.bookwheel.server.community.repository.PostReportRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.group.dto.GroupDetailButtonType;
 import com.bookwheel.server.group.dto.GroupDetailResponse;
@@ -90,9 +89,6 @@ class GroupSettingServiceTest {
 
     @Mock
     private PostLikeRepository postLikeRepository;
-
-    @Mock
-    private PostReportRepository postReportRepository;
 
     @Mock
     private PostCommentRepository postCommentRepository;
@@ -610,7 +606,6 @@ class GroupSettingServiceTest {
         then(postRepository).shouldHaveNoInteractions();
         then(postLikeRepository).shouldHaveNoInteractions();
         then(postCommentRepository).shouldHaveNoInteractions();
-        then(postReportRepository).shouldHaveNoInteractions();
     }
 
     private Group recruitingGroup(String groupId) {

@@ -42,7 +42,7 @@ class AdminReportServiceTest {
     }
 
     private ModerationReport report(ReportTargetType type) {
-        return new ModerationReport(type, 1L, type == ReportTargetType.POST ? 10L : 20L, 10L,
+        return new ModerationReport(type, type == ReportTargetType.POST ? 10L : 20L, 10L,
             author.getId(), "author", "reporter-pk", "reporter", "evidence", PostReportReason.ABUSE, LocalDateTime.now(clock));
     }
 

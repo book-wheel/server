@@ -6,7 +6,6 @@ import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
 import com.bookwheel.server.community.repository.PostRepository;
-import com.bookwheel.server.community.repository.PostReportRepository;
 import com.bookwheel.server.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,6 @@ public class PostDeletionService {
     private final PostCommentRepository postCommentRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostRepository postRepository;
-    private final PostReportRepository postReportRepository;
     private final NotificationService notificationService;
     private final S3Service s3Service;
 
@@ -49,7 +47,6 @@ public class PostDeletionService {
         notificationService.deleteByPostId(postId);
         postCommentRepository.deleteAllByPost(post);
         postLikeRepository.deleteAllByPost(post);
-        postReportRepository.deleteAllByPostId(postId);
         postRepository.delete(post);
         registerPostCommitImageCleanup(imageObjectKeys);
     }

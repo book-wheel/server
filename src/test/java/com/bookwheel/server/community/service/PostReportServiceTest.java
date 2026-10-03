@@ -25,8 +25,6 @@ class PostReportServiceTest {
     @Mock UserRepository userRepository;
     @Mock PostRepository postRepository;
     @Mock PostCommentRepository postCommentRepository;
-    @Mock PostReportRepository postReportRepository;
-    @Mock PostCommentReportRepository postCommentReportRepository;
     @InjectMocks PostService service;
 
     private final User reporter = User.builder().nickname("reporter").build();
@@ -55,80 +53,77 @@ class PostReportServiceTest {
     @Test void reportsPostWithReasonAndReporter() {
         Post post = stubPost(author);
         service.reportPost(1L, postRequest, reporter.getId());
-        verify(postReportRepository).save(argThat(report -> report.getPost() == post
-            && report.getReporter() == reporter && report.getReason() == PostReportReason.SPAM));
-        verify(reportRecordingService).record(any(PostReport.class));
+        verify(reportRecordingService).record(post, reporter, PostReportReason.SPAM);
     }
 
     @Test void rejectsOwnPost() {
         stubPost(reporter);
         error(() -> service.reportPost(1L, postRequest, reporter.getId()), ErrorCode.CANNOT_REPORT_OWN_POST);
-        verifyNoInteractions(postReportRepository);
+        verifyNoInteractions(reportRecordingService);
     }
 
     @Test void rejectsDuplicatePostReport() {
         Post post = stubPost(author);
-        when(postReportRepository.existsByPostAndReporter(post, reporter)).thenReturn(true);
+        doThrow(new BusinessException(ErrorCode.ALREADY_REPORTED))
+            .when(reportRecordingService).record(post, reporter, PostReportReason.SPAM);
         error(() -> service.reportPost(1L, postRequest, reporter.getId()), ErrorCode.ALREADY_REPORTED);
-        verify(postReportRepository, never()).save(any());
+
     }
 
     @Test void reportsPostWithDeletedAuthor() {
         stubPost(null);
         service.reportPost(1L, postRequest, reporter.getId());
-        verify(postReportRepository).save(any());
+        verify(reportRecordingService).record(any(Post.class), eq(reporter), eq(PostReportReason.SPAM));
     }
 
     @Test void reportsCommentUsingUserPostCommentLockOrder() {
         PostComment comment = stubComment(author);
         service.reportPostComment(1L, 2L, commentRequest, reporter.getId());
-        var order = inOrder(userRepository, postRepository, postCommentRepository, postCommentReportRepository);
+        var order = inOrder(userRepository, postRepository, postCommentRepository, reportRecordingService);
         order.verify(userRepository).findByUserPKForUpdate(reporter.getId());
         order.verify(postRepository).findByPostIdForUpdate(1L);
         order.verify(postCommentRepository).findForReport(2L, 1L);
-        order.verify(postCommentReportRepository).existsByCommentAndReporter(comment, reporter);
-        order.verify(postCommentReportRepository).save(argThat(report -> report.getComment() == comment
-            && report.getReporter() == reporter && report.getReason() == PostReportReason.ABUSE));
-        verify(reportRecordingService).record(any(PostCommentReport.class));
+        order.verify(reportRecordingService).record(comment, reporter, PostReportReason.ABUSE);
     }
 
     @Test void rejectsOwnComment() {
         stubComment(reporter);
         error(() -> service.reportPostComment(1L, 2L, commentRequest, reporter.getId()), ErrorCode.CANNOT_REPORT_OWN_COMMENT);
-        verifyNoInteractions(postCommentReportRepository);
+        verifyNoInteractions(reportRecordingService);
     }
 
     @Test void rejectsDuplicateCommentReport() {
         PostComment comment = stubComment(author);
-        when(postCommentReportRepository.existsByCommentAndReporter(comment, reporter)).thenReturn(true);
+        doThrow(new BusinessException(ErrorCode.COMMENT_ALREADY_REPORTED))
+            .when(reportRecordingService).record(comment, reporter, PostReportReason.ABUSE);
         error(() -> service.reportPostComment(1L, 2L, commentRequest, reporter.getId()), ErrorCode.COMMENT_ALREADY_REPORTED);
-        verify(postCommentReportRepository, never()).save(any());
+
     }
 
     @Test void reportsCommentWithDeletedAuthor() {
         stubComment(null);
         service.reportPostComment(1L, 2L, commentRequest, reporter.getId());
-        verify(postCommentReportRepository).save(any());
+        verify(reportRecordingService).record(any(PostComment.class), eq(reporter), eq(PostReportReason.ABUSE));
     }
 
     @Test void rejectsMissingPostForBothReportTypes() {
         stubReporter();
         error(() -> service.reportPost(1L, postRequest, reporter.getId()), ErrorCode.POST_NOT_FOUND);
         error(() -> service.reportPostComment(1L, 2L, commentRequest, reporter.getId()), ErrorCode.POST_NOT_FOUND);
-        verifyNoInteractions(postCommentRepository, postReportRepository, postCommentReportRepository);
+        verifyNoInteractions(postCommentRepository, reportRecordingService);
     }
 
     @Test void rejectsCommentOutsideRequestedPostOrMissingComment() {
         stubPost(author);
         error(() -> service.reportPostComment(1L, 99L, commentRequest, reporter.getId()), ErrorCode.POST_COMMENT_NOT_FOUND);
         verify(postCommentRepository).findForReport(99L, 1L);
-        verifyNoInteractions(postCommentReportRepository);
+        verifyNoInteractions(reportRecordingService);
     }
 
     @Test void rejectsMissingReporter() {
         error(() -> service.reportPost(1L, postRequest, "missing"), ErrorCode.USER_NOT_FOUND);
         error(() -> service.reportPostComment(1L, 2L, commentRequest, "missing"), ErrorCode.USER_NOT_FOUND);
-        verifyNoInteractions(postRepository, postReportRepository, postCommentReportRepository);
+        verifyNoInteractions(postRepository, reportRecordingService);
     }
 
     @Test void rejectsInactiveReporter() {
@@ -136,7 +131,7 @@ class PostReportServiceTest {
         when(userRepository.findByUserPKForUpdate(inactive.getId())).thenReturn(Optional.of(inactive));
         error(() -> service.reportPost(1L, postRequest, inactive.getId()), ErrorCode.INACTIVE_USER);
         error(() -> service.reportPostComment(1L, 2L, commentRequest, inactive.getId()), ErrorCode.INACTIVE_USER);
-        verifyNoInteractions(postRepository, postReportRepository, postCommentReportRepository);
+        verifyNoInteractions(postRepository, reportRecordingService);
     }
 
     private void error(org.assertj.core.api.ThrowableAssert.ThrowingCallable action, ErrorCode code) {

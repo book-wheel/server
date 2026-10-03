@@ -12,8 +12,10 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "moderation_report", uniqueConstraints = @UniqueConstraint(
-    name = "uk_moderation_source", columnNames = {"target_type", "source_report_id"}), indexes = {
+@Table(name = "moderation_report", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_moderation_source", columnNames = {"target_type", "source_report_id"}),
+    @UniqueConstraint(name = "uk_moderation_target_reporter", columnNames = {"target_type", "target_id", "reporter_user_pk"})
+}, indexes = {
     @Index(name = "idx_moderation_queue", columnList = "status,target_type,created_at,report_id"),
     @Index(name = "idx_moderation_author", columnList = "author_user_pk"),
     @Index(name = "idx_moderation_reporter", columnList = "reporter_user_pk")
@@ -23,7 +25,7 @@ public class ModerationReport {
     private Long reportId;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
     private ReportTargetType targetType;
-    @Column(nullable = false) private Long sourceReportId;
+    @Column private Long sourceReportId;
     @Column(nullable = false) private Long targetId;
     @Column(nullable = false) private Long postId;
     @Column(name = "author_user_pk", length = 50) private String authorUserPK;
@@ -42,11 +44,10 @@ public class ModerationReport {
     @Column(length = 255) private String processingReason;
     @Column(length = 20) private String banType;
 
-    public ModerationReport(ReportTargetType targetType, Long sourceReportId, Long targetId, Long postId,
+    public ModerationReport(ReportTargetType targetType, Long targetId, Long postId,
             String authorUserPK, String authorNickname, String reporterUserPK, String reporterNickname,
             String contentSnapshot, PostReportReason reason, LocalDateTime createdAt) {
         this.targetType = targetType;
-        this.sourceReportId = sourceReportId;
         this.targetId = targetId;
         this.postId = postId;
         this.authorUserPK = authorUserPK;

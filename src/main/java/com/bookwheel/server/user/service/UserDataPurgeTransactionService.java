@@ -122,9 +122,6 @@ public class UserDataPurgeTransactionService {
         entityManager.createQuery("delete from PostLike postLike where postLike.user.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
-        entityManager.createQuery("delete from PostReport report where report.reporter.id = :userPK")
-                .setParameter("userPK", userPK)
-                .executeUpdate();
 
         adjustReviewLikeCounts(userPK);
         entityManager.createQuery("delete from ReviewLike reviewLike where reviewLike.user.id = :userPK")

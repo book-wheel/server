@@ -11,6 +11,9 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface ModerationReportRepository extends JpaRepository<ModerationReport, Long> {
+    boolean existsByTargetTypeAndTargetIdAndReporterUserPK(ReportTargetType targetType,
+        Long targetId, String reporterUserPK);
+
     @Query("""
         select r from ModerationReport r
         where (:type is null or r.targetType = :type) and (:status is null or r.status = :status)

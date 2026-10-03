@@ -26,7 +26,6 @@ import com.bookwheel.server.community.image.PostThumbnailService;
 import com.bookwheel.server.community.repository.BookInfoRepository;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
-import com.bookwheel.server.community.repository.PostReportRepository;
 import com.bookwheel.server.community.repository.PostRepository;
 import com.bookwheel.server.group.repository.GroupRepository;
 import com.bookwheel.server.user.entity.User;
@@ -55,7 +54,6 @@ class PostServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private PostLikeRepository postLikeRepository;
     @Mock private PostCommentRepository postCommentRepository;
-    @Mock private PostReportRepository postReportRepository;
     @Mock private PostDeletionService postDeletionService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private S3Service s3Service;

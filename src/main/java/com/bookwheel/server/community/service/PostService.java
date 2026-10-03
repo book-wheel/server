@@ -47,8 +47,6 @@ public class PostService {
     private final MemberRepository memberRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
-    private final PostReportRepository postReportRepository;
-    private final PostCommentReportRepository postCommentReportRepository;
     private final PostDeletionService postDeletionService;
     private final ApplicationEventPublisher eventPublisher;
     private final S3Service s3Service;
@@ -333,14 +331,7 @@ public class PostService {
         }
 
 
-        if (postReportRepository.existsByPostAndReporter(post, user)) {
-            throw new BusinessException(ErrorCode.ALREADY_REPORTED);
-        }
-
-        // 신고 내역 저장
-        PostReport postReport = new PostReport(post, user, request.reason());
-        postReportRepository.save(postReport);
-        reportRecordingService.record(postReport);
+        reportRecordingService.record(post, user, request.reason());
     }
 
     @Transactional
@@ -355,12 +346,7 @@ public class PostService {
         if (author != null && author.getId().equals(reporter.getId())) {
             throw new BusinessException(ErrorCode.CANNOT_REPORT_OWN_COMMENT);
         }
-        if (postCommentReportRepository.existsByCommentAndReporter(comment, reporter)) {
-            throw new BusinessException(ErrorCode.COMMENT_ALREADY_REPORTED);
-        }
-        PostCommentReport report = new PostCommentReport(comment, reporter, request.reason());
-        postCommentReportRepository.save(report);
-        reportRecordingService.record(report);
+        reportRecordingService.record(comment, reporter, request.reason());
     }
 
     private User findActiveReporter(String userPK) {
