@@ -1,6 +1,6 @@
 package com.bookwheel.server.common.oauth2.apple;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -18,19 +18,10 @@ public class AppleTokenRevocationClient {
     private final AppleClientSecretGenerator clientSecretGenerator;
     private final String clientId;
 
-    @Autowired
     public AppleTokenRevocationClient(
-            RestClient.Builder restClientBuilder,
+            @Qualifier("appleTokenRevocationRestClient") RestClient restClient,
             AppleClientSecretGenerator clientSecretGenerator,
             @Value("${spring.security.oauth2.client.registration.apple.client-id:}") String clientId
-    ) {
-        this(restClientBuilder.clone().build(), clientSecretGenerator, clientId);
-    }
-
-    AppleTokenRevocationClient(
-            RestClient restClient,
-            AppleClientSecretGenerator clientSecretGenerator,
-            String clientId
     ) {
         this.restClient = restClient;
         this.clientSecretGenerator = clientSecretGenerator;
