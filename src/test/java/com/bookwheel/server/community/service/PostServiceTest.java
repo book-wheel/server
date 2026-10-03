@@ -92,9 +92,9 @@ class PostServiceTest {
         given(post.getLikeCount()).willReturn(0);
         given(post.getCreatedAt()).willReturn(LocalDateTime.of(2026, 8, 3, 12, 0));
 
-        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(postRepository.findVisibleByPostId(POST_ID, userPK)).willReturn(Optional.of(post));
         given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
-        given(postCommentRepository.countByPost(post)).willReturn(0L);
+        given(postCommentRepository.countVisibleByPost(post, userPK)).willReturn(0L);
         given(postLikeRepository.existsByPostAndUser(post, viewer)).willReturn(false);
 
         return userPK;
@@ -121,14 +121,14 @@ class PostServiceTest {
         Post post = mock(Post.class);
         BookInfo bookInfo = mock(BookInfo.class);
 
-        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(postRepository.findVisibleByPostId(POST_ID, userPK)).willReturn(Optional.of(post));
         given(userRepository.findById(userPK)).willReturn(Optional.of(viewer));
         given(post.getBookInfo()).willReturn(bookInfo);
         given(bookInfo.getIsbn()).willReturn(ISBN);
         given(post.getUploader()).willReturn(null);
         given(post.getImages()).willReturn(List.of());
         given(post.getContent()).willReturn("보존된 게시글");
-        given(postCommentRepository.countByPost(post)).willReturn(0L);
+        given(postCommentRepository.countVisibleByPost(post, userPK)).willReturn(0L);
 
         PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
 
@@ -270,7 +270,7 @@ class PostServiceTest {
     void getPostComments_ThrowsWhenSizeExceedsMax() {
         Long postId = 7L;
         String userPK = UUID.randomUUID().toString();
-        given(postRepository.findById(postId)).willReturn(Optional.of(mock(Post.class)));
+        given(postRepository.findVisibleByPostId(postId, userPK)).willReturn(Optional.of(mock(Post.class)));
         given(userRepository.existsById(userPK)).willReturn(true);
 
         assertThatThrownBy(() -> postService.getPostComments(postId, null, 51, userPK))
@@ -291,10 +291,10 @@ class PostServiceTest {
                 .content("보존된 댓글")
                 .build();
 
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postRepository.findVisibleByPostId(postId, userPK)).willReturn(Optional.of(post));
         given(userRepository.existsById(userPK)).willReturn(true);
-        given(postCommentRepository.findFirstCommentPage(eq(post), any())).willReturn(List.of(comment));
-        given(postCommentRepository.countByPost(post)).willReturn(1L);
+        given(postCommentRepository.findFirstCommentPage(eq(post), eq(userPK), any())).willReturn(List.of(comment));
+        given(postCommentRepository.countVisibleByPost(post, userPK)).willReturn(1L);
 
         var response = postService.getPostComments(postId, null, 20, userPK);
         PostCommentResponse result = response.content().get(0);

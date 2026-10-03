@@ -52,7 +52,7 @@ public class PostController {
     }
 
 
-    @Operation(summary = "게시물 상세 조회", description = "게시물 상세 정보(작성자, 이미지, 좋아요/댓글 수, 내 좋아요 여부 등)를 조회합니다.")
+    @Operation(summary = "게시물 상세 조회", description = "게시물 상세 정보를 조회합니다. 내가 차단한 작성자의 게시물은 POST_001(404)로 응답하며, 댓글 수는 차단한 작성자의 댓글을 제외합니다.")
     @GetMapping("/{postId}")
     public ApiResponse<PostDetailResponse> getPostDetail(
         @PathVariable("postId") Long postId,
@@ -82,7 +82,7 @@ public class PostController {
         return ApiResponse.success("공감 상태가 변경되었습니다.");
     }
 
-    @Operation(summary = "게시물 댓글 목록 조회", description = "게시물에 달린 댓글을 최신순 커서 페이징으로 조회합니다. 내가 작성한 댓글 여부(isMine)를 포함합니다.")
+    @Operation(summary = "게시물 댓글 목록 조회", description = "게시물에 달린 댓글을 최신순 커서 페이징으로 조회합니다. 내가 작성한 댓글 여부(isMine)를 포함하며, 차단한 작성자의 댓글은 목록과 개수에서 제외합니다. 게시물 작성자를 차단한 경우 POST_001(404)로 응답합니다.")
     @GetMapping("/{postId}/comments")
     public ApiResponse<CursorPageResponse<PostCommentResponse>> getPostComments(
         @PathVariable("postId") Long postId,
