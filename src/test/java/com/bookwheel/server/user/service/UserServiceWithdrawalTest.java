@@ -47,6 +47,7 @@ class UserServiceWithdrawalTest {
     @Mock private UserConsentService userConsentService;
     @Mock private S3DeletionQueueService s3DeletionQueueService;
     @Mock private AccessTokenRevocationService accessTokenRevocationService;
+    @Mock private SocialUnlinkService socialUnlinkService;
     @Spy private Clock clock = Clock.fixed(
             Instant.parse("2026-09-17T01:00:00Z"),
             ZoneId.of("Asia/Seoul")
@@ -94,5 +95,29 @@ class UserServiceWithdrawalTest {
         ArgumentCaptor<UserDeactivatedEvent> eventCaptor = ArgumentCaptor.forClass(UserDeactivatedEvent.class);
         then(eventPublisher).should().publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().userPK()).isEqualTo(userPK);
+    }
+
+    @Test
+    @DisplayName("Apple 회원 탈퇴 시 userPK로 token 폐기를 예약한다")
+    void withdrawRequestsAppleTokenRevocation() {
+        User appleUser = User.builder()
+                .loginId("apple-login")
+                .password("social-login")
+                .nickname("nickname")
+                .mail("apple@example.com")
+                .socialType(SocialType.APPLE)
+                .socialId("apple-subject")
+                .isActive(true)
+                .build();
+        String userPK = appleUser.getId();
+        given(userRepository.findById(userPK)).willReturn(Optional.of(appleUser));
+        given(memberRepository.existsByUser_IdAndMemberStatus(userPK, MemberStatus.ACTIVE))
+                .willReturn(false);
+
+        userService.withdraw(userPK, null);
+
+        then(socialUnlinkService).should().unlink(
+                userPK, SocialType.APPLE, "apple-subject"
+        );
     }
 }

@@ -83,6 +83,21 @@ public class RestClientConfig {
     }
 
     @Bean
+    public RestClient appleTokenRevocationRestClient(
+            RestClient.Builder builder,
+            @Value("${app.oauth2.apple.revocation.connect-timeout-ms:3000}") int connectTimeout,
+            @Value("${app.oauth2.apple.revocation.read-timeout-ms:5000}") int readTimeout
+    ) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeout);
+        factory.setReadTimeout(readTimeout);
+
+        return builder
+                .requestFactory(factory)
+                .build();
+    }
+
+    @Bean
     public RestClient expoPushRestClient(
             RestClient.Builder builder,
             @Value("${expo.push.url:https://exp.host/--/api/v2/push/send}") String pushUrl,
