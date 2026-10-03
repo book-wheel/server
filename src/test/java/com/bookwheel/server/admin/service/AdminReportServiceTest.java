@@ -42,8 +42,18 @@ class AdminReportServiceTest {
     }
 
     private ModerationReport report(ReportTargetType type) {
-        return new ModerationReport(type, type == ReportTargetType.POST ? 10L : 20L, 10L,
-            author.getId(), "author", "reporter-pk", "reporter", "evidence", PostReportReason.ABUSE, LocalDateTime.now(clock));
+        return ModerationReport.builder()
+            .targetType(type)
+            .targetId(type == ReportTargetType.POST ? 10L : 20L)
+            .postId(10L)
+            .authorUserPK(author.getId())
+            .authorNickname("author")
+            .reporterUserPK("reporter-pk")
+            .reporterNickname("reporter")
+            .contentSnapshot("evidence")
+            .reason(PostReportReason.ABUSE)
+            .createdAt(LocalDateTime.now(clock))
+            .build();
     }
 
     private ModerationReport prepare(ReportTargetType type, boolean exists) {

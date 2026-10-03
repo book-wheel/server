@@ -5,6 +5,7 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.PostReportReason;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
@@ -44,7 +45,8 @@ public class ModerationReport {
     @Column(length = 255) private String processingReason;
     @Column(length = 20) private String banType;
 
-    public ModerationReport(ReportTargetType targetType, Long targetId, Long postId,
+    @Builder
+    private ModerationReport(ReportTargetType targetType, Long targetId, Long postId,
             String authorUserPK, String authorNickname, String reporterUserPK, String reporterNickname,
             String contentSnapshot, PostReportReason reason, LocalDateTime createdAt) {
         this.targetType = targetType;

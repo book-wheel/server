@@ -30,11 +30,18 @@ public class ReportRecordingService {
             throw new BusinessException(ErrorCode.ALREADY_REPORTED);
         }
         User author = post.getUploader();
-        repository.save(new ModerationReport(ReportTargetType.POST,
-            post.getPostId(), post.getPostId(),
-            author == null ? null : author.getId(), CommunityAuthorDisplay.displayName(author),
-            reporter.getId(), reporter.getNickname(),
-            post.getContent(), reason, LocalDateTime.now(clock)));
+        repository.save(ModerationReport.builder()
+            .targetType(ReportTargetType.POST)
+            .targetId(post.getPostId())
+            .postId(post.getPostId())
+            .authorUserPK(author == null ? null : author.getId())
+            .authorNickname(CommunityAuthorDisplay.displayName(author))
+            .reporterUserPK(reporter.getId())
+            .reporterNickname(reporter.getNickname())
+            .contentSnapshot(post.getContent())
+            .reason(reason)
+            .createdAt(LocalDateTime.now(clock))
+            .build());
     }
 
     public void record(PostComment comment, User reporter, PostReportReason reason) {
@@ -43,10 +50,17 @@ public class ReportRecordingService {
             throw new BusinessException(ErrorCode.COMMENT_ALREADY_REPORTED);
         }
         User author = comment.getUser();
-        repository.save(new ModerationReport(ReportTargetType.COMMENT,
-            comment.getPostCommentId(), comment.getPost().getPostId(),
-            author == null ? null : author.getId(), CommunityAuthorDisplay.displayName(author),
-            reporter.getId(), reporter.getNickname(),
-            comment.getContent(), reason, LocalDateTime.now(clock)));
+        repository.save(ModerationReport.builder()
+            .targetType(ReportTargetType.COMMENT)
+            .targetId(comment.getPostCommentId())
+            .postId(comment.getPost().getPostId())
+            .authorUserPK(author == null ? null : author.getId())
+            .authorNickname(CommunityAuthorDisplay.displayName(author))
+            .reporterUserPK(reporter.getId())
+            .reporterNickname(reporter.getNickname())
+            .contentSnapshot(comment.getContent())
+            .reason(reason)
+            .createdAt(LocalDateTime.now(clock))
+            .build());
     }
 }
