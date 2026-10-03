@@ -18,6 +18,8 @@ import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
@@ -57,14 +59,22 @@ class AdminReportServiceTest {
     }
 
     private ModerationReport prepare(ReportTargetType type, boolean exists) {
+        return prepare(type, exists, "reporter-pk");
+    }
+
+    private ModerationReport prepare(ReportTargetType type, boolean exists, String reporterUserPK) {
         admin();
         ModerationReport report = report(type);
         var target = mock(ModerationReportRepository.ProcessingTarget.class);
         when(target.getAuthorUserPK()).thenReturn(author.getId());
+        when(target.getReporterUserPK()).thenReturn(reporterUserPK);
         when(target.getPostId()).thenReturn(10L);
         lenient().when(target.getTargetType()).thenReturn(type);
         when(reports.findProcessingTarget(1L)).thenReturn(Optional.of(target));
         when(users.findByUserPKForUpdate(author.getId())).thenReturn(Optional.of(author));
+        if (reporterUserPK != null && !reporterUserPK.equals(author.getId())) {
+            when(users.findByUserPKForUpdate(reporterUserPK)).thenReturn(Optional.empty());
+        }
         when(posts.findByPostIdForUpdate(10L)).thenReturn(exists
             ? Optional.of(Post.builder().postId(10L).uploader(author).build()) : Optional.empty());
         if (exists && type == ReportTargetType.COMMENT) {
@@ -115,6 +125,58 @@ class AdminReportServiceTest {
         error(() -> service.process("admin", 1L, new ReportProcessRequest("DELETE_AND_BAN", "again", "PERMANENT")),
             ErrorCode.ALREADY_PROCESSED_REPORT);
         verifyNoInteractions(adminService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"a,z", "z,a", "same,same"})
+    void locksBothUsersInStableOrderBeforeContentAndReport(String authorUserPK, String reporterUserPK) {
+        ReflectionTestUtils.setField(author, "id", authorUserPK);
+        prepare(ReportTargetType.POST, true, reporterUserPK);
+
+        service.process("admin", 1L, new ReportProcessRequest("DELETE_CONTENT", "delete", null));
+
+        var order = inOrder(users, posts, reports, adminService);
+        for (String userPK : new TreeSet<>(List.of(authorUserPK, reporterUserPK))) {
+            order.verify(users).findByUserPKForUpdate(userPK);
+        }
+        order.verify(posts).findByPostIdForUpdate(10L);
+        order.verify(reports).findForUpdate(1L);
+        order.verify(adminService).deletePost(10L, new AdminPostDeleteRequest(PostDeletionReason.OTHER));
+        verify(users, times(authorUserPK.equals(reporterUserPK) ? 1 : 2)).findByUserPKForUpdate(anyString());
+    }
+
+    @Test void reporterLockFailureStopsBeforeAcquiringContentOrReportLocks() {
+        admin();
+        var target = mock(ModerationReportRepository.ProcessingTarget.class);
+        when(target.getAuthorUserPK()).thenReturn("a-author");
+        when(target.getReporterUserPK()).thenReturn("z-reporter");
+        when(reports.findProcessingTarget(1L)).thenReturn(Optional.of(target));
+        when(users.findByUserPKForUpdate("a-author")).thenReturn(Optional.of(author));
+        when(users.findByUserPKForUpdate("z-reporter"))
+            .thenThrow(new PessimisticLockingFailureException("reporter is being purged"));
+
+        assertThatThrownBy(() -> service.process("admin", 1L,
+            new ReportProcessRequest("DELETE_CONTENT", "delete", null)))
+            .isInstanceOf(PessimisticLockingFailureException.class);
+
+        verifyNoInteractions(posts, comments, adminService);
+        verify(reports, never()).findForUpdate(anyLong());
+    }
+
+    @Test void anonymizedUsersDoNotPreventDismissingRetainedReport() {
+        admin();
+        var target = mock(ModerationReportRepository.ProcessingTarget.class);
+        when(target.getPostId()).thenReturn(10L);
+        when(reports.findProcessingTarget(1L)).thenReturn(Optional.of(target));
+        ModerationReport report = report(ReportTargetType.POST);
+        ReflectionTestUtils.setField(report, "authorUserPK", null);
+        ReflectionTestUtils.setField(report, "reporterUserPK", null);
+        when(reports.findForUpdate(1L)).thenReturn(Optional.of(report));
+
+        var response = service.process("admin", 1L, new ReportProcessRequest("DISMISS", "dismiss", null));
+
+        assertThat(response.status()).isEqualTo(ReportStatus.DISMISSED);
+        verifyNoInteractions(users, adminService);
     }
 
     @Test void deletingMissingTargetLeavesReportPending() {

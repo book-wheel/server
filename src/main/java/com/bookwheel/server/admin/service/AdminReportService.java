@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -67,8 +69,7 @@ public class AdminReportService {
         }
         ModerationReportRepository.ProcessingTarget target = reports.findProcessingTarget(reportId)
             .orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
-        User author = target.getAuthorUserPK() == null ? null
-            : users.findByUserPKForUpdate(target.getAuthorUserPK()).orElse(null);
+        User author = lockReportUsers(target);
         Post post = posts.findByPostIdForUpdate(target.getPostId()).orElse(null);
         PostComment comment = post != null && target.getTargetType() == ReportTargetType.COMMENT
             ? comments.findForReport(target.getTargetId(), target.getPostId()).orElse(null) : null;
@@ -98,6 +99,19 @@ public class AdminReportService {
         }
         report.process(action, request.reason().strip(), adminPK, now, request.banType());
         return AdminReportResponse.from(report);
+    }
+
+    private User lockReportUsers(ModerationReportRepository.ProcessingTarget target) {
+        User author = null;
+        // 영구 삭제가 잡는 사용자 잠금을 먼저 확보하고, 두 계정은 항상 같은 순서로 잠근다.
+        for (String userPK : Stream.of(target.getAuthorUserPK(), target.getReporterUserPK())
+                .filter(Objects::nonNull).distinct().sorted().toList()) {
+            User user = users.findByUserPKForUpdate(userPK).orElse(null);
+            if (userPK.equals(target.getAuthorUserPK())) {
+                author = user;
+            }
+        }
+        return author;
     }
 
     private void requireAdmin(String adminPK) {

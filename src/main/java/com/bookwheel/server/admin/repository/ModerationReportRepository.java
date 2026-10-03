@@ -27,11 +27,13 @@ public interface ModerationReportRepository extends JpaRepository<ModerationRepo
         Long getTargetId();
         ReportTargetType getTargetType();
         String getAuthorUserPK();
+        String getReporterUserPK();
     }
 
     @Query("""
         select r.postId as postId, r.targetId as targetId, r.targetType as targetType,
-            r.authorUserPK as authorUserPK from ModerationReport r where r.reportId = :reportId
+            r.authorUserPK as authorUserPK, r.reporterUserPK as reporterUserPK
+        from ModerationReport r where r.reportId = :reportId
         """)
     Optional<ProcessingTarget> findProcessingTarget(@Param("reportId") Long reportId);
 
