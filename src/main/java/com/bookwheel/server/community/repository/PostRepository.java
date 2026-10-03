@@ -12,6 +12,9 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long>, PostRepositoryCustom {
 
+    @Query("select p from Post p where p.postId = :postId and " + ContentVisibility.POST)
+    Optional<Post> findVisibleByPostId(@Param("postId") Long postId, @Param("userPK") String userPK);
+
     @Query("SELECT p FROM Post p " +
         "LEFT JOIN FETCH p.uploader " +
         "JOIN FETCH p.bookInfo")

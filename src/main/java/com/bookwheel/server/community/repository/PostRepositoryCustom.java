@@ -7,11 +7,11 @@ import java.util.List;
 
 public interface PostRepositoryCustom {
 
-    List<Post> findGalleryPage(GalleryCursor cursor, int limit);
+    List<Post> findGalleryPage(GalleryCursor cursor, int limit, String userPK);
 
-    long countGalleryPosts();
+    long countGalleryPosts(String userPK);
 
-    List<Post> findGalleryPageByIsbn(String isbn, GalleryCursor cursor, int limit);
+    List<Post> findGalleryPageByIsbn(String isbn, GalleryCursor cursor, int limit, String userPK);
 
-    long countGalleryPostsByIsbn(String isbn);
+    long countGalleryPostsByIsbn(String isbn, String userPK);
 }

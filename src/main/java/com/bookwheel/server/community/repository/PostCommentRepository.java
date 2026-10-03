@@ -16,7 +16,8 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     List<PostComment> findAllByPost(Post post);
 
-    long countByPost(Post post);
+    @Query("select count(c) from PostComment c where c.post = :post and " + ContentVisibility.COMMENT)
+    long countVisibleByPost(@Param("post") Post post, @Param("userPK") String userPK);
 
     Optional<PostComment> findByPostCommentIdAndPost_PostId(Long postCommentId, Long postId);
 
@@ -30,15 +31,19 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
         select c from PostComment c
         left join fetch c.user
         where c.post = :post
+        and
+        """ + ContentVisibility.COMMENT + """
         order by c.createdAt desc, c.postCommentId desc
         """)
-    List<PostComment> findFirstCommentPage(@Param("post") Post post, Pageable pageable);
+    List<PostComment> findFirstCommentPage(@Param("post") Post post, @Param("userPK") String userPK, Pageable pageable);
 
     // 커서 이후(더 오래된) 댓글 페이지
     @Query("""
         select c from PostComment c
         left join fetch c.user
         where c.post = :post
+        and
+        """ + ContentVisibility.COMMENT + """
         and (
             c.createdAt < :cursorCreatedAt
             or (c.createdAt = :cursorCreatedAt and c.postCommentId < :cursorId)
@@ -47,6 +52,7 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
         """)
     List<PostComment> findCommentPageAfterCursor(
         @Param("post") Post post,
+        @Param("userPK") String userPK,
         @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
         @Param("cursorId") Long cursorId,
         Pageable pageable

@@ -55,7 +55,7 @@ public class PostService {
     private static final int MAX_COMMENT_PAGE_SIZE = 50;
 
     public CursorPageResponse<PostCommentResponse> getPostComments(Long postId, String cursor, Integer size, String userPK) {
-        Post post = postRepository.findById(postId)
+        Post post = postRepository.findVisibleByPostId(postId, userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         if (!userRepository.existsById(userPK)) {
@@ -68,9 +68,9 @@ public class PostService {
 
         PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
         List<PostComment> comments = (commentCursor == null)
-            ? postCommentRepository.findFirstCommentPage(post, pageRequest)
+            ? postCommentRepository.findFirstCommentPage(post, userPK, pageRequest)
             : postCommentRepository.findCommentPageAfterCursor(
-                post, commentCursor.createdAt(), commentCursor.commentId(), pageRequest);
+                post, userPK, commentCursor.createdAt(), commentCursor.commentId(), pageRequest);
 
         boolean hasNext = comments.size() > pageSize;
         List<PostComment> pageComments = hasNext ? comments.subList(0, pageSize) : comments;
@@ -87,7 +87,7 @@ public class PostService {
             .toList();
 
         String nextCursor = hasNext ? createNextCommentCursor(pageComments) : null;
-        Long totalElements = commentCursor == null ? postCommentRepository.countByPost(post) : null;
+        Long totalElements = commentCursor == null ? postCommentRepository.countVisibleByPost(post, userPK) : null;
 
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }
@@ -117,7 +117,7 @@ public class PostService {
     }
 
     public PostDetailResponse getPostDetail(Long postId, String userPK) {
-        Post post = postRepository.findById(postId)
+        Post post = postRepository.findVisibleByPostId(postId, userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         User user = userRepository.findById(userPK)
@@ -133,7 +133,7 @@ public class PostService {
             .map(image -> s3Service.getPresignedGetUrl(image.getObjectKey()))
             .toList();
 
-        long commentCount = postCommentRepository.countByPost(post);
+        long commentCount = postCommentRepository.countVisibleByPost(post, userPK);
         boolean isLikedByMe = postLikeRepository.existsByPostAndUser(post, user);
         boolean isMine = !CommunityAuthorDisplay.isAnonymous(uploader) && userPK.equals(uploader.getId());
         // 모임에서 작성한 게시물이면 모임 이름, 개인 작성이면 null
