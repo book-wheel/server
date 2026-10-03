@@ -1,5 +1,6 @@
 package com.bookwheel.server.user.service;
 
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -98,7 +99,7 @@ public class UserDataPurgeTransactionService {
                 .executeUpdate();
 
         // 공개 게시글·댓글·리뷰와 첨부 이미지는 보존하고 작성자 연결만 해제한다.
-        // 탈퇴자가 다른 콘텐츠에 남긴 좋아요·신고 기록은 개인 행동 기록이므로 삭제한다.
+        // 좋아요 기록은 삭제하고, 신고 이력은 식별자를 익명화하여 보존한다.
         adjustPostLikeCounts(userPK);
         entityManager.createQuery("update Post post set post.uploader = null where post.uploader.id = :userPK")
                 .setParameter("userPK", userPK)
@@ -109,15 +110,17 @@ public class UserDataPurgeTransactionService {
 
         entityManager.createQuery("""
                         update ModerationReport report set report.authorUserPK = null,
-                            report.authorNickname = '탈퇴한 사용자' where report.authorUserPK = :userPK
+                            report.authorNickname = :deletedAuthorName where report.authorUserPK = :userPK
                         """)
                 .setParameter("userPK", userPK)
+                .setParameter("deletedAuthorName", CommunityAuthorDisplay.DELETED_AUTHOR_NAME)
                 .executeUpdate();
         entityManager.createQuery("""
                         update ModerationReport report set report.reporterUserPK = null,
-                            report.reporterNickname = '탈퇴한 사용자' where report.reporterUserPK = :userPK
+                            report.reporterNickname = :deletedAuthorName where report.reporterUserPK = :userPK
                         """)
                 .setParameter("userPK", userPK)
+                .setParameter("deletedAuthorName", CommunityAuthorDisplay.DELETED_AUTHOR_NAME)
                 .executeUpdate();
         entityManager.createQuery("delete from PostLike postLike where postLike.user.id = :userPK")
                 .setParameter("userPK", userPK)

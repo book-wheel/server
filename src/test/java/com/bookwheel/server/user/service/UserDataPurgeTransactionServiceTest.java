@@ -1,5 +1,6 @@
 package com.bookwheel.server.user.service;
 
+import com.bookwheel.server.community.support.CommunityAuthorDisplay;
 import com.bookwheel.server.user.entity.User;
 import com.bookwheel.server.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -56,8 +57,10 @@ class UserDataPurgeTransactionServiceTest {
         order.verify(comments).setParameter("userPK", user.getId());
         order.verify(comments).executeUpdate();
         order.verify(authorReports).setParameter("userPK", user.getId());
+        order.verify(authorReports).setParameter("deletedAuthorName", CommunityAuthorDisplay.DELETED_AUTHOR_NAME);
         order.verify(authorReports).executeUpdate();
         order.verify(reporterReports).setParameter("userPK", user.getId());
+        order.verify(reporterReports).setParameter("deletedAuthorName", CommunityAuthorDisplay.DELETED_AUTHOR_NAME);
         order.verify(reporterReports).executeUpdate();
         order.verify(users).delete(user);
         order.verify(users).flush();
