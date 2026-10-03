@@ -118,6 +118,8 @@ public enum ErrorCode {
 
     // 관리자 관련 에러
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_001", "해당 신고 내역을 찾을 수 없습니다."),
+    REPORT_TARGET_DELETED(HttpStatus.CONFLICT, "REPORT_004", "이미 삭제된 신고 대상입니다."),
+    REPORT_AUTHOR_UNAVAILABLE(HttpStatus.CONFLICT, "REPORT_005", "탈퇴하거나 삭제된 작성자는 제재할 수 없습니다."),
     ALREADY_PROCESSED_REPORT(HttpStatus.BAD_REQUEST, "REPORT_002", "이미 처리 완료된 신고입니다."),
     CANNOT_BAN_ADMIN(HttpStatus.BAD_REQUEST, "ADMIN_001", "관리자 계정은 제재할 수 없습니다."),
     ALREADY_BANNED_USER(HttpStatus.BAD_REQUEST, "ADMIN_002", "이미 정지된 사용자입니다."),

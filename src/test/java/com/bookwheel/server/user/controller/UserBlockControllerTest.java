@@ -5,6 +5,7 @@ import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
+import com.bookwheel.server.common.jwt.UserAuthenticationStatusService;
 import com.bookwheel.server.common.oauth2.CustomOAuth2UserService;
 import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import com.bookwheel.server.config.SecurityConfig;
@@ -34,6 +35,7 @@ class UserBlockControllerTest {
     @MockitoBean UserBlockService service;
     @MockitoBean JwtTokenProvider jwtTokenProvider;
     @MockitoBean AccessTokenRevocationService accessTokenRevocationService;
+    @MockitoBean UserAuthenticationStatusService userAuthenticationStatusService;
     @MockitoBean CustomOAuth2UserService customOAuth2UserService;
     @MockitoBean OAuth2SuccessHandler oAuth2SuccessHandler;
     @MockitoBean ClientRegistrationRepository clientRegistrationRepository;

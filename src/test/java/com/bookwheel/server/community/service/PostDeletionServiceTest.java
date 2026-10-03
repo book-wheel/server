@@ -6,6 +6,7 @@ import com.bookwheel.server.community.entity.PostImage;
 import com.bookwheel.server.community.repository.PostCommentRepository;
 import com.bookwheel.server.community.repository.PostLikeRepository;
 import com.bookwheel.server.community.repository.PostRepository;
+import com.bookwheel.server.community.repository.PostReportRepository;
 import com.bookwheel.server.notification.service.NotificationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class PostDeletionServiceTest {
@@ -30,6 +33,7 @@ class PostDeletionServiceTest {
     @Mock private PostCommentRepository postCommentRepository;
     @Mock private PostLikeRepository postLikeRepository;
     @Mock private PostRepository postRepository;
+    @Mock private PostReportRepository postReportRepository;
     @Mock private NotificationService notificationService;
     @Mock private S3Service s3Service;
 
@@ -37,7 +41,7 @@ class PostDeletionServiceTest {
     private PostDeletionService postDeletionService;
 
     @Test
-    @DisplayName("게시물 삭제는 알림·댓글·좋아요를 먼저 삭제한 뒤 게시물을 삭제하고 이미지 객체를 정리한다")
+    @DisplayName("게시물 잠금 후 알림·댓글·좋아요·신고를 정리하고 게시물을 삭제한다")
     void delete_RemovesRelatedRowsBeforePostAndDeletesImages() {
         Post post = mock(Post.class);
         PostImage image = mock(PostImage.class);
@@ -50,12 +54,13 @@ class PostDeletionServiceTest {
         try {
             postDeletionService.delete(post);
 
-            InOrder inOrder = inOrder(notificationService, postCommentRepository, postLikeRepository, postRepository);
+            InOrder inOrder = inOrder(notificationService, postCommentRepository, postLikeRepository, postReportRepository, postRepository);
             // 알림을 정리하기 전에 게시물 행을 잠가야, 정리 이후에 비동기 알림 저장이 끼어들지 못한다.
             inOrder.verify(postRepository).findByPostIdForUpdate(10L);
             inOrder.verify(notificationService).deleteByPostId(10L);
             inOrder.verify(postCommentRepository).deleteAllByPost(post);
             inOrder.verify(postLikeRepository).deleteAllByPost(post);
+            inOrder.verify(postReportRepository).deleteAllByPostId(10L);
             inOrder.verify(postRepository).delete(post);
 
             // 커밋이 끝나기 전에는 S3 객체를 건드리지 않는다.
@@ -65,6 +70,21 @@ class PostDeletionServiceTest {
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    void delete_DoesNotDeletePostOrImagesWhenReportCleanupFails() {
+        Post post = mock(Post.class);
+        given(post.getPostId()).willReturn(10L);
+        given(post.getImages()).willReturn(List.of());
+        doThrow(new IllegalStateException("report cleanup failed"))
+                .when(postReportRepository).deleteAllByPostId(10L);
+
+        assertThatThrownBy(() -> postDeletionService.delete(post))
+                .isInstanceOf(IllegalStateException.class);
+
+        then(postRepository).should(never()).delete(post);
+        then(s3Service).shouldHaveNoInteractions();
     }
 
     @Test

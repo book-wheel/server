@@ -87,7 +87,7 @@ class AdminServiceTest {
         when(mockUser.getIsActive()).thenReturn(true); // 활성 상태
         when(mockUser.getNickname()).thenReturn("테스트유저");
 
-        when(userRepository.findById(userPK)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByUserPKForUpdate(userPK)).thenReturn(Optional.of(mockUser));
 
         // when
         AdminBanResponse response = adminService.banUser(userPK, request);
@@ -107,7 +107,7 @@ class AdminServiceTest {
         AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "스팸/도배");
         User mockUser = mock(User.class);
         when(mockUser.getIsActive()).thenReturn(false); // 이미 비활성화됨
-        when(userRepository.findById(userPK)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByUserPKForUpdate(userPK)).thenReturn(Optional.of(mockUser));
 
         // when & then
         BusinessException exception = assertThrows(BusinessException.class,
@@ -121,7 +121,7 @@ class AdminServiceTest {
         // given
         String invaliduserPK = "invalid";
         AdminBanRequest request = new AdminBanRequest("SUSPEND", BanReason.ETC, "스팸/도배");
-        when(userRepository.findById(invaliduserPK)).thenReturn(Optional.empty());
+        when(userRepository.findByUserPKForUpdate(invaliduserPK)).thenReturn(Optional.empty());
 
         // when & then
         BusinessException exception = assertThrows(BusinessException.class,

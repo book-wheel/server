@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class UserDataPurgeTransactionServiceTest {
     @Test
     @SuppressWarnings("unchecked")
-    void detachesPostsBeforeCommentsAndDeletesUserLast() {
+    void detachesContentAndAnonymizesReportsBeforeDeletingUser() {
         UserRepository users = mock(UserRepository.class);
         EntityManager entityManager = mock(EntityManager.class);
         S3DeletionQueueService queue = mock(S3DeletionQueueService.class);
@@ -42,16 +42,25 @@ class UserDataPurgeTransactionServiceTest {
             .thenReturn(posts);
         when(entityManager.createQuery("update PostComment comment set comment.user = null where comment.user.id = :userPK"))
             .thenReturn(comments);
+        Query authorReports = mock(Query.class, RETURNS_SELF);
+        Query reporterReports = mock(Query.class, RETURNS_SELF);
+        when(entityManager.createQuery(contains("set report.authorUserPK = null"))).thenReturn(authorReports);
+        when(entityManager.createQuery(contains("set report.reporterUserPK = null"))).thenReturn(reporterReports);
 
         new UserDataPurgeTransactionService(users, entityManager, queue, clock).purgeIfDue(user.getId());
 
-        var order = inOrder(posts, comments, users);
+        var order = inOrder(posts, comments, authorReports, reporterReports, users);
         order.verify(users).findByUserPKForUpdate(user.getId());
         order.verify(posts).setParameter("userPK", user.getId());
         order.verify(posts).executeUpdate();
         order.verify(comments).setParameter("userPK", user.getId());
         order.verify(comments).executeUpdate();
+        order.verify(authorReports).setParameter("userPK", user.getId());
+        order.verify(authorReports).executeUpdate();
+        order.verify(reporterReports).setParameter("userPK", user.getId());
+        order.verify(reporterReports).executeUpdate();
         order.verify(users).delete(user);
         order.verify(users).flush();
+        verify(entityManager, never()).createQuery(startsWith("delete from ModerationReport"));
     }
 }

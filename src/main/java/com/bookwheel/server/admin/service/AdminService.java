@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AdminService {
-    // TODO: 신고 목록 조회, 신고처리 로직 추가
 
     private final UserRepository userRepository;
     private final PenaltyRepository penaltyRepository;
@@ -41,7 +40,7 @@ public class AdminService {
     @Transactional
     public AdminBanResponse banUser(String userPK, AdminBanRequest request) {
 
-        User user = userRepository.findById(userPK)
+        User user = userRepository.findByUserPKForUpdate(userPK)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         if (!user.getIsActive()) {

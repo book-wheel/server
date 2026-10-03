@@ -1,6 +1,7 @@
 package com.bookwheel.server.community.service;
 
 import com.bookwheel.server.common.exception.BusinessException;
+import com.bookwheel.server.admin.service.ReportRecordingService;
 import com.bookwheel.server.common.exception.ErrorCode;
 import com.bookwheel.server.community.dto.*;
 import com.bookwheel.server.community.entity.*;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PostReportServiceTest {
+    @Mock ReportRecordingService reportRecordingService;
     @Mock UserRepository userRepository;
     @Mock PostRepository postRepository;
     @Mock PostCommentRepository postCommentRepository;
@@ -55,6 +57,7 @@ class PostReportServiceTest {
         service.reportPost(1L, postRequest, reporter.getId());
         verify(postReportRepository).save(argThat(report -> report.getPost() == post
             && report.getReporter() == reporter && report.getReason() == PostReportReason.SPAM));
+        verify(reportRecordingService).record(any(PostReport.class));
     }
 
     @Test void rejectsOwnPost() {
@@ -86,6 +89,7 @@ class PostReportServiceTest {
         order.verify(postCommentReportRepository).existsByCommentAndReporter(comment, reporter);
         order.verify(postCommentReportRepository).save(argThat(report -> report.getComment() == comment
             && report.getReporter() == reporter && report.getReason() == PostReportReason.ABUSE));
+        verify(reportRecordingService).record(any(PostCommentReport.class));
     }
 
     @Test void rejectsOwnComment() {

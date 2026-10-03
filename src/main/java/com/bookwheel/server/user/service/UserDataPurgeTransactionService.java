@@ -100,16 +100,29 @@ public class UserDataPurgeTransactionService {
         // 공개 게시글·댓글·리뷰와 첨부 이미지는 보존하고 작성자 연결만 해제한다.
         // 탈퇴자가 다른 콘텐츠에 남긴 좋아요·신고 기록은 개인 행동 기록이므로 삭제한다.
         adjustPostLikeCounts(userPK);
-        entityManager.createQuery("delete from PostLike postLike where postLike.user.id = :userPK")
-                .setParameter("userPK", userPK)
-                .executeUpdate();
-        entityManager.createQuery("delete from PostReport report where report.reporter.id = :userPK")
-                .setParameter("userPK", userPK)
-                .executeUpdate();
         entityManager.createQuery("update Post post set post.uploader = null where post.uploader.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
         entityManager.createQuery("update PostComment comment set comment.user = null where comment.user.id = :userPK")
+                .setParameter("userPK", userPK)
+                .executeUpdate();
+
+        entityManager.createQuery("""
+                        update ModerationReport report set report.authorUserPK = null,
+                            report.authorNickname = '탈퇴한 사용자' where report.authorUserPK = :userPK
+                        """)
+                .setParameter("userPK", userPK)
+                .executeUpdate();
+        entityManager.createQuery("""
+                        update ModerationReport report set report.reporterUserPK = null,
+                            report.reporterNickname = '탈퇴한 사용자' where report.reporterUserPK = :userPK
+                        """)
+                .setParameter("userPK", userPK)
+                .executeUpdate();
+        entityManager.createQuery("delete from PostLike postLike where postLike.user.id = :userPK")
+                .setParameter("userPK", userPK)
+                .executeUpdate();
+        entityManager.createQuery("delete from PostReport report where report.reporter.id = :userPK")
                 .setParameter("userPK", userPK)
                 .executeUpdate();
 
