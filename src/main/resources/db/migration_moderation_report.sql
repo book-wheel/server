@@ -33,7 +33,7 @@ SELECT 'POST', r.report_id, p.post_id, p.post_id, a.id,
     COALESCE(p.content, ''), r.reason, NULL, 'PENDING'
 FROM post_report r JOIN post p ON p.post_id = r.post_post_id
 LEFT JOIN users a ON a.id = p.user_id
-JOIN users u ON u.id = r.reporter_id
+JOIN users u ON u.id = r.reporter_user_pk
 WHERE NOT EXISTS (SELECT 1 FROM moderation_report m
     WHERE m.target_type = 'POST' AND m.source_report_id = r.report_id);
 

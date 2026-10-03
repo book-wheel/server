@@ -238,6 +238,7 @@ class PostControllerTest {
         PostDetailResponse response = new PostDetailResponse(
                 postId,
                 "9791161571188",
+                "author-pk",
                 "문소희",
                 "https://cdn.example.com/profile.png",
                 "소카모임", // groupName (모임에서 작성한 글)
@@ -257,6 +258,7 @@ class PostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.postId").value(10L))
                 .andExpect(jsonPath("$.data.author").value("문소희"))
+                .andExpect(jsonPath("$.data.userPK").value("author-pk"))
                 .andExpect(jsonPath("$.data.groupName").value("소카모임"))
                 .andExpect(jsonPath("$.data.title").value("내 남편을 팝니다"))
                 .andExpect(jsonPath("$.data.imageUrls.length()").value(2))
@@ -288,6 +290,7 @@ class PostControllerTest {
         PostCommentResponse comment = new PostCommentResponse(
                 1L,
                 postId,
+                "author-pk",
                 "문소희",
                 "https://cdn.example.com/profile.png",
                 "댓글 내용",
@@ -302,6 +305,7 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].commentId").value(1L))
+                .andExpect(jsonPath("$.data.content[0].userPK").value("author-pk"))
                 .andExpect(jsonPath("$.data.content[0].isMine").value(true))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
     }

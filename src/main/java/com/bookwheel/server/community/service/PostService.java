@@ -146,6 +146,7 @@ public class PostService {
         return new PostDetailResponse(
             post.getPostId(),
             isbn,
+            CommunityAuthorDisplay.userPK(uploader),
             CommunityAuthorDisplay.displayName(uploader),
             profileImageUrl,
             groupName,

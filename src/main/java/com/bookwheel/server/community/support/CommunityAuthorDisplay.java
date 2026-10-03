@@ -20,4 +20,8 @@ public final class CommunityAuthorDisplay {
     public static String profileImageKey(User author) {
         return isAnonymous(author) ? null : author.getProfileImageKey();
     }
+
+    public static String userPK(User author) {
+        return isAnonymous(author) ? null : author.getId();
+    }
 }
