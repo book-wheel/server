@@ -1,6 +1,7 @@
 package com.bookwheel.server.user.service;
 
 import com.bookwheel.server.user.entity.User;
+import com.bookwheel.server.user.entity.SocialType;
 import com.bookwheel.server.user.image.ProfileImagePolicy;
 import com.bookwheel.server.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class AbandonedOnboardingCleanupService {
     private final UserRepository userRepository;
     private final UserConsentService userConsentService;
     private final S3DeletionQueueService s3DeletionQueueService;
+    private final SocialUnlinkService socialUnlinkService;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean deleteIfStillAbandoned(String userPK, LocalDateTime cutoff) {
@@ -36,6 +38,9 @@ public class AbandonedOnboardingCleanupService {
         }
         // 프로필 완료 여부와 무관하게 동의 행위 증빙은 계정 삭제 시점부터 3년간 별도 보관한다.
         userConsentService.scheduleRetentionFromAccountDeletion(userPK);
+        if (user.getSocialType() == SocialType.APPLE) {
+            socialUnlinkService.unlink(userPK, user.getSocialType(), user.getSocialId());
+        }
         userRepository.delete(user);
         userRepository.flush();
         log.info("미완료 온보딩 계정 삭제 완료: userPK={}", userPK);

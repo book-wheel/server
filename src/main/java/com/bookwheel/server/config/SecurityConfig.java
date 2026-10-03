@@ -4,8 +4,15 @@ import com.bookwheel.server.common.jwt.JwtAuthenticationFilter;
 import com.bookwheel.server.common.jwt.JwtAuthenticationEntryPoint;
 import com.bookwheel.server.common.jwt.JwtTokenProvider;
 import com.bookwheel.server.common.jwt.AccessTokenRevocationService;
+import com.bookwheel.server.common.oauth2.apple.AppleClientSecretGenerator;
+import com.bookwheel.server.common.oauth2.apple.AppleOAuth2AuthorizedClientRepository;
+import com.bookwheel.server.common.oauth2.apple.AppleOAuth2AuthorizationRequestResolver;
+import com.bookwheel.server.common.oauth2.apple.AppleOAuthCredentialService;
+import com.bookwheel.server.common.oauth2.apple.AppleOAuth2TokenRequestParametersConverter;
 import com.bookwheel.server.common.oauth2.handler.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,6 +22,10 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import com.bookwheel.server.common.oauth2.CustomOAuth2UserService;
@@ -38,7 +49,21 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public AppleClientSecretGenerator appleClientSecretGenerator(
+            @Value("${app.oauth2.apple.team-id:}") String teamId,
+            @Value("${app.oauth2.apple.key-id:}") String keyId,
+            @Value("${app.oauth2.apple.private-key:}") String privateKey
+    ) {
+        return new AppleClientSecretGenerator(teamId, keyId, privateKey);
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            AppleClientSecretGenerator appleClientSecretGenerator,
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider,
+            ObjectProvider<AppleOAuthCredentialService> appleOAuthCredentialServiceProvider
+    ) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
 
@@ -64,7 +89,7 @@ public class SecurityConfig {
                                 "/api/v1/admin/auth/login",
                                 "/api/v1/admin/auth/reissue",
                                 "/api/v1/users/signup",
-                                "/login/**",        // 카카오 콜백 주소 허용
+                                "/login/**",        // 소셜 로그인 콜백 주소 허용
                                 "/oauth2/**",       // 시큐리티 기본 소셜 로그인 시작 주소 허용
                                 "/api/v1/users/recovery/**",
                                 "/images/profiles/**"
@@ -81,15 +106,51 @@ public class SecurityConfig {
                         .anyRequest().hasRole("USER")
                 )
 
-                .oauth2Login(oauth2 -> oauth2
-                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-                        .successHandler(oAuth2SuccessHandler)
-                )
+                .oauth2Login(oauth2 -> {
+                    oauth2
+                            .userInfoEndpoint(userInfo -> userInfo
+                                    .userService(customOAuth2UserService)
+                                    .oidcUserService(customOAuth2UserService::loadOidcUser)
+                            )
+                            .tokenEndpoint(token -> token.accessTokenResponseClient(
+                                    appleAwareTokenResponseClient(appleClientSecretGenerator)
+                            ))
+                            .successHandler(oAuth2SuccessHandler);
+
+                    ClientRegistrationRepository registrations =
+                            clientRegistrationRepositoryProvider.getIfAvailable();
+                    if (registrations != null) {
+                        oauth2.authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestResolver(
+                                        new AppleOAuth2AuthorizationRequestResolver(registrations)
+                                )
+                        );
+                    }
+
+                    AppleOAuthCredentialService credentialService =
+                            appleOAuthCredentialServiceProvider.getIfAvailable();
+                    if (credentialService != null) {
+                        oauth2.authorizedClientRepository(
+                                new AppleOAuth2AuthorizedClientRepository(credentialService)
+                        );
+                    }
+                })
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtTokenProvider, accessTokenRevocationService),
                         UsernamePasswordAuthenticationFilter.class
                 );
 
         return http.build();
+    }
+
+    private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+    appleAwareTokenResponseClient(AppleClientSecretGenerator appleClientSecretGenerator) {
+        RestClientAuthorizationCodeTokenResponseClient client =
+                new RestClientAuthorizationCodeTokenResponseClient();
+
+        client.setParametersConverter(
+                new AppleOAuth2TokenRequestParametersConverter(appleClientSecretGenerator)
+        );
+        return client;
     }
 }

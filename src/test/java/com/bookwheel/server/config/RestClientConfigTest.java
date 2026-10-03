@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.UnknownContentTypeException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +54,16 @@ class RestClientConfigTest {
                 responseBody.write(body);
             }
         });
+        server.createContext("/slow", exchange -> {
+            try {
+                Thread.sleep(300);
+                exchange.sendResponseHeaders(204, -1);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
         server.start();
         url = "http://localhost:" + server.getAddress().getPort() + "/book";
     }
@@ -80,7 +91,12 @@ class RestClientConfigTest {
     @Test
     void otherRestClientsDoNotReadTextJavascriptResponse() {
         contextRunner.run(context -> {
-            for (String beanName : List.of("restClient", "naruRestClient", "naruPopularLoanRestClient")) {
+            for (String beanName : List.of(
+                    "restClient",
+                    "naruRestClient",
+                    "naruPopularLoanRestClient",
+                    "appleTokenRevocationRestClient"
+            )) {
                 RestClient restClient = context.getBean(beanName, RestClient.class);
 
                 assertThatExceptionOfType(UnknownContentTypeException.class)
@@ -89,6 +105,24 @@ class RestClientConfigTest {
                     .withMessageContaining("text/javascript");
             }
         });
+    }
+
+    @Test
+    void appleTokenRevocationRestClientTimesOutOnSlowResponse() {
+        contextRunner
+                .withPropertyValues("app.oauth2.apple.revocation.read-timeout-ms=50")
+                .run(context -> {
+                    RestClient restClient = context.getBean(
+                            "appleTokenRevocationRestClient",
+                            RestClient.class
+                    );
+
+                    assertThatExceptionOfType(ResourceAccessException.class)
+                            .isThrownBy(() -> restClient.post()
+                                    .uri(url.replace("/book", "/slow"))
+                                    .retrieve()
+                                    .toBodilessEntity());
+                });
     }
 
     // MVC 응답 컨버터도 같은 인스턴스를 공유하므로, 함께 바뀌지 않았는지 확인한다.

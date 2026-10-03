@@ -1,9 +1,9 @@
 package com.bookwheel.server.common.oauth2.handler;
 
 import com.bookwheel.server.common.auth.AuthRole;
-import com.bookwheel.server.common.oauth2.CustomOAuth2User;
 import com.bookwheel.server.common.oauth2.OAuth2LoginCodeService;
 import com.bookwheel.server.common.oauth2.OAuth2Pkce;
+import com.bookwheel.server.common.oauth2.SocialLoginPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -35,9 +35,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
         log.info("OAuth2 로그인 성공! 일회용 로그인 코드를 발급합니다.");
 
-        CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
-        String userPK = oAuth2User.getUserPK();
-        AuthRole role = oAuth2User.getRole();
+        if (!(authentication.getPrincipal() instanceof SocialLoginPrincipal socialPrincipal)) {
+            log.error("소셜 로그인 principal 타입이 올바르지 않습니다.");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid social login principal");
+            return;
+        }
+        String userPK = socialPrincipal.getUserPK();
+        AuthRole role = socialPrincipal.getRole();
 
         HttpSession session = request.getSession(false);
         Object codeChallengeAttribute = session == null
@@ -53,7 +57,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         session.removeAttribute(OAuth2Pkce.SESSION_ATTRIBUTE);
 
         // 임시 닉네임 규칙이 아니라 저장된 프로필 완료 상태로 소셜 신규 유저를 판단한다.
-        boolean isFirstLogin = !oAuth2User.isProfileSet();
+        boolean isFirstLogin = !socialPrincipal.isProfileSet();
         String code = loginCodeService.issue(userPK, role, isFirstLogin, codeChallenge);
 
         // 토큰 대신 PKCE로 보호된 일회용 코드만 프론트엔드로 전달한다.

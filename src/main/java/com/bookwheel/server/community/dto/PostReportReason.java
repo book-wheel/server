@@ -1,6 +1,8 @@
 package com.bookwheel.server.community.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -15,4 +17,12 @@ public enum PostReportReason {
     OTHER("기타 (상세 내용 참고)");
 
     private final String description;
+
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    public static PostReportReason fromJson(JsonNode value) {
+        if (value == null || !value.isTextual()) {
+            throw new IllegalArgumentException("신고 사유는 문자열로 입력해야 합니다.");
+        }
+        return PostReportReason.valueOf(value.textValue());
+    }
 }

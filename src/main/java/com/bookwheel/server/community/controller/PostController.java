@@ -130,4 +130,16 @@ public class PostController {
         postService.reportPost(postId, request, getUserPK(principal));
         return ApiResponse.success("게시물이 성공적으로 신고 접수되었습니다.");
     }
+
+    @Operation(summary = "게시물 댓글 신고", description = "본인 댓글 및 중복 신고는 허용하지 않습니다. "
+        + "신고 사유는 SPAM, ABUSE, PORNOGRAPHY, COPYRIGHT, OTHER 중 하나입니다.")
+    @PostMapping("/{postId}/comments/{commentId}/reports")
+    public ApiResponse<String> reportPostComment(
+        @PathVariable("postId") Long postId,
+        @PathVariable("commentId") Long commentId,
+        @Valid @RequestBody PostCommentReportRequest request,
+        @AuthenticationPrincipal Object principal) {
+        postService.reportPostComment(postId, commentId, request, getUserPK(principal));
+        return ApiResponse.success("댓글이 성공적으로 신고 접수되었습니다.");
+    }
 }

@@ -1,5 +1,6 @@
 package com.bookwheel.server.user.service;
 
+import com.bookwheel.server.common.oauth2.apple.AppleOAuthCredentialService;
 import com.bookwheel.server.user.entity.SocialType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,12 +18,19 @@ public class SocialUnlinkService {
     private String kakaoAdminKey;
 
     private final RestClient restClient = RestClient.create();
+    private final AppleOAuthCredentialService appleOAuthCredentialService;
 
-    public void unlink(SocialType socialType, String socialId) {
-        if (socialType == SocialType.KAKAO) {
-            unlinkKakao(socialId);
+    public void unlink(String userPK, SocialType socialType, String socialId) {
+        switch (socialType) {
+            case KAKAO -> unlinkKakao(socialId);
+            case APPLE -> appleOAuthCredentialService.requestRevocation(userPK);
+            case GOOGLE -> {
+                // Google 연동 해제는 사용자가 Google 계정의 연결 관리에서 직접 처리한다.
+            }
+            case NONE -> {
+                // 일반 회원은 해제할 소셜 연결이 없다.
+            }
         }
-        // 구글은 사용자가 직접 연동 해제 (https://myaccount.google.com/permissions)
     }
 
     private void unlinkKakao(String socialId) {

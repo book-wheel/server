@@ -108,6 +108,7 @@ class PostServiceTest {
         PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
 
         assertThat(response.title()).isEqualTo("Clean Code");
+        assertThat(response.userPK()).isEqualTo(userPK);
         assertThat(response.isbn()).isEqualTo(ISBN);
         assertThat(response.isMine()).isTrue();
     }
@@ -132,6 +133,7 @@ class PostServiceTest {
         PostDetailResponse response = postService.getPostDetail(POST_ID, userPK);
 
         assertThat(response.author()).isEqualTo("탈퇴한 사용자");
+        assertThat(response.userPK()).isNull();
         assertThat(response.profileImageUrl()).isNull();
         assertThat(response.isMine()).isFalse();
     }

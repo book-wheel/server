@@ -14,6 +14,9 @@ public record PostCommentResponse(
     @Schema(description = "게시물 ID", example = "10")
     Long postId,
 
+    @Schema(description = "작성자 userPK. 작성자 탈퇴 또는 영구 삭제 시 null", nullable = true)
+    String userPK,
+
     @Schema(description = "작성자 닉네임 (탈퇴 후 '탈퇴한 사용자')", example = "문소희")
     String author,
 
@@ -33,6 +36,7 @@ public record PostCommentResponse(
         return new PostCommentResponse(
             comment.getPostCommentId(),
             comment.getPost().getPostId(),
+            CommunityAuthorDisplay.userPK(comment.getUser()),
             CommunityAuthorDisplay.displayName(comment.getUser()),
             profileImageUrl,
             comment.getContent(),

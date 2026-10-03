@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     // 공통 에러
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_001", "잘못된 입력값입니다."),
+    CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "BLOCK_001", "자기 자신을 차단할 수 없습니다."),
+    BLOCK_TARGET_INACTIVE(HttpStatus.BAD_REQUEST, "BLOCK_002", "탈퇴한 사용자를 차단할 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "COMMON_002", "허용되지 않은 메서드입니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "서버 내부 오류가 발생했습니다."),
 
@@ -135,6 +137,8 @@ public enum ErrorCode {
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_001", "해당 게시물을 찾을 수 없습니다."),
     ALREADY_REPORTED(HttpStatus.BAD_REQUEST, "POST_002", "이미 신고한 게시물입니다."),
     CANNOT_REPORT_OWN_POST(HttpStatus.BAD_REQUEST, "POST_003", "자신의 게시물은 신고할 수 없습니다."),
+    CANNOT_REPORT_OWN_COMMENT(HttpStatus.BAD_REQUEST, "COMMENT_REPORT_001", "자신의 댓글은 신고할 수 없습니다."),
+    COMMENT_ALREADY_REPORTED(HttpStatus.BAD_REQUEST, "COMMENT_REPORT_002", "이미 신고한 댓글입니다."),
     POST_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_004", "해당 댓글을 찾을 수 없습니다."),
     POST_COMMENT_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "POST_005", "본인이 작성한 댓글만 삭제할 수 있습니다."),
     POST_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "POST_006", "본인이 작성한 게시물만 삭제할 수 있습니다."),
