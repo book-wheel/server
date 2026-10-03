@@ -489,12 +489,12 @@ public class BookService {
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }
 
-    public CursorPageResponse<GalleryResponseDto> getGallery(String cursor, Integer size) {
+    public CursorPageResponse<GalleryResponseDto> getGallery(String cursor, Integer size, String userPK) {
         int pageSize = resolveGalleryPageSize(size);
         GalleryCursor galleryCursor = cursorUtils.decode(cursor, GalleryCursor.class);
         validateGalleryCursor(galleryCursor);
 
-        List<Post> posts = postRepository.findGalleryPage(galleryCursor, pageSize + 1);
+        List<Post> posts = postRepository.findGalleryPage(galleryCursor, pageSize + 1, userPK);
         boolean hasNext = posts.size() > pageSize;
         List<Post> pagePosts = hasNext ? posts.subList(0, pageSize) : posts;
 
@@ -503,17 +503,17 @@ public class BookService {
             .toList();
 
         String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
-        Long totalElements = galleryCursor == null ? postRepository.countGalleryPosts() : null;
+        Long totalElements = galleryCursor == null ? postRepository.countGalleryPosts(userPK) : null;
 
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }
 
-    public CursorPageResponse<GalleryResponseDto> getGalleryByIsbn(String isbn, String cursor, Integer size) {
+    public CursorPageResponse<GalleryResponseDto> getGalleryByIsbn(String isbn, String cursor, Integer size, String userPK) {
         int pageSize = resolveGalleryPageSize(size);
         GalleryCursor galleryCursor = cursorUtils.decode(cursor, GalleryCursor.class);
         validateGalleryCursor(galleryCursor);
 
-        List<Post> posts = postRepository.findGalleryPageByIsbn(isbn, galleryCursor, pageSize + 1);
+        List<Post> posts = postRepository.findGalleryPageByIsbn(isbn, galleryCursor, pageSize + 1, userPK);
         boolean hasNext = posts.size() > pageSize;
         List<Post> pagePosts = hasNext ? posts.subList(0, pageSize) : posts;
 
@@ -522,7 +522,7 @@ public class BookService {
             .toList();
 
         String nextCursor = hasNext ? createNextGalleryCursor(pagePosts) : null;
-        Long totalElements = galleryCursor == null ? postRepository.countGalleryPostsByIsbn(isbn) : null;
+        Long totalElements = galleryCursor == null ? postRepository.countGalleryPostsByIsbn(isbn, userPK) : null;
 
         return CursorPageResponse.of(content, pageSize, totalElements, hasNext, nextCursor);
     }

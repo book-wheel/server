@@ -16,8 +16,8 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
     private final EntityManager entityManager;
 
     @Override
-    public List<Post> findGalleryPage(GalleryCursor cursor, int limit) {
-        List<Long> postIds = findGalleryPostIds(cursor, limit);
+    public List<Post> findGalleryPage(GalleryCursor cursor, int limit, String userPK) {
+        List<Long> postIds = findGalleryPostIds(cursor, limit, userPK);
         if (postIds.isEmpty()) {
             return List.of();
         }
@@ -25,18 +25,20 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
     }
 
     @Override
-    public long countGalleryPosts() {
+    public long countGalleryPosts(String userPK) {
         return entityManager.createQuery("""
                 select count(p)
                 from Post p
                 where p.images is not empty
-                """, Long.class)
+                and
+                """ + ContentVisibility.POST, Long.class)
+            .setParameter("userPK", userPK)
             .getSingleResult();
     }
 
     @Override
-    public List<Post> findGalleryPageByIsbn(String isbn, GalleryCursor cursor, int limit) {
-        List<Long> postIds = findGalleryPostIdsByIsbn(isbn, cursor, limit);
+    public List<Post> findGalleryPageByIsbn(String isbn, GalleryCursor cursor, int limit, String userPK) {
+        List<Long> postIds = findGalleryPostIdsByIsbn(isbn, cursor, limit, userPK);
         if (postIds.isEmpty()) {
             return List.of();
         }
@@ -44,13 +46,15 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
     }
 
     @Override
-    public long countGalleryPostsByIsbn(String isbn) {
+    public long countGalleryPostsByIsbn(String isbn, String userPK) {
         return entityManager.createQuery("""
                 select count(p)
                 from Post p
                 where p.images is not empty
                 and p.bookInfo.isbn = :isbn
-                """, Long.class)
+                and
+                """ + ContentVisibility.POST, Long.class)
+            .setParameter("userPK", userPK)
             .setParameter("isbn", isbn)
             .getSingleResult();
     }
@@ -77,14 +81,17 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
             .toList();
     }
 
-    private List<Long> findGalleryPostIds(GalleryCursor cursor, int limit) {
+    private List<Long> findGalleryPostIds(GalleryCursor cursor, int limit, String userPK) {
         if (cursor == null) {
             return entityManager.createQuery("""
                     select p.postId
                     from Post p
                     where p.images is not empty
+                    and
+                    """ + ContentVisibility.POST + """
                     order by p.createdAt desc, p.postId desc
                     """, Long.class)
+                .setParameter("userPK", userPK)
                 .setMaxResults(limit)
                 .getResultList();
         }
@@ -93,27 +100,33 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
                 select p.postId
                 from Post p
                 where p.images is not empty
+                and
+                """ + ContentVisibility.POST + """
                 and (
                     p.createdAt < :cursorCreatedAt
                     or (p.createdAt = :cursorCreatedAt and p.postId < :cursorGalleryId)
                 )
                 order by p.createdAt desc, p.postId desc
                 """, Long.class)
+            .setParameter("userPK", userPK)
             .setParameter("cursorCreatedAt", cursor.createdAt())
             .setParameter("cursorGalleryId", cursor.galleryId())
             .setMaxResults(limit)
             .getResultList();
     }
 
-    private List<Long> findGalleryPostIdsByIsbn(String isbn, GalleryCursor cursor, int limit) {
+    private List<Long> findGalleryPostIdsByIsbn(String isbn, GalleryCursor cursor, int limit, String userPK) {
         if (cursor == null) {
             return entityManager.createQuery("""
                     select p.postId
                     from Post p
                     where p.images is not empty
                     and p.bookInfo.isbn = :isbn
+                    and
+                    """ + ContentVisibility.POST + """
                     order by p.createdAt desc, p.postId desc
                     """, Long.class)
+                .setParameter("userPK", userPK)
                 .setParameter("isbn", isbn)
                 .setMaxResults(limit)
                 .getResultList();
@@ -124,12 +137,15 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
                 from Post p
                 where p.images is not empty
                 and p.bookInfo.isbn = :isbn
+                and
+                """ + ContentVisibility.POST + """
                 and (
                     p.createdAt < :cursorCreatedAt
                     or (p.createdAt = :cursorCreatedAt and p.postId < :cursorGalleryId)
                 )
                 order by p.createdAt desc, p.postId desc
                 """, Long.class)
+            .setParameter("userPK", userPK)
             .setParameter("isbn", isbn)
             .setParameter("cursorCreatedAt", cursor.createdAt())
             .setParameter("cursorGalleryId", cursor.galleryId())

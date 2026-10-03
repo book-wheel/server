@@ -416,12 +416,23 @@ class BookControllerTest {
         );
         CursorPageResponse<GalleryResponseDto> page =
                 CursorPageResponse.of(List.of(item), 18, 1L, false, null);
-        given(bookService.getGalleryByIsbn(eq(isbn), any(), any())).willReturn(page);
+        given(bookService.getGalleryByIsbn(eq(isbn), any(), any(), eq("user"))).willReturn(page);
 
         mockMvc.perform(get("/api/v1/books/{isbn}/gallery", isbn))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].postId").value(10L))
                 .andExpect(jsonPath("$.data.content[0].isbn").value(isbn));
+        verify(bookService).getGalleryByIsbn(isbn, null, 18, "user");
+    }
+
+    @Test
+    @WithMockUser(username = "viewer-pk")
+    void galleryUsesAuthenticatedViewerInsteadOfRequestParameter() throws Exception {
+        given(bookService.getGallery(null, 18, "viewer-pk"))
+                .willReturn(CursorPageResponse.of(List.of(), 18, 0L, false, null));
+        mockMvc.perform(get("/api/v1/books/gallery").param("userPK", "other-pk"))
+                .andExpect(status().isOk());
+        verify(bookService).getGallery(null, 18, "viewer-pk");
     }
 }

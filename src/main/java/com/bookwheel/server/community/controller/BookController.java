@@ -68,28 +68,30 @@ public class BookController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "교환독서 갤러리 목록 조회", description = "게시물에 업로드된 대표 이미지를 최신순 커서 페이징으로 조회합니다.")
+    @Operation(summary = "교환독서 갤러리 목록 조회", description = "게시물에 업로드된 대표 이미지를 최신순 커서 페이징으로 조회합니다. 내가 차단한 작성자의 게시물은 목록과 전체 개수에서 제외합니다.")
     @GetMapping("/gallery")
     public ApiResponse<CursorPageResponse<GalleryResponseDto>> getGallery(
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
         @Parameter(description = "한 번에 조회할 갤러리 개수 (1~50, 초과 시 400)", example = "18")
-        @RequestParam(required = false, defaultValue = "18") Integer size
+        @RequestParam(required = false, defaultValue = "18") Integer size,
+        @AuthenticationPrincipal Object principal
     ) {
-        CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(cursor, size);
+        CursorPageResponse<GalleryResponseDto> response = bookService.getGallery(cursor, size, getUserPK(principal));
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "특정 책 갤러리 목록 조회", description = "특정 책(ISBN)에 업로드된 게시물 대표 이미지를 최신순 커서 페이징으로 조회합니다.")
+    @Operation(summary = "특정 책 갤러리 목록 조회", description = "특정 책(ISBN)에 업로드된 게시물 대표 이미지를 최신순 커서 페이징으로 조회합니다. 내가 차단한 작성자의 게시물은 목록과 전체 개수에서 제외합니다.")
     @GetMapping("/{isbn}/gallery")
     public ApiResponse<CursorPageResponse<GalleryResponseDto>> getGalleryByIsbn(
         @PathVariable("isbn") String isbn,
         @Parameter(description = "다음 페이지 조회용 커서")
         @RequestParam(required = false) String cursor,
         @Parameter(description = "한 번에 조회할 갤러리 개수 (1~50, 초과 시 400)", example = "18")
-        @RequestParam(required = false, defaultValue = "18") Integer size
+        @RequestParam(required = false, defaultValue = "18") Integer size,
+        @AuthenticationPrincipal Object principal
     ) {
-        CursorPageResponse<GalleryResponseDto> response = bookService.getGalleryByIsbn(isbn, cursor, size);
+        CursorPageResponse<GalleryResponseDto> response = bookService.getGalleryByIsbn(isbn, cursor, size, getUserPK(principal));
         return ApiResponse.success(response);
     }
 
